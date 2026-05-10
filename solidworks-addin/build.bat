@@ -18,18 +18,18 @@ REM    build.bat /unregister  Unregister the COM add-in (requires Admin)
 REM ──────────────────────────────────────────────────────────────────────
 
 set PROJECT=TrentCAD.SolidWorksAddin\TrentCAD.SolidWorksAddin.csproj
-set OUTPUT=TrentCAD.SolidWorksAddin\bin\Release\net48
+set OUTPUT=%~dp0publish
 set DLL=%OUTPUT%\TrentCAD.SolidWorksAddin.dll
 
 if /i "%~1"=="/unregister" (
     echo Unregistering add-in...
-    %windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /unregister "%~dp0%DLL%"
+    %windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /unregister "%DLL%"
     echo Done. Restart SolidWorks.
     exit /b %ERRORLEVEL%
 )
 
 echo Building TrentCAD SolidWorks Add-in...
-dotnet build "%~dp0%PROJECT%" -c Release
+dotnet publish "%~dp0%PROJECT%" -c Release -o "%OUTPUT%"
 if %ERRORLEVEL% neq 0 (
     echo.
     echo Build failed. Make sure you have installed:
@@ -40,12 +40,12 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo Build succeeded: %~dp0%DLL%
+echo Build succeeded: %DLL%
 
 if /i "%~1"=="/register" (
     echo.
     echo Registering COM add-in (requires Administrator)...
-    %windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase "%~dp0%DLL%"
+    %windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase "%DLL%"
     if %ERRORLEVEL% neq 0 (
         echo.
         echo Registration failed. Right-click this script and "Run as Administrator".

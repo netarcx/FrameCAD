@@ -8,6 +8,7 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RootNamespace>TrentCAD.SolidWorksAddin</RootNamespace>
     <AssemblyName>TrentCAD.SolidWorksAddin</AssemblyName>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <SolidWorksInstalled Condition="Exists('C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll')">true</SolidWorksInstalled>
   </PropertyGroup>
 

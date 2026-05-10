@@ -21,12 +21,12 @@ jobs:
         with:
           dotnet-version: '8.x'
 
-      - name: Build add-in
-        run: dotnet build solidworks-addin/TrentCAD.SolidWorksAddin/TrentCAD.SolidWorksAddin.csproj -c Release
+      - name: Publish add-in
+        run: dotnet publish solidworks-addin/TrentCAD.SolidWorksAddin/TrentCAD.SolidWorksAddin.csproj -c Release -o solidworks-addin/publish
 
       - name: Upload add-in artifact
         uses: actions/upload-artifact@v4
         with:
           name: TrentCAD-SolidWorksAddin
-          path: solidworks-addin/TrentCAD.SolidWorksAddin/bin/Release/net48/
+          path: solidworks-addin/publish/
           retention-days: 90
