@@ -1,0 +1,143 @@
+import { useMemo } from 'react'
+import { useGit } from './hooks/useGit'
+import ProjectSetup from './components/ProjectSetup'
+import ProjectBrowser from './components/ProjectBrowser'
+import Toolbar from './components/Toolbar'
+import ActivityFeed from './components/ActivityFeed'
+import DetailsPanel from './components/DetailsPanel'
+import type { FileEntry } from '@shared/types'
+
+function countByState(files: FileEntry[], state: string): number {
+  let count = 0
+  for (const f of files) {
+    if (!f.isDirectory && f.state === state) count++
+    if (f.children) count += countByState(f.children, state)
+  }
+  return count
+}
+
+export default function App() {
+  const {
+    project,
+    files,
+    history,
+    locks,
+    isLoading,
+    error,
+    selectedFile,
+    setSelectedFile,
+    createProject,
+    joinProject,
+    openProject,
+    sync,
+    publish,
+    checkOut,
+    checkIn,
+    dismissError
+  } = useGit()
+
+  const stats = useMemo(() => ({
+    modified: countByState(files, 'modified'),
+    untracked: countByState(files, 'untracked'),
+    lockedByYou: countByState(files, 'locked-by-you'),
+    lockedByOther: countByState(files, 'locked-by-other')
+  }), [files])
+
+  if (!project) {
+    return (
+      <div className="app">
+        {error && (
+          <div className="error-banner">
+            <span>{error}</span>
+            <button onClick={dismissError}>{'×'}</button>
+          </div>
+        )}
+        <ProjectSetup
+          onCreateProject={createProject}
+          onJoinProject={joinProject}
+          onOpenProject={openProject}
+          isLoading={isLoading}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="app">
+      {error && (
+        <div className="error-banner">
+          <span>{error}</span>
+          <button onClick={dismissError}>{'×'}</button>
+        </div>
+      )}
+
+      <div className="app-header">
+        <span className="logo">TrentCAD</span>
+        <span className="divider" />
+        <span className="project-name">{project.name}</span>
+        <span className="spacer" />
+        <span className="team-badge">FRC 2129</span>
+      </div>
+
+      <Toolbar
+        onSync={sync}
+        onPublish={publish}
+        onCheckOut={checkOut}
+        onCheckIn={checkIn}
+        selectedFile={selectedFile}
+        isLoading={isLoading}
+        hasProject={true}
+      />
+
+      <div className="app-body">
+        <div className="file-panel">
+          <ProjectBrowser
+            files={files}
+            selectedFile={selectedFile}
+            onSelect={setSelectedFile}
+            onCheckOut={checkOut}
+            onCheckIn={checkIn}
+          />
+          <ActivityFeed history={history} />
+        </div>
+        <DetailsPanel
+          file={selectedFile}
+          onCheckOut={checkOut}
+          onCheckIn={checkIn}
+        />
+      </div>
+
+      <div className="status-bar">
+        {stats.modified > 0 && (
+          <span className="status-item">
+            <span className="status-dot modified" />
+            {stats.modified} modified
+          </span>
+        )}
+        {stats.untracked > 0 && (
+          <span className="status-item">
+            <span className="status-dot untracked" />
+            {stats.untracked} new
+          </span>
+        )}
+        {stats.lockedByYou > 0 && (
+          <span className="status-item">
+            <span className="status-dot locked-by-you" />
+            {stats.lockedByYou} checked out by you
+          </span>
+        )}
+        {stats.lockedByOther > 0 && (
+          <span className="status-item">
+            <span className="status-dot locked-by-other" />
+            {stats.lockedByOther} locked by others
+          </span>
+        )}
+        {locks.length > 0 && (
+          <span className="status-item">
+            {locks.length} total lock{locks.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}

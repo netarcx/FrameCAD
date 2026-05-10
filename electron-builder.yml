@@ -1,0 +1,24 @@
+appId: com.trentcad.app
+productName: TrentCAD
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+  - "!node_modules/**/*"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${name}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  artifactName: ${name}-${version}.${ext}

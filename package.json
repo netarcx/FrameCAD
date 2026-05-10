@@ -1,0 +1,30 @@
+{
+  "name": "trentcad",
+  "version": "0.1.0",
+  "description": "CAD collaboration tool for FRC robotics teams",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "ELECTRON_DISABLE_SANDBOX=1 electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-vite build && electron-builder --config electron-builder.yml"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^4.0.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^35.1.2",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.4"
+  }
+}
