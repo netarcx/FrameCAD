@@ -19,18 +19,18 @@ namespace TrentCAD.SolidWorksAddin
         private const int BtnGap = 4;
         private const int SectionGap = 16;
 
-        // Catppuccin Mocha
-        static readonly Color CBase = Color.FromArgb(30, 30, 46);
-        static readonly Color CMantle = Color.FromArgb(24, 24, 37);
-        static readonly Color CSurface0 = Color.FromArgb(49, 50, 68);
-        static readonly Color CSurface1 = Color.FromArgb(69, 71, 90);
-        static readonly Color COverlay0 = Color.FromArgb(108, 112, 134);
-        static readonly Color CSubtext = Color.FromArgb(166, 173, 200);
-        static readonly Color CText = Color.FromArgb(205, 214, 244);
-        static readonly Color CBlue = Color.FromArgb(137, 180, 250);
-        static readonly Color CGreen = Color.FromArgb(166, 227, 161);
-        static readonly Color CRed = Color.FromArgb(243, 139, 168);
-        static readonly Color CYellow = Color.FromArgb(249, 226, 175);
+        // Slate Grey + Purple
+        static readonly Color CBase = Color.FromArgb(28, 31, 38);
+        static readonly Color CMantle = Color.FromArgb(22, 25, 32);
+        static readonly Color CSurface0 = Color.FromArgb(40, 44, 52);
+        static readonly Color CSurface1 = Color.FromArgb(53, 58, 69);
+        static readonly Color COverlay0 = Color.FromArgb(107, 112, 128);
+        static readonly Color CSubtext = Color.FromArgb(160, 165, 180);
+        static readonly Color CText = Color.FromArgb(220, 223, 230);
+        static readonly Color CBlue = Color.FromArgb(167, 139, 250);
+        static readonly Color CGreen = Color.FromArgb(134, 239, 172);
+        static readonly Color CRed = Color.FromArgb(251, 113, 133);
+        static readonly Color CYellow = Color.FromArgb(252, 211, 77);
 
         private StatusDot _dot;
         private Label _lblConnection;
@@ -129,7 +129,7 @@ namespace TrentCAD.SolidWorksAddin
             _btnOpenApp.ForeColor = CMantle;
             _btnOpenApp.Font = new Font("Segoe UI Semibold", 9f);
             _btnOpenApp.FlatAppearance.BorderSize = 0;
-            _btnOpenApp.FlatAppearance.MouseOverBackColor = Color.FromArgb(116, 162, 234);
+            _btnOpenApp.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 181, 253);
             _btnOpenApp.Enabled = true;
             _btnOpenApp.Click += (s, e) => DoOpenApp();
             Controls.Add(_btnOpenApp);
@@ -239,13 +239,15 @@ namespace TrentCAD.SolidWorksAddin
             try { BeginInvoke(action); } catch (ObjectDisposedException) { }
         }
 
+        private bool _connected;
+
         private void SetButtonStates(bool canCheckOut, bool canCheckIn)
         {
-            _btnCheckOut.Enabled = canCheckOut && !_busy;
-            _btnCheckIn.Enabled = canCheckIn && !_busy;
-            _btnSync.Enabled = !_busy;
-            _btnPublish.Enabled = !_busy;
-            _btnNewPart.Enabled = !_busy;
+            _btnCheckOut.Enabled = _connected && canCheckOut && !_busy;
+            _btnCheckIn.Enabled = _connected && canCheckIn && !_busy;
+            _btnSync.Enabled = _connected && !_busy;
+            _btnPublish.Enabled = _connected && !_busy;
+            _btnNewPart.Enabled = _connected && !_busy;
         }
 
         protected override void Dispose(bool disposing)
@@ -277,15 +279,20 @@ namespace TrentCAD.SolidWorksAddin
         {
             try
             {
-                var connected = await _api.IsConnectedAsync();
+                var wasConnected = _connected;
+                var health = await _api.GetHealthAsync();
+                var isConnected = health?.Running == true;
                 SafeInvoke(() =>
                 {
-                    if (connected)
+                    _connected = isConnected;
+                    if (isConnected)
                     {
                         _dot.DotColor = CGreen;
-                        _lblConnection.Text = "Connected";
-                        _btnSync.Enabled = !_busy;
-                        _btnPublish.Enabled = !_busy;
+                        var projectName = health?.Project?.Name;
+                        _lblConnection.Text = string.IsNullOrEmpty(projectName) ? "Connected" : projectName;
+                        SetButtonStates(false, false);
+                        if (!wasConnected && !string.IsNullOrEmpty(_currentFilePath))
+                            UpdateForDocument(_currentFilePath);
                     }
                     else
                     {
@@ -295,7 +302,16 @@ namespace TrentCAD.SolidWorksAddin
                     }
                 });
             }
-            catch { }
+            catch
+            {
+                SafeInvoke(() =>
+                {
+                    _connected = false;
+                    _dot.DotColor = CRed;
+                    _lblConnection.Text = "Not Running";
+                    SetButtonStates(false, false);
+                });
+            }
         }
 
         public async void UpdateForDocument(string absolutePath)
@@ -489,7 +505,22 @@ namespace TrentCAD.SolidWorksAddin
                 try
                 {
                     var desc = string.IsNullOrWhiteSpace(dialog.Description) ? null : dialog.Description;
-                    if (dialog.SelectedType == NewItemType.Assembly)
+                    if (dialog.SelectedType == NewItemType.Folder)
+                    {
+                        var name = dialog.ItemName;
+                        if (string.IsNullOrWhiteSpace(name))
+                        {
+                            ShowMessage("Folder name is required", true);
+                            return;
+                        }
+                        var result = await _api.CreateSubsystemAsync(name);
+                        SafeInvoke(() =>
+                        {
+                            if (result.Success) ShowMessage($"Created {result.FolderPath}");
+                            else ShowMessage(result.Error ?? "Failed", true);
+                        });
+                    }
+                    else if (dialog.SelectedType == NewItemType.Assembly)
                     {
                         var name = dialog.ItemName;
                         if (string.IsNullOrWhiteSpace(name))

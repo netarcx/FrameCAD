@@ -29,3 +29,8 @@ linux:
       arch:
         - x64
   artifactName: ${name}-${version}.${ext}
+publish:
+  provider: github
+  owner: netarcx
+  repo: TrentCAD
+  releaseType: release

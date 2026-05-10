@@ -48,6 +48,8 @@ namespace TrentCAD.SolidWorksAddin
             CreateTaskPane();
             _taskPaneControl?.StartHealthPolling();
 
+            OnActiveDocChange();
+
             return true;
         }
 

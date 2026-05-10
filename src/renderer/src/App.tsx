@@ -6,7 +6,7 @@ import ProjectBrowser from './components/ProjectBrowser'
 import Toolbar from './components/Toolbar'
 import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
-import type { FileEntry } from '@shared/types'
+import type { FileEntry, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
   let count = 0
@@ -36,6 +36,7 @@ export default function App() {
     checkIn,
     createNewPart,
     createNewAssembly,
+    createSubsystem,
     driveStatus,
     connectDrive,
     disconnectDrive,
@@ -47,6 +48,9 @@ export default function App() {
   const [showProfileEdit, setShowProfileEdit] = useState(false)
   const [gitName, setGitName] = useState('')
   const [gitEmail, setGitEmail] = useState('')
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null)
+  const [updateReady, setUpdateReady] = useState(false)
 
   useEffect(() => {
     window.api.getGitIdentity().then(({ name, email }) => {
@@ -55,6 +59,18 @@ export default function App() {
       setNeedsProfile(!name || !email)
       setIdentityChecked(true)
     }).catch(() => setIdentityChecked(true))
+  }, [])
+
+  useEffect(() => {
+    const cleanups = [
+      window.api.onUpdateAvailable((info) => setUpdateInfo(info)),
+      window.api.onUpdateDownloadProgress(({ percent }) => setUpdateProgress(percent)),
+      window.api.onUpdateDownloaded(() => {
+        setUpdateProgress(null)
+        setUpdateReady(true)
+      })
+    ]
+    return () => cleanups.forEach(fn => fn())
   }, [])
 
   const handleProfileComplete = useCallback(() => {
@@ -116,6 +132,26 @@ export default function App() {
 
   return (
     <div className="app">
+      {updateInfo && (
+        <div className="update-banner">
+          {updateReady ? (
+            <>
+              <span>Update v{updateInfo.version} ready to install</span>
+              <button onClick={() => window.api.restartToUpdate()}>Restart Now</button>
+            </>
+          ) : updateProgress != null ? (
+            <>
+              <span>Downloading v{updateInfo.version}... {updateProgress}%</span>
+              <div className="update-progress">
+                <div className="update-progress-bar" style={{ width: `${updateProgress}%` }} />
+              </div>
+            </>
+          ) : (
+            <span>Update v{updateInfo.version} available — downloading...</span>
+          )}
+        </div>
+      )}
+
       {error && (
         <div className="error-banner">
           <span>{error}</span>
@@ -159,6 +195,7 @@ export default function App() {
         onCheckIn={checkIn}
         onNewPart={createNewPart}
         onNewAssembly={createNewAssembly}
+        onNewSubsystem={createSubsystem}
         selectedFile={selectedFile}
         isLoading={isLoading}
         hasProject={true}

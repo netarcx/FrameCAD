@@ -174,6 +174,10 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     return driveOps.syncToDrive()
   })
 
+  ipcMain.handle('create-subsystem', async (_e, parentFolder: string, name: string) => {
+    return partsOps.createSubsystem(parentFolder, name)
+  })
+
   ipcMain.handle('get-recent-projects', async () => {
     return getRecentProjects()
   })

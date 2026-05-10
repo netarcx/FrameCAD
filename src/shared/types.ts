@@ -81,6 +81,10 @@ export interface DriveSyncResult {
   error?: string
 }
 
+export interface UpdateInfo {
+  version: string
+}
+
 export interface AppState {
   currentProject: ProjectConfig | null
   files: FileEntry[]
@@ -112,10 +116,15 @@ export interface IpcApi {
   getDriveStatus(): Promise<DriveStatus>
   syncToDrive(): Promise<DriveSyncResult>
   getRecentProjects(): Promise<ProjectConfig[]>
+  createSubsystem(parentFolder: string, name: string): Promise<{ folderPath: string }>
   getGitIdentity(): Promise<{ name: string; email: string }>
   setGitIdentity(name: string, email: string): Promise<void>
+  restartToUpdate(): Promise<void>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
+  onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void
+  onUpdateDownloadProgress(callback: (progress: { percent: number }) => void): () => void
+  onUpdateDownloaded(callback: () => void): () => void
 }
 
 declare global {

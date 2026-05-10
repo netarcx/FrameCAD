@@ -8,6 +8,7 @@ interface Props {
   onCheckIn: (path: string) => void
   onNewPart: (folder: string, description?: string) => Promise<{ partNumber: string; filePath: string } | null>
   onNewAssembly: (parentFolder: string, name: string, description?: string) => Promise<{ partNumber: string; filePath: string } | null>
+  onNewSubsystem: (parentFolder: string, name: string) => Promise<{ folderPath: string } | null>
   selectedFile: FileEntry | null
   isLoading: boolean
   hasProject: boolean
@@ -19,7 +20,7 @@ function getSelectedFolder(file: FileEntry | null): string {
   return file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : ''
 }
 
-export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNewPart, onNewAssembly, selectedFile, isLoading, hasProject }: Props) {
+export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNewPart, onNewAssembly, onNewSubsystem, selectedFile, isLoading, hasProject }: Props) {
   const [showPublish, setShowPublish] = useState(false)
   const [message, setMessage] = useState('')
   const [showNewPart, setShowNewPart] = useState(false)
@@ -27,7 +28,10 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
   const [partDescription, setPartDescription] = useState('')
   const [assemblyName, setAssemblyName] = useState('')
   const [assemblyDescription, setAssemblyDescription] = useState('')
+  const [showNewSubsystem, setShowNewSubsystem] = useState(false)
+  const [subsystemName, setSubsystemName] = useState('')
   const [createdInfo, setCreatedInfo] = useState<{ partNumber: string; filePath: string } | null>(null)
+  const [createdFolder, setCreatedFolder] = useState<string | null>(null)
 
   const handlePublish = () => {
     if (!message.trim()) return
@@ -48,6 +52,17 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
       setCreatedInfo(result)
       setPartDescription('')
       setShowNewPart(false)
+    }
+  }
+
+  const handleNewSubsystem = async () => {
+    if (!subsystemName.trim()) return
+    const parentFolder = getSelectedFolder(selectedFile)
+    const result = await onNewSubsystem(parentFolder, subsystemName.trim())
+    if (result) {
+      setCreatedFolder(result.folderPath)
+      setSubsystemName('')
+      setShowNewSubsystem(false)
     }
   }
 
@@ -131,6 +146,14 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
             title="Create a new assembly folder with an assigned part number"
           >
             + Assembly
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => setShowNewSubsystem(true)}
+            disabled={!hasProject || isLoading}
+            title="Create a new folder to organize files"
+          >
+            + Folder
           </button>
         </div>
 
@@ -228,6 +251,62 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
                 disabled={!assemblyName.trim() || isLoading}
               >
                 Create Assembly
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewSubsystem && (
+        <div className="modal-overlay" onClick={() => setShowNewSubsystem(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>New Folder</h2>
+            <div className="modal-info">
+              Creating in: <span className="modal-path">{currentFolder || '/ (project root)'}</span>
+            </div>
+            <input
+              value={subsystemName}
+              onChange={e => setSubsystemName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleNewSubsystem()
+                if (e.key === 'Escape') setShowNewSubsystem(false)
+              }}
+              placeholder="Folder name (e.g., Drivetrain)"
+              autoFocus
+            />
+            <div className="actions">
+              <button className="toolbar-btn" onClick={() => setShowNewSubsystem(false)}>Cancel</button>
+              <button
+                className="toolbar-btn primary"
+                onClick={handleNewSubsystem}
+                disabled={!subsystemName.trim() || isLoading}
+              >
+                Create Folder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createdFolder && (
+        <div className="modal-overlay" onClick={() => setCreatedFolder(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Folder Created</h2>
+            <div className="created-details">
+              <div className="created-path">{createdFolder}</div>
+            </div>
+            <div className="actions">
+              <button
+                className="toolbar-btn"
+                onClick={() => {
+                  window.api.openFileExplorer(createdFolder + '/.gitkeep')
+                  setCreatedFolder(null)
+                }}
+              >
+                Show in Explorer
+              </button>
+              <button className="toolbar-btn primary" onClick={() => setCreatedFolder(null)}>
+                Done
               </button>
             </div>
           </div>

@@ -134,6 +134,16 @@ namespace TrentCAD.SolidWorksAddin
             return JsonSerializer.Deserialize<CreatePartResult>(json);
         }
 
+        public async Task<CreateSubsystemResult> CreateSubsystemAsync(string name, string parentFolder = "")
+        {
+            var obj = new Dictionary<string, string> { { "name", name }, { "parentFolder", parentFolder } };
+            var body = JsonSerializer.Serialize(obj);
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var response = await Client.PostAsync($"{_baseUrl}/api/parts/new-subsystem", content);
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<CreateSubsystemResult>(json);
+        }
+
         public async Task<List<LockInfo>> GetLocksAsync()
         {
             var response = await Client.GetAsync($"{_baseUrl}/api/locks");

@@ -71,6 +71,18 @@ namespace TrentCAD.SolidWorksAddin.Models
         public string Error { get; set; }
     }
 
+    public class CreateSubsystemResult
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("folderPath")]
+        public string FolderPath { get; set; }
+
+        [JsonPropertyName("error")]
+        public string Error { get; set; }
+    }
+
     public class LockInfo
     {
         [JsonPropertyName("path")]

@@ -65,11 +65,17 @@ const api: IpcApi = {
   getRecentProjects: () =>
     ipcRenderer.invoke('get-recent-projects'),
 
+  createSubsystem: (parentFolder, name) =>
+    ipcRenderer.invoke('create-subsystem', parentFolder, name),
+
   getGitIdentity: () =>
     ipcRenderer.invoke('get-git-identity'),
 
   setGitIdentity: (name, email) =>
     ipcRenderer.invoke('set-git-identity', name, email),
+
+  restartToUpdate: () =>
+    ipcRenderer.invoke('restart-to-update'),
 
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
@@ -83,6 +89,26 @@ const api: IpcApi = {
       callback(error)
     ipcRenderer.on('error', handler)
     return () => ipcRenderer.removeListener('error', handler)
+  },
+
+  onUpdateAvailable: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, info: unknown) =>
+      callback(info as Parameters<typeof callback>[0])
+    ipcRenderer.on('update-available', handler)
+    return () => ipcRenderer.removeListener('update-available', handler)
+  },
+
+  onUpdateDownloadProgress: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: unknown) =>
+      callback(progress as Parameters<typeof callback>[0])
+    ipcRenderer.on('update-download-progress', handler)
+    return () => ipcRenderer.removeListener('update-download-progress', handler)
+  },
+
+  onUpdateDownloaded: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('update-downloaded', handler)
+    return () => ipcRenderer.removeListener('update-downloaded', handler)
   }
 }
 

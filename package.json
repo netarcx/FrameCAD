@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "chokidar": "^4.0.3",
+    "electron-updater": "^6.8.3",
     "googleapis": "^171.4.0",
     "simple-git": "^3.27.0"
   },

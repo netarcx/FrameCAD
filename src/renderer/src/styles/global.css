@@ -1,19 +1,19 @@
 :root {
-  --bg-primary: #1e1e2e;
-  --bg-secondary: #181825;
-  --bg-surface: #313244;
-  --bg-hover: #45475a;
-  --bg-selected: #3b3d57;
-  --text-primary: #cdd6f4;
-  --text-secondary: #a6adc8;
-  --text-muted: #6c7086;
-  --accent: #89b4fa;
-  --accent-hover: #74c7ec;
-  --green: #a6e3a1;
-  --yellow: #f9e2af;
-  --red: #f38ba8;
-  --blue: #89b4fa;
-  --border: #45475a;
+  --bg-primary: #1c1f26;
+  --bg-secondary: #161920;
+  --bg-surface: #282c34;
+  --bg-hover: #353a45;
+  --bg-selected: #2e3347;
+  --text-primary: #dcdfe6;
+  --text-secondary: #a0a5b4;
+  --text-muted: #6b7080;
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --green: #86efac;
+  --yellow: #fcd34d;
+  --red: #fb7185;
+  --blue: #a78bfa;
+  --border: #353a45;
   --radius: 6px;
 }
 
@@ -790,6 +790,47 @@ input {
 }
 
 /* ─── Utilities ─── */
+
+.update-banner {
+  padding: 8px 16px;
+  background: rgba(137, 180, 250, 0.15);
+  border-bottom: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-banner button {
+  color: var(--bg-primary);
+  background: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+
+.update-banner button:hover {
+  background: var(--accent-hover);
+}
+
+.update-progress {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-surface);
+  border-radius: 2px;
+  overflow: hidden;
+  max-width: 200px;
+}
+
+.update-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
 
 .error-banner {
   padding: 8px 16px;

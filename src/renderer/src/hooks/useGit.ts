@@ -194,6 +194,18 @@ export function useGit() {
     }
   }, [])
 
+  const createSubsystem = useCallback(async (parentFolder: string, name: string) => {
+    setError(null)
+    try {
+      const result = await window.api.createSubsystem(parentFolder, name)
+      await fetchAll()
+      return result
+    } catch (err) {
+      setError((err as Error).message)
+      return null
+    }
+  }, [])
+
   const createNewAssembly = useCallback(async (parentFolder: string, name: string, description?: string) => {
     setError(null)
     try {
@@ -226,6 +238,7 @@ export function useGit() {
     checkIn,
     createNewPart,
     createNewAssembly,
+    createSubsystem,
     driveStatus,
     connectDrive,
     disconnectDrive,

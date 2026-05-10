@@ -1,17 +1,20 @@
-name: Build Windows Installer
+name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build:
+  release:
     runs-on: windows-2022
+
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -30,14 +33,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and package
-        run: npx electron-vite build && npx electron-builder --config electron-builder.yml --publish never
+      - name: Build and publish
+        run: npx electron-vite build && npx electron-builder --config electron-builder.yml --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload installer
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: TrentCAD-Installer
           path: |
             dist/*.exe
             !dist/*-uninstaller-*.exe
+          retention-days: 90
+
+      - name: Upload add-in artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrentCAD-SolidWorksAddin
+          path: build/solidworks-addin/
           retention-days: 90

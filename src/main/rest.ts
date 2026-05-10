@@ -180,6 +180,22 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         return
       }
 
+      case 'POST /api/parts/new-subsystem': {
+        const body = parseJson(await readBody(req)) as {
+          parentFolder?: string
+          name?: string
+        } | null
+        if (!body?.name) {
+          json(res, 400, { error: 'Missing name for subsystem' })
+          return
+        }
+        const result = await serialWrite(() =>
+          partsOps.createSubsystem(body.parentFolder ?? '', body.name!)
+        )
+        json(res, 200, { success: true, ...result })
+        return
+      }
+
       case 'POST /api/parts/new-assembly': {
         const body = parseJson(await readBody(req)) as {
           parentFolder?: string

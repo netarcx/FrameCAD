@@ -320,6 +320,18 @@ export async function createNewAssembly(
   return { partNumber, filePath: relPath }
 }
 
+export async function createSubsystem(
+  parentFolder: string,
+  name: string
+): Promise<{ folderPath: string }> {
+  const projectDir = getProjectPath()
+  const folderPath = parentFolder ? `${parentFolder}/${name}` : name
+  const fullPath = path.join(projectDir, folderPath)
+  await fs.mkdir(fullPath, { recursive: true })
+  await fs.writeFile(path.join(fullPath, '.gitkeep'), '')
+  return { folderPath }
+}
+
 export function annotatePartNumbers(entries: FileEntry[], manifest: PartsManifest): void {
   for (const entry of entries) {
     if (!entry.isDirectory && manifest.entries[entry.path]) {

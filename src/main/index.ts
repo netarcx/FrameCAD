@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron'
 import path from 'path'
 import { is } from '@electron-toolkit/utils'
 import { setupIpc, stopWatching, stopRestServer } from './ipc'
+import { initAutoUpdater } from './updater'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -44,6 +45,7 @@ setupIpc(() => mainWindow)
 
 app.whenReady().then(() => {
   createWindow()
+  initAutoUpdater(() => mainWindow)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

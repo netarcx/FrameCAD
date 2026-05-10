@@ -16,14 +16,14 @@ namespace TrentCAD.SolidWorksAddin
             StartPosition = FormStartPosition.CenterScreen;
             MaximizeBox = false;
             MinimizeBox = false;
-            BackColor = Color.FromArgb(30, 30, 46);
-            ForeColor = Color.FromArgb(205, 214, 244);
+            BackColor = Color.FromArgb(28, 31, 38);
+            ForeColor = Color.FromArgb(220, 223, 230);
             Font = new Font("Segoe UI", 9.75f);
 
             var lbl = new Label
             {
                 Text = "What changed?",
-                ForeColor = Color.FromArgb(166, 173, 200),
+                ForeColor = Color.FromArgb(160, 165, 180),
                 Font = new Font("Segoe UI", 8.25f),
                 Location = new Point(20, 20),
                 AutoSize = true
@@ -34,8 +34,8 @@ namespace TrentCAD.SolidWorksAddin
             {
                 Location = new Point(20, 40),
                 Size = new Size(310, 26),
-                BackColor = Color.FromArgb(49, 50, 68),
-                ForeColor = Color.FromArgb(205, 214, 244),
+                BackColor = Color.FromArgb(40, 44, 52),
+                ForeColor = Color.FromArgb(220, 223, 230),
                 BorderStyle = BorderStyle.FixedSingle
             };
             Controls.Add(_txtMessage);
@@ -47,11 +47,11 @@ namespace TrentCAD.SolidWorksAddin
                 Location = new Point(164, 80),
                 Size = new Size(80, 30),
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(49, 50, 68),
-                ForeColor = Color.FromArgb(205, 214, 244)
+                BackColor = Color.FromArgb(40, 44, 52),
+                ForeColor = Color.FromArgb(220, 223, 230)
             };
-            btnCancel.FlatAppearance.BorderColor = Color.FromArgb(69, 71, 90);
-            btnCancel.FlatAppearance.MouseOverBackColor = Color.FromArgb(69, 71, 90);
+            btnCancel.FlatAppearance.BorderColor = Color.FromArgb(53, 58, 69);
+            btnCancel.FlatAppearance.MouseOverBackColor = Color.FromArgb(53, 58, 69);
             Controls.Add(btnCancel);
 
             var btnPublish = new Button
@@ -61,12 +61,12 @@ namespace TrentCAD.SolidWorksAddin
                 Location = new Point(250, 80),
                 Size = new Size(80, 30),
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(137, 180, 250),
-                ForeColor = Color.FromArgb(30, 30, 46),
+                BackColor = Color.FromArgb(167, 139, 250),
+                ForeColor = Color.FromArgb(28, 31, 38),
                 Font = new Font("Segoe UI Semibold", 9.75f)
             };
             btnPublish.FlatAppearance.BorderSize = 0;
-            btnPublish.FlatAppearance.MouseOverBackColor = Color.FromArgb(116, 162, 234);
+            btnPublish.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 181, 253);
             Controls.Add(btnPublish);
 
             AcceptButton = btnPublish;
