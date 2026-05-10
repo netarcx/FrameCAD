@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using TrentCAD.SolidWorksAddin.Models;
 
@@ -13,172 +14,223 @@ namespace TrentCAD.SolidWorksAddin
         private bool _busy;
         private bool _disposed;
 
-        private Label _lblTitle;
+        private const int Pad = 12;
+        private const int BtnHeight = 32;
+        private const int BtnGap = 4;
+        private const int SectionGap = 16;
+
+        // Catppuccin Mocha
+        static readonly Color CBase = Color.FromArgb(30, 30, 46);
+        static readonly Color CMantle = Color.FromArgb(24, 24, 37);
+        static readonly Color CSurface0 = Color.FromArgb(49, 50, 68);
+        static readonly Color CSurface1 = Color.FromArgb(69, 71, 90);
+        static readonly Color COverlay0 = Color.FromArgb(108, 112, 134);
+        static readonly Color CSubtext = Color.FromArgb(166, 173, 200);
+        static readonly Color CText = Color.FromArgb(205, 214, 244);
+        static readonly Color CBlue = Color.FromArgb(137, 180, 250);
+        static readonly Color CGreen = Color.FromArgb(166, 227, 161);
+        static readonly Color CRed = Color.FromArgb(243, 139, 168);
+        static readonly Color CYellow = Color.FromArgb(249, 226, 175);
+
+        private StatusDot _dot;
         private Label _lblConnection;
         private Panel _pnlConnection;
 
-        private GroupBox _grpFile;
+        private Panel _pnlFileCard;
         private Label _lblFileName;
         private Label _lblPartNumber;
+        private Label _lblDescription;
         private Label _lblStatus;
         private Label _lblLockedBy;
-        private Label _lblDescription;
 
-        private Button _btnCheckOut;
-        private Button _btnCheckIn;
-        private Button _btnSync;
-        private Button _btnPublish;
-
+        private Button _btnCheckOut, _btnCheckIn;
+        private Button _btnSync, _btnPublish;
+        private Button _btnNewPart;
+        private Button _btnOpenApp;
         private Label _lblMessage;
 
         public TaskPaneControl()
         {
-            InitializeControls();
+            SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
+            BackColor = CBase;
+            AutoScroll = true;
+            BuildUI();
+            Resize += (s, e) => LayoutAll();
         }
 
-        private void InitializeControls()
+        private void BuildUI()
         {
-            BackColor = Color.FromArgb(30, 30, 46);
-            AutoScroll = true;
-            Padding = new Padding(12);
-
-            var y = 12;
-
-            _lblTitle = new Label
+            // --- Header ---
+            var title = new Label
             {
                 Text = "TrentCAD",
-                Font = new Font("Segoe UI", 14f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(137, 180, 250),
-                Location = new Point(12, y),
+                Font = new Font("Segoe UI Semibold", 13f),
+                ForeColor = CText,
+                Location = new Point(Pad, 10),
                 AutoSize = true
             };
-            Controls.Add(_lblTitle);
-            y += 36;
+            Controls.Add(title);
 
-            _pnlConnection = new Panel
-            {
-                Location = new Point(12, y),
-                Size = new Size(220, 24),
-                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
-            };
-            var dot = new Panel
-            {
-                Size = new Size(8, 8),
-                Location = new Point(0, 8),
-                BackColor = Color.Gray
-            };
-            dot.Name = "connectionDot";
-            _pnlConnection.Controls.Add(dot);
+            // --- Connection ---
+            _pnlConnection = new Panel { Size = new Size(200, 20) };
+            _dot = new StatusDot { Location = new Point(0, 5), BackColor = Color.Transparent };
+            _dot.DotColor = COverlay0;
+            _pnlConnection.Controls.Add(_dot);
             _lblConnection = new Label
             {
                 Text = "Checking...",
-                ForeColor = Color.FromArgb(166, 173, 200),
-                Font = new Font("Segoe UI", 9f),
-                Location = new Point(14, 3),
+                ForeColor = CSubtext,
+                Font = new Font("Segoe UI", 8.25f),
+                Location = new Point(14, 2),
                 AutoSize = true
             };
             _pnlConnection.Controls.Add(_lblConnection);
             Controls.Add(_pnlConnection);
-            y += 34;
 
-            _grpFile = new GroupBox
+            // --- File info card ---
+            _pnlFileCard = new Panel
             {
-                Text = "Current File",
-                ForeColor = Color.FromArgb(166, 173, 200),
-                Font = new Font("Segoe UI", 9f),
-                Location = new Point(12, y),
-                Size = new Size(220, 160),
-                Visible = false,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
+                BackColor = CSurface0,
+                Visible = false
             };
 
-            var fy = 20;
-            _lblFileName = CreateInfoLabel(_grpFile, ref fy, "");
-            _lblFileName.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
-            _lblFileName.ForeColor = Color.FromArgb(205, 214, 244);
+            var cardY = 10;
+            _lblFileName = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI Semibold", 9.75f), CText);
+            _lblPartNumber = MakeLabel(_pnlFileCard, ref cardY, new Font("Consolas", 9.5f), CBlue);
+            _lblDescription = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI", 8.25f), CSubtext);
+            cardY += 4;
+            _lblStatus = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI", 8.25f), CSubtext);
+            _lblLockedBy = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI", 8.25f), CSubtext);
+            Controls.Add(_pnlFileCard);
 
-            _lblPartNumber = CreateInfoLabel(_grpFile, ref fy, "");
-            _lblPartNumber.Font = new Font("Consolas", 10f, FontStyle.Bold);
-            _lblPartNumber.ForeColor = Color.FromArgb(137, 180, 250);
-
-            _lblDescription = CreateInfoLabel(_grpFile, ref fy, "");
-            _lblDescription.ForeColor = Color.FromArgb(166, 173, 200);
-
-            _lblStatus = CreateInfoLabel(_grpFile, ref fy, "");
-            _lblLockedBy = CreateInfoLabel(_grpFile, ref fy, "");
-
-            Controls.Add(_grpFile);
-            y += 170;
-
-            _btnCheckOut = CreateButton("Check Out", y);
+            // --- Buttons ---
+            _btnCheckOut = MakeButton("Check Out");
             _btnCheckOut.Click += async (s, e) => await DoCheckOut();
             Controls.Add(_btnCheckOut);
-            y += 34;
 
-            _btnCheckIn = CreateButton("Check In", y);
+            _btnCheckIn = MakeButton("Check In");
             _btnCheckIn.Click += async (s, e) => await DoCheckIn();
             Controls.Add(_btnCheckIn);
-            y += 44;
 
-            _btnSync = CreateButton("Sync", y);
+            _btnSync = MakeButton("Sync");
             _btnSync.Click += async (s, e) => await DoSync();
             Controls.Add(_btnSync);
-            y += 34;
 
-            _btnPublish = CreateButton("Publish", y);
+            _btnPublish = MakeButton("Publish");
             _btnPublish.Click += async (s, e) => await DoPublish();
             Controls.Add(_btnPublish);
-            y += 44;
+
+            _btnNewPart = MakeButton("New Part / Assembly");
+            _btnNewPart.Click += async (s, e) => await DoNewPart();
+            Controls.Add(_btnNewPart);
+
+            _btnOpenApp = MakeButton("Open TrentCAD");
+            _btnOpenApp.BackColor = CBlue;
+            _btnOpenApp.ForeColor = CMantle;
+            _btnOpenApp.Font = new Font("Segoe UI Semibold", 9f);
+            _btnOpenApp.FlatAppearance.BorderSize = 0;
+            _btnOpenApp.FlatAppearance.MouseOverBackColor = Color.FromArgb(116, 162, 234);
+            _btnOpenApp.Enabled = true;
+            _btnOpenApp.Click += (s, e) => DoOpenApp();
+            Controls.Add(_btnOpenApp);
 
             _lblMessage = new Label
             {
                 Text = "",
-                ForeColor = Color.FromArgb(166, 173, 200),
+                ForeColor = CSubtext,
                 Font = new Font("Segoe UI", 8f),
-                Location = new Point(12, y),
-                Size = new Size(220, 40),
                 AutoSize = false,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
+                Size = new Size(200, 32)
             };
             Controls.Add(_lblMessage);
 
             SetButtonStates(false, false);
+            LayoutAll();
         }
 
-        private Label CreateInfoLabel(Control parent, ref int y, string text)
+        private void LayoutAll()
+        {
+            var w = ClientSize.Width - Pad * 2;
+            if (w < 40) return;
+            var y = 34;
+
+            _pnlConnection.Location = new Point(Pad, y);
+            _pnlConnection.Width = w;
+            y += 26;
+
+            if (_pnlFileCard.Visible)
+            {
+                _pnlFileCard.Location = new Point(Pad, y);
+                _pnlFileCard.Width = w;
+
+                var cardH = 10;
+                foreach (Control c in _pnlFileCard.Controls)
+                {
+                    if (c is Label lbl && lbl.Visible && !string.IsNullOrEmpty(lbl.Text))
+                        cardH = Math.Max(cardH, c.Bottom + 8);
+                }
+                _pnlFileCard.Height = cardH;
+                y += cardH + SectionGap;
+            }
+
+            PlaceButton(_btnCheckOut, ref y, w);
+            PlaceButton(_btnCheckIn, ref y, w);
+            y += SectionGap - BtnGap;
+
+            PlaceButton(_btnSync, ref y, w);
+            PlaceButton(_btnPublish, ref y, w);
+            y += SectionGap - BtnGap;
+
+            PlaceButton(_btnNewPart, ref y, w);
+            y += SectionGap - BtnGap;
+
+            PlaceButton(_btnOpenApp, ref y, w);
+            y += 8;
+
+            _lblMessage.Location = new Point(Pad, y);
+            _lblMessage.Width = w;
+        }
+
+        private void PlaceButton(Button btn, ref int y, int w)
+        {
+            btn.Location = new Point(Pad, y);
+            btn.Width = w;
+            y += BtnHeight + BtnGap;
+        }
+
+        private Label MakeLabel(Control parent, ref int y, Font font, Color color)
         {
             var lbl = new Label
             {
-                Text = text,
-                ForeColor = Color.FromArgb(166, 173, 200),
-                Font = new Font("Segoe UI", 9f),
-                Location = new Point(8, y),
+                ForeColor = color,
+                Font = font,
+                Location = new Point(10, y),
                 AutoSize = true
             };
             parent.Controls.Add(lbl);
-            y += 22;
+            y += (int)(font.GetHeight() + 6);
             return lbl;
         }
 
-        private Button CreateButton(string text, int y)
+        private Button MakeButton(string text)
         {
-            return new Button
+            var btn = new Button
             {
                 Text = text,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(49, 50, 68),
-                ForeColor = Color.FromArgb(205, 214, 244),
+                BackColor = CSurface0,
+                ForeColor = CText,
                 Font = new Font("Segoe UI", 9f),
-                Location = new Point(12, y),
-                Size = new Size(220, 28),
-                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right,
+                Size = new Size(200, BtnHeight),
+                Cursor = Cursors.Hand,
                 FlatAppearance =
                 {
-                    BorderColor = Color.FromArgb(69, 71, 90),
-                    MouseOverBackColor = Color.FromArgb(69, 71, 90)
+                    BorderColor = CSurface1,
+                    MouseOverBackColor = CSurface1
                 },
                 Enabled = false
             };
+            return btn;
         }
 
         private void SafeInvoke(Action action)
@@ -193,6 +245,7 @@ namespace TrentCAD.SolidWorksAddin
             _btnCheckIn.Enabled = canCheckIn && !_busy;
             _btnSync.Enabled = !_busy;
             _btnPublish.Enabled = !_busy;
+            _btnNewPart.Enabled = !_busy;
         }
 
         protected override void Dispose(bool disposing)
@@ -227,26 +280,22 @@ namespace TrentCAD.SolidWorksAddin
                 var connected = await _api.IsConnectedAsync();
                 SafeInvoke(() =>
                 {
-                    var dot = _pnlConnection.Controls["connectionDot"];
                     if (connected)
                     {
-                        dot.BackColor = Color.FromArgb(166, 227, 161);
+                        _dot.DotColor = CGreen;
                         _lblConnection.Text = "Connected";
                         _btnSync.Enabled = !_busy;
                         _btnPublish.Enabled = !_busy;
                     }
                     else
                     {
-                        dot.BackColor = Color.FromArgb(243, 139, 168);
-                        _lblConnection.Text = "TrentCAD Not Running";
+                        _dot.DotColor = CRed;
+                        _lblConnection.Text = "Not Running";
                         SetButtonStates(false, false);
                     }
                 });
             }
-            catch
-            {
-                // Ignore polling errors
-            }
+            catch { }
         }
 
         public async void UpdateForDocument(string absolutePath)
@@ -264,12 +313,7 @@ namespace TrentCAD.SolidWorksAddin
                 if (_currentFilePath != absolutePath) return;
                 SafeInvoke(() =>
                 {
-                    _grpFile.Visible = true;
-                    _lblFileName.Text = System.IO.Path.GetFileName(absolutePath);
-                    _lblPartNumber.Text = "";
-                    _lblDescription.Text = "";
-                    _lblStatus.Text = "Not in project";
-                    _lblLockedBy.Text = "";
+                    ShowFileCard(System.IO.Path.GetFileName(absolutePath), "", "", "Not tracked", COverlay0, "");
                     SetButtonStates(false, false);
                 });
             }
@@ -278,58 +322,67 @@ namespace TrentCAD.SolidWorksAddin
         public void ClearDocument()
         {
             _currentFilePath = null;
-            _grpFile.Visible = false;
+            _pnlFileCard.Visible = false;
             SetButtonStates(false, false);
+            LayoutAll();
+        }
+
+        private void ShowFileCard(string name, string partNum, string desc, string status, Color statusColor, string lockedBy)
+        {
+            _pnlFileCard.Visible = true;
+            _lblFileName.Text = name ?? "";
+            _lblPartNumber.Text = partNum ?? "";
+            _lblPartNumber.Visible = !string.IsNullOrEmpty(partNum);
+            _lblDescription.Text = desc ?? "";
+            _lblDescription.Visible = !string.IsNullOrEmpty(desc);
+            _lblStatus.Text = status;
+            _lblStatus.ForeColor = statusColor;
+            _lblLockedBy.Text = lockedBy ?? "";
+            _lblLockedBy.Visible = !string.IsNullOrEmpty(lockedBy);
+            LayoutAll();
         }
 
         private void UpdateFileDisplay(FileStatus file, string path)
         {
-            _grpFile.Visible = true;
-
             if (file == null)
             {
-                _lblFileName.Text = System.IO.Path.GetFileName(path);
-                _lblPartNumber.Text = "";
-                _lblDescription.Text = "";
-                _lblStatus.Text = "Not in project";
-                _lblLockedBy.Text = "";
+                ShowFileCard(System.IO.Path.GetFileName(path), "", "", "Not tracked", COverlay0, "");
                 SetButtonStates(false, false);
                 return;
             }
 
-            _lblFileName.Text = file.Name;
-            _lblPartNumber.Text = file.PartNumber ?? "";
-            _lblDescription.Text = file.PartDescription ?? "";
-
+            string statusText;
+            Color statusColor;
             switch (file.State)
             {
                 case "synced":
-                    _lblStatus.Text = "Status: Synced";
-                    _lblStatus.ForeColor = Color.FromArgb(166, 227, 161);
+                    statusText = "Synced";
+                    statusColor = CGreen;
                     break;
                 case "modified":
-                    _lblStatus.Text = "Status: Modified";
-                    _lblStatus.ForeColor = Color.FromArgb(249, 226, 175);
+                    statusText = "Modified";
+                    statusColor = CYellow;
                     break;
                 case "untracked":
-                    _lblStatus.Text = "Status: New";
-                    _lblStatus.ForeColor = Color.FromArgb(108, 112, 134);
+                    statusText = "New";
+                    statusColor = COverlay0;
                     break;
                 case "locked-by-you":
-                    _lblStatus.Text = "Status: Checked Out by You";
-                    _lblStatus.ForeColor = Color.FromArgb(137, 180, 250);
+                    statusText = "Checked out by you";
+                    statusColor = CBlue;
                     break;
                 case "locked-by-other":
-                    _lblStatus.Text = "Status: Locked";
-                    _lblStatus.ForeColor = Color.FromArgb(243, 139, 168);
+                    statusText = "Locked";
+                    statusColor = CRed;
                     break;
                 default:
-                    _lblStatus.Text = $"Status: {file.State}";
-                    _lblStatus.ForeColor = Color.FromArgb(166, 173, 200);
+                    statusText = file.State;
+                    statusColor = CSubtext;
                     break;
             }
 
-            _lblLockedBy.Text = !string.IsNullOrEmpty(file.LockedBy) ? $"Locked by: {file.LockedBy}" : "";
+            var lockedText = !string.IsNullOrEmpty(file.LockedBy) ? file.LockedBy : "";
+            ShowFileCard(file.Name, file.PartNumber, file.PartDescription, statusText, statusColor, lockedText);
 
             var canCheckOut = file.State != "locked-by-you" && file.State != "locked-by-other";
             var canCheckIn = file.State == "locked-by-you";
@@ -339,9 +392,7 @@ namespace TrentCAD.SolidWorksAddin
         private void ShowMessage(string text, bool isError = false)
         {
             _lblMessage.Text = text;
-            _lblMessage.ForeColor = isError
-                ? Color.FromArgb(243, 139, 168)
-                : Color.FromArgb(166, 227, 161);
+            _lblMessage.ForeColor = isError ? CRed : CGreen;
         }
 
         private async System.Threading.Tasks.Task DoCheckOut()
@@ -349,27 +400,18 @@ namespace TrentCAD.SolidWorksAddin
             if (string.IsNullOrEmpty(_currentFilePath) || _busy) return;
             _busy = true;
             SetButtonStates(false, false);
-
             try
             {
                 var result = await _api.CheckOutAsync(_currentFilePath);
                 SafeInvoke(() =>
                 {
-                    if (result.Success)
-                        ShowMessage("Checked out successfully");
-                    else
-                        ShowMessage(result.Error ?? "Check out failed", true);
+                    if (result.Success) ShowMessage("Checked out");
+                    else ShowMessage(result.Error ?? "Check out failed", true);
                 });
                 UpdateForDocument(_currentFilePath);
             }
-            catch (Exception ex)
-            {
-                SafeInvoke(() => ShowMessage(ex.Message, true));
-            }
-            finally
-            {
-                _busy = false;
-            }
+            catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }
+            finally { _busy = false; }
         }
 
         private async System.Threading.Tasks.Task DoCheckIn()
@@ -377,27 +419,18 @@ namespace TrentCAD.SolidWorksAddin
             if (string.IsNullOrEmpty(_currentFilePath) || _busy) return;
             _busy = true;
             SetButtonStates(false, false);
-
             try
             {
                 var result = await _api.CheckInAsync(_currentFilePath);
                 SafeInvoke(() =>
                 {
-                    if (result.Success)
-                        ShowMessage("Checked in successfully");
-                    else
-                        ShowMessage(result.Error ?? "Check in failed", true);
+                    if (result.Success) ShowMessage("Checked in");
+                    else ShowMessage(result.Error ?? "Check in failed", true);
                 });
                 UpdateForDocument(_currentFilePath);
             }
-            catch (Exception ex)
-            {
-                SafeInvoke(() => ShowMessage(ex.Message, true));
-            }
-            finally
-            {
-                _busy = false;
-            }
+            catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }
+            finally { _busy = false; }
         }
 
         private async System.Threading.Tasks.Task DoSync()
@@ -405,34 +438,24 @@ namespace TrentCAD.SolidWorksAddin
             if (_busy) return;
             _busy = true;
             SetButtonStates(false, false);
-
             try
             {
                 var result = await _api.SyncAsync();
                 SafeInvoke(() =>
                 {
-                    if (result.Success)
-                        ShowMessage($"Synced ({result.FilesUpdated} files updated)");
-                    else
-                        ShowMessage(result.Error ?? "Sync failed", true);
+                    if (result.Success) ShowMessage($"Synced ({result.FilesUpdated} updated)");
+                    else ShowMessage(result.Error ?? "Sync failed", true);
                 });
                 if (!string.IsNullOrEmpty(_currentFilePath))
                     UpdateForDocument(_currentFilePath);
             }
-            catch (Exception ex)
-            {
-                SafeInvoke(() => ShowMessage(ex.Message, true));
-            }
-            finally
-            {
-                _busy = false;
-            }
+            catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }
+            finally { _busy = false; }
         }
 
         private async System.Threading.Tasks.Task DoPublish()
         {
             if (_busy) return;
-
             using (var dialog = new PublishMessageDialog())
             {
                 if (dialog.ShowDialog() != DialogResult.OK) return;
@@ -441,27 +464,101 @@ namespace TrentCAD.SolidWorksAddin
 
                 _busy = true;
                 SetButtonStates(false, false);
-
                 try
                 {
                     var result = await _api.PublishAsync(message);
                     SafeInvoke(() =>
                     {
-                        if (result.Success)
-                            ShowMessage("Published successfully");
-                        else
-                            ShowMessage(result.Error ?? "Publish failed", true);
+                        if (result.Success) ShowMessage("Published");
+                        else ShowMessage(result.Error ?? "Publish failed", true);
                     });
                 }
-                catch (Exception ex)
-                {
-                    SafeInvoke(() => ShowMessage(ex.Message, true));
-                }
-                finally
-                {
-                    _busy = false;
-                }
+                catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }
+                finally { _busy = false; }
             }
+        }
+
+        private async System.Threading.Tasks.Task DoNewPart()
+        {
+            if (_busy) return;
+            using (var dialog = new NewPartDialog())
+            {
+                if (dialog.ShowDialog() != DialogResult.OK) return;
+                _busy = true;
+                SetButtonStates(false, false);
+                try
+                {
+                    var desc = string.IsNullOrWhiteSpace(dialog.Description) ? null : dialog.Description;
+                    if (dialog.SelectedType == NewItemType.Assembly)
+                    {
+                        var name = dialog.ItemName;
+                        if (string.IsNullOrWhiteSpace(name))
+                        {
+                            ShowMessage("Assembly name is required", true);
+                            return;
+                        }
+                        var result = await _api.CreateNewAssemblyAsync(name, "", desc);
+                        SafeInvoke(() =>
+                        {
+                            if (result.Success) ShowMessage($"Created {result.PartNumber}");
+                            else ShowMessage(result.Error ?? "Failed", true);
+                        });
+                    }
+                    else
+                    {
+                        var result = await _api.CreateNewPartAsync("", desc);
+                        SafeInvoke(() =>
+                        {
+                            if (result.Success) ShowMessage($"Created {result.PartNumber}");
+                            else ShowMessage(result.Error ?? "Failed", true);
+                        });
+                    }
+                }
+                catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }
+                finally { _busy = false; }
+            }
+        }
+
+        private void DoOpenApp()
+        {
+            var localApp = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Programs", "trentcad", "TrentCAD.exe");
+            var progFiles = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "TrentCAD", "TrentCAD.exe");
+
+            var target = System.IO.File.Exists(localApp) ? localApp
+                       : System.IO.File.Exists(progFiles) ? progFiles
+                       : null;
+
+            if (target != null)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = target, UseShellExecute = true });
+            else
+                ShowMessage("TrentCAD not found", true);
+        }
+    }
+
+    internal class StatusDot : Control
+    {
+        private Color _color = Color.Gray;
+        public Color DotColor
+        {
+            get => _color;
+            set { _color = value; Invalidate(); }
+        }
+
+        public StatusDot()
+        {
+            SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer, true);
+            Size = new Size(10, 10);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var brush = new SolidBrush(_color))
+                e.Graphics.FillEllipse(brush, 1, 1, Width - 2, Height - 2);
         }
     }
 }

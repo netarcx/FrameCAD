@@ -172,6 +172,31 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         return
       }
 
+      case 'POST /api/parts/new-part': {
+        const body = parseJson(await readBody(req)) as { folder?: string; description?: string } | null
+        const folder = body?.folder ?? ''
+        const result = await serialWrite(() => partsOps.createNewPart(folder, body?.description))
+        json(res, 200, { success: true, ...result })
+        return
+      }
+
+      case 'POST /api/parts/new-assembly': {
+        const body = parseJson(await readBody(req)) as {
+          parentFolder?: string
+          name?: string
+          description?: string
+        } | null
+        if (!body?.name) {
+          json(res, 400, { error: 'Missing name for assembly' })
+          return
+        }
+        const result = await serialWrite(() =>
+          partsOps.createNewAssembly(body.parentFolder ?? '', body.name!, body.description)
+        )
+        json(res, 200, { success: true, ...result })
+        return
+      }
+
       default:
         json(res, 404, { error: 'Not found' })
     }

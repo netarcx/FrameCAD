@@ -112,6 +112,28 @@ namespace TrentCAD.SolidWorksAddin
             return JsonSerializer.Deserialize<PublishResult>(json);
         }
 
+        public async Task<CreatePartResult> CreateNewPartAsync(string folder = "", string description = null)
+        {
+            var obj = new Dictionary<string, string> { { "folder", folder } };
+            if (description != null) obj["description"] = description;
+            var body = JsonSerializer.Serialize(obj);
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var response = await Client.PostAsync($"{_baseUrl}/api/parts/new-part", content);
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<CreatePartResult>(json);
+        }
+
+        public async Task<CreatePartResult> CreateNewAssemblyAsync(string name, string parentFolder = "", string description = null)
+        {
+            var obj = new Dictionary<string, string> { { "name", name }, { "parentFolder", parentFolder } };
+            if (description != null) obj["description"] = description;
+            var body = JsonSerializer.Serialize(obj);
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var response = await Client.PostAsync($"{_baseUrl}/api/parts/new-assembly", content);
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<CreatePartResult>(json);
+        }
+
         public async Task<List<LockInfo>> GetLocksAsync()
         {
             var response = await Client.GetAsync($"{_baseUrl}/api/locks");

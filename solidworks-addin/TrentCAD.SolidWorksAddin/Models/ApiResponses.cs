@@ -56,6 +56,21 @@ namespace TrentCAD.SolidWorksAddin.Models
         public string Error { get; set; }
     }
 
+    public class CreatePartResult
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("partNumber")]
+        public string PartNumber { get; set; }
+
+        [JsonPropertyName("filePath")]
+        public string FilePath { get; set; }
+
+        [JsonPropertyName("error")]
+        public string Error { get; set; }
+    }
+
     public class LockInfo
     {
         [JsonPropertyName("path")]
