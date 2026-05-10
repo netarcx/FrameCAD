@@ -8,13 +8,16 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RootNamespace>TrentCAD.SolidWorksAddin</RootNamespace>
     <AssemblyName>TrentCAD.SolidWorksAddin</AssemblyName>
+    <SolidWorksInstalled Condition="Exists('C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll')">true</SolidWorksInstalled>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- Use real SolidWorks interop DLLs when installed -->
+  <ItemGroup Condition="'$(SolidWorksInstalled)' == 'true'">
+    <Compile Remove="Stubs\**" />
     <Reference Include="SolidWorks.Interop.sldworks">
       <HintPath>C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll</HintPath>
       <EmbedInteropTypes>true</EmbedInteropTypes>
