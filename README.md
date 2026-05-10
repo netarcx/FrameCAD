@@ -203,19 +203,36 @@ Write operations (`checkout`, `checkin`, `sync`, `publish`) are serialized — o
 
 ## SolidWorks Add-in Setup
 
-The add-in is a separate C# project targeting .NET Framework 4.8.
+The add-in is a separate C# project targeting .NET Framework 4.8. No Visual Studio required.
 
 ### Prerequisites
-- Visual Studio 2019 or later
-- SolidWorks (with interop assemblies)
-- .NET Framework 4.8 SDK
+- [.NET SDK](https://dotnet.microsoft.com/download) (any modern version — 6, 8, or 9)
+- [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48)
+- SolidWorks installed (provides the interop assemblies)
 
 ### Build & Install
 
-1. Open `solidworks-addin/TrentCAD.SolidWorksAddin.sln` in Visual Studio
-2. Build the solution (Release configuration)
-3. Register the COM add-in: `regasm /codebase TrentCAD.SolidWorksAddin.dll`
-4. Restart SolidWorks — the TrentCAD pane appears in the Task Pane
+A `build.bat` script is included in the `solidworks-addin/` folder:
+
+```batch
+cd solidworks-addin
+
+build.bat               # Build only
+build.bat /register     # Build + register (run as Administrator)
+build.bat /unregister   # Unregister the add-in (run as Administrator)
+```
+
+Or manually:
+
+```batch
+cd solidworks-addin
+dotnet build TrentCAD.SolidWorksAddin\TrentCAD.SolidWorksAddin.csproj -c Release
+
+REM Register (run as Administrator):
+%windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase TrentCAD.SolidWorksAddin\bin\Release\net48\TrentCAD.SolidWorksAddin.dll
+```
+
+Restart SolidWorks after registering — the TrentCAD pane appears in the Task Pane.
 
 The add-in requires TrentCAD to be running with a project open (it communicates via the REST API on port 42129).
 
