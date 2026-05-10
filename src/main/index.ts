@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import path from 'path'
 import { is } from '@electron-toolkit/utils'
 import { setupIpc, stopWatching, stopRestServer } from './ipc'
@@ -23,6 +23,17 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
+
+  mainWindow.webContents.on('context-menu', (_e, params) => {
+    const menu = Menu.buildFromTemplate([
+      { role: 'cut', enabled: params.editFlags.canCut },
+      { role: 'copy', enabled: params.editFlags.canCopy },
+      { role: 'paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { role: 'selectAll', enabled: params.editFlags.canSelectAll }
+    ])
+    menu.popup()
+  })
 
   mainWindow.on('closed', () => {
     mainWindow = null
