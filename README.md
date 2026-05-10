@@ -12,7 +12,7 @@ A desktop CAD collaboration tool built for FRC Team 2129 (Ultraviolet). TrentCAD
 - **Real-time file watching** with chokidar — the file browser updates automatically as you save in SolidWorks
 
 ### Part Numbering System
-- Hierarchical part numbers in the format `2129-XX-YYY` (prefix-assembly-part)
+- Hierarchical part numbers in the format `YY-2129-XX-YYY` (year-team-assembly-part)
 - `parts.json` manifest committed to Git so the whole team shares a single source of truth
 - Auto-assigns numbers to SolidWorks files (`.sldprt`, `.sldasm`, `.slddrw`)
 - Folder structure determines assembly hierarchy — each folder gets a 2-digit assembly number
@@ -168,17 +168,18 @@ TrentCAD deliberately hides Git terminology to be approachable for CAD users:
 Parts follow a hierarchical numbering scheme:
 
 ```
-2129-XX-YYY
-  │   │   └── Part number (3 digits, per-assembly counter)
-  │   └────── Assembly number (2 digits, from folder hierarchy)
-  └────────── Team prefix
+YY-2129-XX-YYY
+ │   │    │   └── Part number (3 digits, per-assembly counter)
+ │   │    └────── Assembly number (2 digits, from folder hierarchy)
+ │   └─────────── Team number
+ └─────────────── Year (last 2 digits, set at project creation)
 ```
 
-Examples:
-- `2129-001` — a part in the project root (no assembly)
-- `2129-01` — the first assembly (folder)
-- `2129-01-001` — the first part inside that assembly
-- `2129-01-02-001` — a part nested inside a sub-assembly
+Examples (for a project created in 2026):
+- `26-2129-001` — a part in the project root (no assembly)
+- `26-2129-01` — the first assembly (folder)
+- `26-2129-01-001` — the first part inside that assembly
+- `26-2129-01-02-001` — a part nested inside a sub-assembly
 
 Drawings (`.slddrw`) automatically share the number of the part/assembly with the same base filename in the same folder.
 

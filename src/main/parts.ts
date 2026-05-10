@@ -5,13 +5,16 @@ import { getProjectPath } from './git'
 
 const MANIFEST_FILE = 'parts.json'
 const SOLIDWORKS_EXTS = new Set(['.sldprt', '.sldasm', '.slddrw'])
-const DEFAULT_PREFIX = '2129'
+function defaultPrefix(): string {
+  const yy = new Date().getFullYear().toString().slice(-2)
+  return `${yy}-2129`
+}
 
 let manifestLock: Promise<void> = Promise.resolve()
 
 function emptyManifest(): PartsManifest {
   return {
-    prefix: DEFAULT_PREFIX,
+    prefix: defaultPrefix(),
     nextCounters: {},
     nextAssemblyCounters: {},
     entries: {},

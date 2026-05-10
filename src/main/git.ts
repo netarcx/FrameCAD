@@ -52,7 +52,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
   await fs.writeFile(path.join(dirPath, '.gitignore'), gitignore)
 
   const emptyManifest: PartsManifest = {
-    prefix: '2129',
+    prefix: `${new Date().getFullYear().toString().slice(-2)}-2129`,
     nextCounters: {},
     nextAssemblyCounters: {},
     entries: {},

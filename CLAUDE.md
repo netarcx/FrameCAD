@@ -64,7 +64,7 @@ The file browser is the central element (full-width table, not a sidebar tree). 
 ## Part Numbering (Phase 2)
 
 - `parts.json` at project root, committed to Git so the whole team shares it
-- Hierarchical format: `2129-XX-YYY` (assembly-part), e.g., `2129-01-001`
+- Hierarchical format: `YY-2129-XX-YYY` (year-team-assembly-part), e.g., `26-2129-01-001`
 - Folder structure determines hierarchy (folder = assembly group)
 - Auto-assigns numbers to SolidWorks files (.sldprt, .sldasm, .slddrw)
 - "New Part" / "New Assembly" buttons create files pre-named with part numbers
