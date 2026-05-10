@@ -14,8 +14,10 @@ win:
   artifactName: ${name}-${version}-setup.${ext}
 nsis:
   oneClick: false
+  perMachine: true
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: true
+  include: build/installer.nsh
 linux:
   target:
     - target: AppImage

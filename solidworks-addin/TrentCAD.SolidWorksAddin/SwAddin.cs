@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 using Microsoft.Win32;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swpublished;
@@ -15,6 +16,7 @@ namespace TrentCAD.SolidWorksAddin
         private int _addinCookie;
         private TaskPaneControl _taskPaneControl;
         private ITaskpaneView _taskPaneView;
+        private TaskPaneHost _taskPaneHost;
 
         [ComRegisterFunction]
         public static void RegisterFunction(Type t)
@@ -54,11 +56,13 @@ namespace TrentCAD.SolidWorksAddin
             _swEvents.ActiveDocChangeNotify -= OnActiveDocChange;
 
             _taskPaneControl?.StopHealthPolling();
+            _taskPaneHost?.ReleaseHandle();
             _taskPaneView?.DeleteView();
             _taskPaneControl?.Dispose();
 
             _swApp = null;
             _swEvents = null;
+            _taskPaneHost = null;
             return true;
         }
 
@@ -69,8 +73,9 @@ namespace TrentCAD.SolidWorksAddin
 
             if (_taskPaneView != null)
             {
-                _taskPaneControl.Dock = System.Windows.Forms.DockStyle.Fill;
                 _taskPaneView.DisplayWindowFromHandlex64(_taskPaneControl.Handle.ToInt64());
+                var parentHwnd = (IntPtr)_taskPaneView.GetTaskpaneViewWndx64();
+                _taskPaneHost = new TaskPaneHost(parentHwnd, _taskPaneControl);
             }
         }
 
@@ -86,6 +91,38 @@ namespace TrentCAD.SolidWorksAddin
                 _taskPaneControl?.ClearDocument();
             }
             return 0;
+        }
+    }
+
+    internal class TaskPaneHost : NativeWindow
+    {
+        private const int WM_SIZE = 0x0005;
+        private readonly Control _child;
+
+        [DllImport("user32.dll")]
+        private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        public TaskPaneHost(IntPtr hwnd, Control child)
+        {
+            _child = child;
+            AssignHandle(hwnd);
+            FitChild();
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            if (m.Msg == WM_SIZE)
+                FitChild();
+        }
+
+        private void FitChild()
+        {
+            if (GetClientRect(Handle, out var rect))
+                _child.SetBounds(0, 0, rect.Right, rect.Bottom);
         }
     }
 }

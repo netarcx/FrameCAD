@@ -6,3 +6,4 @@ dist/
 solidworks-addin/publish/
 solidworks-addin/TrentCAD.SolidWorksAddin/bin/
 solidworks-addin/TrentCAD.SolidWorksAddin/obj/
+build/solidworks-addin/

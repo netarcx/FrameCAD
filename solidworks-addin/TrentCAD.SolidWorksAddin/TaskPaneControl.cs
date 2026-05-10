@@ -58,7 +58,8 @@ namespace TrentCAD.SolidWorksAddin
             _pnlConnection = new Panel
             {
                 Location = new Point(12, y),
-                Size = new Size(220, 24)
+                Size = new Size(220, 24),
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
             };
             var dot = new Panel
             {
@@ -87,7 +88,8 @@ namespace TrentCAD.SolidWorksAddin
                 Font = new Font("Segoe UI", 9f),
                 Location = new Point(12, y),
                 Size = new Size(220, 160),
-                Visible = false
+                Visible = false,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
             };
 
             var fy = 20;
@@ -135,7 +137,8 @@ namespace TrentCAD.SolidWorksAddin
                 Font = new Font("Segoe UI", 8f),
                 Location = new Point(12, y),
                 Size = new Size(220, 40),
-                AutoSize = false
+                AutoSize = false,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
             };
             Controls.Add(_lblMessage);
 
@@ -168,6 +171,7 @@ namespace TrentCAD.SolidWorksAddin
                 Font = new Font("Segoe UI", 9f),
                 Location = new Point(12, y),
                 Size = new Size(220, 28),
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right,
                 FlatAppearance =
                 {
                     BorderColor = Color.FromArgb(69, 71, 90),

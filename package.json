@@ -7,7 +7,8 @@
     "dev": "ELECTRON_DISABLE_SANDBOX=1 electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder --config electron-builder.yml"
+    "package": "electron-vite build && electron-builder --config electron-builder.yml",
+    "package:win": "scripts\\build-addin.bat && electron-vite build && electron-builder --config electron-builder.yml --win"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
