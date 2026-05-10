@@ -48,13 +48,20 @@ export default function App() {
     lockedByOther: countByState(files, 'locked-by-other')
   }), [files])
 
+  const copyError = () => {
+    if (error) navigator.clipboard.writeText(error)
+  }
+
   if (!project) {
     return (
       <div className="app">
         {error && (
           <div className="error-banner">
             <span>{error}</span>
-            <button onClick={dismissError}>{'×'}</button>
+            <div className="error-banner-actions">
+              <button onClick={copyError} title="Copy error">Copy</button>
+              <button onClick={dismissError}>{'×'}</button>
+            </div>
           </div>
         )}
         <ProjectSetup
@@ -72,7 +79,10 @@ export default function App() {
       {error && (
         <div className="error-banner">
           <span>{error}</span>
-          <button onClick={dismissError}>{'×'}</button>
+          <div className="error-banner-actions">
+            <button onClick={copyError} title="Copy error">Copy</button>
+            <button onClick={dismissError}>{'×'}</button>
+          </div>
         </div>
       )}
 

@@ -726,8 +726,20 @@ input {
   justify-content: space-between;
 }
 
+.error-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .error-banner button {
   color: var(--red);
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
+.error-banner button:last-child {
   font-size: 18px;
   padding: 0 4px;
 }
