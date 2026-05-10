@@ -4,11 +4,15 @@ on:
   push:
     paths:
       - 'solidworks-addin/**'
+      - '.github/workflows/build-addin.yml'
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - uses: actions/checkout@v4

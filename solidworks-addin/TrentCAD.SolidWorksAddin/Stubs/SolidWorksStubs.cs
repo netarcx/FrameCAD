@@ -3,11 +3,9 @@
 // (e.g., in CI). At runtime the real COM types from SolidWorks are used instead.
 
 using System;
-using System.Runtime.InteropServices;
 
 namespace SolidWorks.Interop.sldworks
 {
-    [ComImport, Guid("83A33D31-27C5-11CE-BFD4-00400513BB57")]
     public interface ISldWorks
     {
         object ActiveDoc { get; }
@@ -15,13 +13,11 @@ namespace SolidWorks.Interop.sldworks
         event Func<int> ActiveDocChangeNotify;
     }
 
-    [ComImport, Guid("7A628E09-E920-11D2-BE09-0060089A8B02")]
     public interface ModelDoc2
     {
         string GetPathName();
     }
 
-    [ComImport, Guid("26B1D5B4-2924-4964-8BEA-B365E93C2D3C")]
     public interface ITaskpaneView
     {
         void DisplayWindowFromHandlex64(long handle);
