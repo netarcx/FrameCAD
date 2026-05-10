@@ -61,6 +61,18 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
           <span className="label">Type</span>
           <span className="value">{file.isDirectory ? 'Folder' : fileType(file.name)}</span>
         </div>
+        {file.partNumber && (
+          <div className="details-row">
+            <span className="label">Part #</span>
+            <span className="value part-number-detail">{file.partNumber}</span>
+          </div>
+        )}
+        {file.partDescription && (
+          <div className="details-row">
+            <span className="label">Description</span>
+            <span className="value">{file.partDescription}</span>
+          </div>
+        )}
         <div className="details-row">
           <span className="label">Status</span>
           <span className="value">{stateLabel(file.state)}</span>

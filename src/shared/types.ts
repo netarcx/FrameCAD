@@ -2,6 +2,7 @@ export interface ProjectConfig {
   name: string
   path: string
   remote: string
+  partPrefix?: string
 }
 
 export type FileState = 'synced' | 'modified' | 'untracked' | 'locked-by-you' | 'locked-by-other'
@@ -12,6 +13,8 @@ export interface FileEntry {
   isDirectory: boolean
   state: FileState
   lockedBy?: string
+  partNumber?: string
+  partDescription?: string
   children?: FileEntry[]
 }
 
@@ -47,6 +50,37 @@ export interface GitStatusFile {
   working_dir: string
 }
 
+export type PartType = 'part' | 'assembly' | 'drawing'
+
+export interface PartEntry {
+  partNumber: string
+  assignedAt: string
+  type: PartType
+  description?: string
+  linkedTo?: string
+}
+
+export interface PartsManifest {
+  prefix: string
+  nextCounters: Record<string, number>
+  nextAssemblyCounters: Record<string, number>
+  entries: Record<string, PartEntry>
+  assemblies: Record<string, string>
+}
+
+export interface DriveStatus {
+  connected: boolean
+  configured: boolean
+  folderUrl?: string
+  lastSync?: string
+}
+
+export interface DriveSyncResult {
+  success: boolean
+  filesUploaded: number
+  error?: string
+}
+
 export interface AppState {
   currentProject: ProjectConfig | null
   files: FileEntry[]
@@ -70,6 +104,13 @@ export interface IpcApi {
   selectDirectory(): Promise<string | null>
   openFileExplorer(path: string): Promise<void>
   getProjectConfig(): Promise<ProjectConfig | null>
+  getPartsManifest(): Promise<PartsManifest | null>
+  createNewPart(folder: string, description?: string): Promise<{ partNumber: string; filePath: string }>
+  createNewAssembly(parentFolder: string, name: string, description?: string): Promise<{ partNumber: string; filePath: string }>
+  connectDrive(): Promise<{ success: boolean; error?: string }>
+  disconnectDrive(): Promise<void>
+  getDriveStatus(): Promise<DriveStatus>
+  syncToDrive(): Promise<DriveSyncResult>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
 }

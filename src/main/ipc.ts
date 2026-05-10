@@ -3,7 +3,10 @@ import path from 'path'
 import { watch } from 'chokidar'
 import * as gitOps from './git'
 import * as lockOps from './locking'
+import * as partsOps from './parts'
 import { addRecentProject } from './config'
+import { startRestServer, stopRestServer } from './rest'
+import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
 
 let watcher: ReturnType<typeof watch> | null = null
@@ -17,16 +20,22 @@ function debounce<T extends (...args: unknown[]) => unknown>(fn: T, ms: number):
 }
 
 function notifyFileChange(win: BrowserWindow): void {
-  gitOps.getStatus().then(files => {
-    win.webContents.send('file-change', files)
-  }).catch(() => {})
+  if (win.isDestroyed()) return
+  partsOps.syncManifest()
+    .then(() => gitOps.getStatus())
+    .then(files => { if (!win.isDestroyed()) win.webContents.send('file-change', files) })
+    .catch(() => {
+      gitOps.getStatus().then(files => {
+        if (!win.isDestroyed()) win.webContents.send('file-change', files)
+      }).catch(() => {})
+    })
 }
 
 function startWatching(dirPath: string, win: BrowserWindow): void {
   stopWatching()
   const debouncedNotify = debounce(() => notifyFileChange(win), 500)
   watcher = watch(dirPath, {
-    ignored: [/(^|[/\\])\../, /node_modules/],
+    ignored: [/(^|[/\\])\../, /node_modules/, /parts\.json$/],
     persistent: true,
     ignoreInitial: true,
     depth: 10
@@ -48,6 +57,8 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     await gitOps.createProject(name, dirPath, remote)
     currentProject = { name, path: dirPath, remote }
     await addRecentProject(currentProject)
+    startRestServer(currentProject)
+    driveOps.initDrive().catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
   })
@@ -57,6 +68,8 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     const name = path.basename(dirPath)
     currentProject = { name, path: dirPath, remote: url }
     await addRecentProject(currentProject)
+    startRestServer(currentProject)
+    driveOps.initDrive().catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
   })
@@ -72,6 +85,8 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     } catch { /* no remote */ }
     currentProject = { name, path: dirPath, remote }
     await addRecentProject(currentProject)
+    startRestServer(currentProject)
+    driveOps.initDrive().catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
     return currentProject
@@ -82,7 +97,11 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('publish', async (_e, message: string) => {
-    return gitOps.publish(message)
+    const result = await gitOps.publish(message)
+    if (result.success && driveOps.isDriveConnected()) {
+      driveOps.syncToDrive().catch(() => {})
+    }
+    return result
   })
 
   ipcMain.handle('get-status', async () => {
@@ -122,6 +141,38 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('get-project-config', () => {
     return currentProject
   })
+
+  ipcMain.handle('get-parts-manifest', async () => {
+    try {
+      return await partsOps.loadManifest()
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle('create-new-part', async (_e, folder: string, description?: string) => {
+    return partsOps.createNewPart(folder, description)
+  })
+
+  ipcMain.handle('create-new-assembly', async (_e, parentFolder: string, name: string, description?: string) => {
+    return partsOps.createNewAssembly(parentFolder, name, description)
+  })
+
+  ipcMain.handle('connect-drive', async () => {
+    return driveOps.connectDrive()
+  })
+
+  ipcMain.handle('disconnect-drive', async () => {
+    await driveOps.disconnectDrive()
+  })
+
+  ipcMain.handle('get-drive-status', () => {
+    return driveOps.getDriveStatus()
+  })
+
+  ipcMain.handle('sync-to-drive', async () => {
+    return driveOps.syncToDrive()
+  })
 }
 
-export { stopWatching }
+export { stopWatching, stopRestServer }

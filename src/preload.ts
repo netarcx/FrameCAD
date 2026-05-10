@@ -41,6 +41,27 @@ const api: IpcApi = {
   getProjectConfig: () =>
     ipcRenderer.invoke('get-project-config'),
 
+  getPartsManifest: () =>
+    ipcRenderer.invoke('get-parts-manifest'),
+
+  createNewPart: (folder, description?) =>
+    ipcRenderer.invoke('create-new-part', folder, description),
+
+  createNewAssembly: (parentFolder, name, description?) =>
+    ipcRenderer.invoke('create-new-assembly', parentFolder, name, description),
+
+  connectDrive: () =>
+    ipcRenderer.invoke('connect-drive'),
+
+  disconnectDrive: () =>
+    ipcRenderer.invoke('disconnect-drive'),
+
+  getDriveStatus: () =>
+    ipcRenderer.invoke('get-drive-status'),
+
+  syncToDrive: () =>
+    ipcRenderer.invoke('sync-to-drive'),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

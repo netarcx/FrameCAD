@@ -33,6 +33,11 @@ export default function App() {
     publish,
     checkOut,
     checkIn,
+    createNewPart,
+    createNewAssembly,
+    driveStatus,
+    connectDrive,
+    disconnectDrive,
     dismissError
   } = useGit()
 
@@ -76,6 +81,17 @@ export default function App() {
         <span className="divider" />
         <span className="project-name">{project.name}</span>
         <span className="spacer" />
+        {driveStatus.configured && (
+          <button
+            className={`drive-badge ${driveStatus.connected ? 'connected' : ''}`}
+            onClick={driveStatus.connected ? disconnectDrive : connectDrive}
+            title={driveStatus.connected
+              ? `Google Drive connected${driveStatus.lastSync ? ` — last sync: ${new Date(driveStatus.lastSync).toLocaleTimeString()}` : ''}`
+              : 'Connect Google Drive'}
+          >
+            {driveStatus.connected ? 'Drive Connected' : 'Connect Drive'}
+          </button>
+        )}
         <span className="team-badge">FRC 2129</span>
       </div>
 
@@ -84,6 +100,8 @@ export default function App() {
         onPublish={publish}
         onCheckOut={checkOut}
         onCheckIn={checkIn}
+        onNewPart={createNewPart}
+        onNewAssembly={createNewAssembly}
         selectedFile={selectedFile}
         isLoading={isLoading}
         hasProject={true}

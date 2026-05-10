@@ -99,6 +99,7 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
     <>
       <div className="file-table-header">
         <span className="col-name">Name</span>
+        <span className="col-partnum">Part #</span>
         <span className="col-status">Status</span>
         <span className="col-lock">Checked Out By</span>
       </div>
@@ -130,6 +131,11 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
                 )}
                 <span className="icon" title={fileIconTitle(entry)}>{fileIcon(entry)}</span>
                 <span className="name">{entry.name}</span>
+              </div>
+              <div className="col-partnum">
+                {!entry.isDirectory && entry.partNumber && (
+                  <span className="part-number">{entry.partNumber}</span>
+                )}
               </div>
               <div className="col-status">
                 {!entry.isDirectory && (

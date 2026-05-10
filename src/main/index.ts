@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { is } from '@electron-toolkit/utils'
-import { setupIpc, stopWatching } from './ipc'
+import { setupIpc, stopWatching, stopRestServer } from './ipc'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -41,5 +41,6 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   stopWatching()
+  stopRestServer()
   if (process.platform !== 'darwin') app.quit()
 })

@@ -1,8 +1,9 @@
 import simpleGit, { SimpleGit } from 'simple-git'
 import path from 'path'
 import fs from 'fs/promises'
-import type { FileEntry, FileState, HistoryEntry, PublishResult, SyncResult } from '@shared/types'
+import type { FileEntry, FileState, HistoryEntry, PartsManifest, PublishResult, SyncResult } from '@shared/types'
 import { getLocks } from './locking'
+import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
 
 const LFS_PATTERNS = [
   '*.sldprt', '*.sldasm', '*.slddrw',
@@ -50,7 +51,16 @@ export async function createProject(name: string, dirPath: string, remote: strin
   ].join('\n')
   await fs.writeFile(path.join(dirPath, '.gitignore'), gitignore)
 
-  await git.add(['.gitattributes', '.gitignore'])
+  const emptyManifest: PartsManifest = {
+    prefix: '2129',
+    nextCounters: {},
+    nextAssemblyCounters: {},
+    entries: {},
+    assemblies: {}
+  }
+  await fs.writeFile(path.join(dirPath, 'parts.json'), JSON.stringify(emptyManifest, null, 2) + '\n')
+
+  await git.add(['.gitattributes', '.gitignore', 'parts.json'])
   await git.commit('Initialize TrentCAD project')
 
   if (remote) {
@@ -94,6 +104,8 @@ export async function sync(): Promise<SyncResult> {
 export async function publish(message: string): Promise<PublishResult> {
   const g = getGit()
   try {
+    await syncManifest()
+
     const status = await g.status()
     if (status.files.length === 0) {
       return { success: false, error: 'No changes to publish' }
@@ -102,6 +114,7 @@ export async function publish(message: string): Promise<PublishResult> {
     await g.raw(['add', '-A'])
     const result = await g.commit(message)
     await g.push()
+
     return { success: true, hash: result.commit }
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message }
@@ -177,7 +190,14 @@ export async function getStatus(): Promise<FileEntry[]> {
     return entries
   }
 
-  return buildTree(dirPath, dirPath)
+  const result = await buildTree(dirPath, dirPath)
+  try {
+    const manifest = await loadManifest()
+    annotatePartNumbers(result, manifest)
+  } catch {
+    // parts.json may not exist yet for joined/legacy projects
+  }
+  return result
 }
 
 export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
