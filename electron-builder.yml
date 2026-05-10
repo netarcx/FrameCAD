@@ -5,7 +5,12 @@ directories:
   output: dist
 files:
   - out/**/*
-  - "!node_modules/**/*"
+  - node_modules/**/*
+  - "!node_modules/**/*.md"
+  - "!node_modules/**/*.map"
+  - "!node_modules/**/test/**"
+  - "!node_modules/**/tests/**"
+  - "!node_modules/**/__tests__/**"
 win:
   target:
     - target: nsis
