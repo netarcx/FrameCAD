@@ -65,7 +65,7 @@ namespace TrentCAD.SolidWorksAddin
         private void CreateTaskPane()
         {
             _taskPaneControl = new TaskPaneControl();
-            _taskPaneView = _swApp.CreateTaskpaneView3(null, "TrentCAD");
+            _taskPaneView = _swApp.CreateTaskpaneView2("", "TrentCAD");
 
             if (_taskPaneView != null)
             {
