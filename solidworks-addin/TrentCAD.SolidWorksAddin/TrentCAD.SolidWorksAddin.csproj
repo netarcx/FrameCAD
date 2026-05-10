@@ -9,27 +9,25 @@
     <RootNamespace>TrentCAD.SolidWorksAddin</RootNamespace>
     <AssemblyName>TrentCAD.SolidWorksAddin</AssemblyName>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <SolidWorksInstalled Condition="Exists('C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll')">true</SolidWorksInstalled>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Stubs\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
-  <!-- Use real SolidWorks interop DLLs when installed -->
-  <ItemGroup Condition="'$(SolidWorksInstalled)' == 'true'">
-    <Compile Remove="Stubs\**" />
+  <ItemGroup>
     <Reference Include="SolidWorks.Interop.sldworks">
-      <HintPath>C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.sldworks.dll</HintPath>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
+      <HintPath>..\lib\SolidWorks.Interop.sldworks.dll</HintPath>
     </Reference>
     <Reference Include="SolidWorks.Interop.swconst">
-      <HintPath>C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.swconst.dll</HintPath>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
+      <HintPath>..\lib\SolidWorks.Interop.swconst.dll</HintPath>
     </Reference>
     <Reference Include="SolidWorks.Interop.swpublished">
-      <HintPath>C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.swpublished.dll</HintPath>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
+      <HintPath>..\lib\SolidWorks.Interop.swpublished.dll</HintPath>
     </Reference>
   </ItemGroup>
 

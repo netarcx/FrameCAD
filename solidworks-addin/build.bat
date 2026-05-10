@@ -35,7 +35,6 @@ if %ERRORLEVEL% neq 0 (
     echo Build failed. Make sure you have installed:
     echo   - .NET SDK: https://dotnet.microsoft.com/download
     echo   - .NET Framework 4.8 Developer Pack: https://dotnet.microsoft.com/download/dotnet-framework/net48
-    echo   - SolidWorks (for interop assemblies in C:\Program Files\SOLIDWORKS Corp\)
     exit /b 1
 )
 
