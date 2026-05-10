@@ -203,16 +203,21 @@ Write operations (`checkout`, `checkin`, `sync`, `publish`) are serialized — o
 
 ## SolidWorks Add-in Setup
 
-The add-in is a separate C# project targeting .NET Framework 4.8. No Visual Studio required.
+### Option 1: Download from GitHub (easiest)
 
-### Prerequisites
-- [.NET SDK](https://dotnet.microsoft.com/download) (any modern version — 6, 8, or 9)
-- [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48)
-- SolidWorks installed (provides the interop assemblies)
+The add-in is built automatically by GitHub Actions on every push to `solidworks-addin/`.
 
-### Build & Install
+1. Go to **Actions** > **Build SolidWorks Add-in** > click the latest run > download the **TrentCAD-SolidWorksAddin** artifact
+2. Extract the zip to a permanent folder (e.g., `C:\TrentCAD-Addin\`)
+3. Open a Command Prompt **as Administrator** and run:
+   ```batch
+   %windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase "C:\TrentCAD-Addin\TrentCAD.SolidWorksAddin.dll"
+   ```
+4. Restart SolidWorks — the TrentCAD pane appears in the Task Pane
 
-A `build.bat` script is included in the `solidworks-addin/` folder:
+### Option 2: Build locally
+
+Requires [.NET SDK](https://dotnet.microsoft.com/download) and [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48). No Visual Studio needed.
 
 ```batch
 cd solidworks-addin
@@ -222,19 +227,9 @@ build.bat /register     # Build + register (run as Administrator)
 build.bat /unregister   # Unregister the add-in (run as Administrator)
 ```
 
-Or manually:
+### Usage
 
-```batch
-cd solidworks-addin
-dotnet build TrentCAD.SolidWorksAddin\TrentCAD.SolidWorksAddin.csproj -c Release
-
-REM Register (run as Administrator):
-%windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase TrentCAD.SolidWorksAddin\bin\Release\net48\TrentCAD.SolidWorksAddin.dll
-```
-
-Restart SolidWorks after registering — the TrentCAD pane appears in the Task Pane.
-
-The add-in requires TrentCAD to be running with a project open (it communicates via the REST API on port 42129).
+The add-in requires TrentCAD (the Electron app) to be running with a project open — it communicates via the REST API on port 42129. The connection indicator in the pane shows green when connected.
 
 ## Google Drive Setup
 

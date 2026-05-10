@@ -1,0 +1,28 @@
+name: Build SolidWorks Add-in
+
+on:
+  push:
+    paths:
+      - 'solidworks-addin/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Build add-in
+        run: dotnet build solidworks-addin/TrentCAD.SolidWorksAddin/TrentCAD.SolidWorksAddin.csproj -c Release
+
+      - name: Upload add-in artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrentCAD-SolidWorksAddin
+          path: solidworks-addin/TrentCAD.SolidWorksAddin/bin/Release/net48/
+          retention-days: 90
