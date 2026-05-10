@@ -111,6 +111,9 @@ export interface IpcApi {
   disconnectDrive(): Promise<void>
   getDriveStatus(): Promise<DriveStatus>
   syncToDrive(): Promise<DriveSyncResult>
+  getRecentProjects(): Promise<ProjectConfig[]>
+  getGitIdentity(): Promise<{ name: string; email: string }>
+  setGitIdentity(name: string, email: string): Promise<void>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
 }

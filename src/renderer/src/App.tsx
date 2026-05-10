@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useGit } from './hooks/useGit'
+import ProfileSetup from './components/ProfileSetup'
 import ProjectSetup from './components/ProjectSetup'
 import ProjectBrowser from './components/ProjectBrowser'
 import Toolbar from './components/Toolbar'
@@ -41,6 +42,30 @@ export default function App() {
     dismissError
   } = useGit()
 
+  const [identityChecked, setIdentityChecked] = useState(false)
+  const [needsProfile, setNeedsProfile] = useState(false)
+  const [showProfileEdit, setShowProfileEdit] = useState(false)
+  const [gitName, setGitName] = useState('')
+  const [gitEmail, setGitEmail] = useState('')
+
+  useEffect(() => {
+    window.api.getGitIdentity().then(({ name, email }) => {
+      setGitName(name)
+      setGitEmail(email)
+      setNeedsProfile(!name || !email)
+      setIdentityChecked(true)
+    }).catch(() => setIdentityChecked(true))
+  }, [])
+
+  const handleProfileComplete = useCallback(() => {
+    window.api.getGitIdentity().then(({ name, email }) => {
+      setGitName(name)
+      setGitEmail(email)
+      setNeedsProfile(false)
+      setShowProfileEdit(false)
+    })
+  }, [])
+
   const stats = useMemo(() => ({
     modified: countByState(files, 'modified'),
     untracked: countByState(files, 'untracked'),
@@ -50,6 +75,21 @@ export default function App() {
 
   const copyError = () => {
     if (error) navigator.clipboard.writeText(error)
+  }
+
+  if (!identityChecked) return null
+
+  if (needsProfile || showProfileEdit) {
+    return (
+      <div className="app">
+        <ProfileSetup
+          onComplete={handleProfileComplete}
+          onCancel={needsProfile ? undefined : () => setShowProfileEdit(false)}
+          initialName={gitName}
+          initialEmail={gitEmail}
+        />
+      </div>
+    )
   }
 
   if (!project) {
@@ -102,6 +142,13 @@ export default function App() {
             {driveStatus.connected ? 'Drive Connected' : 'Connect Drive'}
           </button>
         )}
+        <button
+          className="user-badge"
+          onClick={() => setShowProfileEdit(true)}
+          title={`Signed in as ${gitName} (${gitEmail})`}
+        >
+          {gitName}
+        </button>
         <span className="team-badge">FRC 2129</span>
       </div>
 

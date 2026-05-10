@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import type { ProjectConfig } from '@shared/types'
 
 interface Props {
   onCreateProject: (name: string, path: string, remote: string) => Promise<void>
@@ -15,6 +16,11 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   const [path, setPath] = useState('')
   const [remote, setRemote] = useState('')
   const [url, setUrl] = useState('')
+  const [recentProjects, setRecentProjects] = useState<ProjectConfig[]>([])
+
+  useEffect(() => {
+    window.api.getRecentProjects().then(setRecentProjects).catch(() => {})
+  }, [])
 
   const handleBrowse = async () => {
     const dir = await window.api.selectDirectory()
@@ -43,6 +49,24 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <span className="card-desc">Open an existing<br />project folder</span>
           </button>
         </div>
+        {recentProjects.length > 0 && (
+          <div className="recent-projects">
+            <h3>Recent Projects</h3>
+            <div className="recent-list">
+              {recentProjects.map(p => (
+                <button
+                  key={p.path}
+                  className="recent-item"
+                  onClick={() => onOpenProject(p.path)}
+                  disabled={isLoading}
+                >
+                  <span className="recent-name">{p.name}</span>
+                  <span className="recent-path">{p.path}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     )
   }

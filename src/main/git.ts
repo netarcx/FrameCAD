@@ -31,6 +31,7 @@ export function getProjectPath(): string {
 
 export async function createProject(name: string, dirPath: string, remote: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true })
+  await addSafeDirectory(dirPath)
   git = simpleGit(dirPath)
   projectPath = dirPath
 
@@ -70,6 +71,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
 }
 
 export async function joinProject(url: string, dirPath: string): Promise<void> {
+  await addSafeDirectory(dirPath)
   git = simpleGit()
   git.env('GIT_CLONE_PROTECTION_ACTIVE', 'false')
   await git.clone(url, dirPath)
@@ -77,7 +79,23 @@ export async function joinProject(url: string, dirPath: string): Promise<void> {
   projectPath = dirPath
 }
 
+async function addSafeDirectory(dirPath: string): Promise<void> {
+  const normalized = dirPath.replace(/\\/g, '/')
+  try {
+    const g = simpleGit()
+    await g.raw(['config', '--global', '--get-all', 'safe.directory']).then(result => {
+      const dirs = result.trim().split('\n')
+      if (dirs.includes(normalized) || dirs.includes('*')) return
+      return g.raw(['config', '--global', '--add', 'safe.directory', normalized])
+    })
+  } catch {
+    const g = simpleGit()
+    await g.raw(['config', '--global', '--add', 'safe.directory', normalized])
+  }
+}
+
 export async function openProject(dirPath: string): Promise<void> {
+  await addSafeDirectory(dirPath)
   git = simpleGit(dirPath)
   projectPath = dirPath
 
@@ -199,6 +217,19 @@ export async function getStatus(): Promise<FileEntry[]> {
     // parts.json may not exist yet for joined/legacy projects
   }
   return result
+}
+
+export async function getGitIdentity(): Promise<{ name: string; email: string }> {
+  const g = simpleGit()
+  const name = (await g.getConfig('user.name')).value || ''
+  const email = (await g.getConfig('user.email')).value || ''
+  return { name, email }
+}
+
+export async function setGitIdentity(name: string, email: string): Promise<void> {
+  const g = simpleGit()
+  await g.addConfig('user.name', name, false, 'global')
+  await g.addConfig('user.email', email, false, 'global')
 }
 
 export async function getHistory(limit = 50): Promise<HistoryEntry[]> {

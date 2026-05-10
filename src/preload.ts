@@ -62,6 +62,15 @@ const api: IpcApi = {
   syncToDrive: () =>
     ipcRenderer.invoke('sync-to-drive'),
 
+  getRecentProjects: () =>
+    ipcRenderer.invoke('get-recent-projects'),
+
+  getGitIdentity: () =>
+    ipcRenderer.invoke('get-git-identity'),
+
+  setGitIdentity: (name, email) =>
+    ipcRenderer.invoke('set-git-identity', name, email),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

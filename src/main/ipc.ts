@@ -4,7 +4,7 @@ import { watch } from 'chokidar'
 import * as gitOps from './git'
 import * as lockOps from './locking'
 import * as partsOps from './parts'
-import { addRecentProject } from './config'
+import { addRecentProject, getRecentProjects } from './config'
 import { startRestServer, stopRestServer } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
@@ -172,6 +172,18 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('sync-to-drive', async () => {
     return driveOps.syncToDrive()
+  })
+
+  ipcMain.handle('get-recent-projects', async () => {
+    return getRecentProjects()
+  })
+
+  ipcMain.handle('get-git-identity', async () => {
+    return gitOps.getGitIdentity()
+  })
+
+  ipcMain.handle('set-git-identity', async (_e, name: string, email: string) => {
+    await gitOps.setGitIdentity(name, email)
   })
 }
 
