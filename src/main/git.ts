@@ -71,6 +71,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
 
 export async function joinProject(url: string, dirPath: string): Promise<void> {
   git = simpleGit()
+  git.env('GIT_CLONE_PROTECTION_ACTIVE', 'false')
   await git.clone(url, dirPath)
   git = simpleGit(dirPath)
   projectPath = dirPath
