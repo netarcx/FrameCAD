@@ -8,10 +8,10 @@ namespace TrentCAD.SolidWorksAddin
 {
     [ComVisible(true)]
     [Guid("8A3F4B2E-1C5D-4E6F-9A7B-2D3E4F5A6B7C")]
-    [SwAddin(Description = "TrentCAD - CAD Collaboration for FRC 2129", Title = "TrentCAD", LoadAtStartup = true)]
     public class SwAddin : ISwAddin
     {
         private ISldWorks _swApp;
+        private SldWorks _swEvents;
         private int _addinCookie;
         private TaskPaneControl _taskPaneControl;
         private ITaskpaneView _taskPaneView;
@@ -38,9 +38,10 @@ namespace TrentCAD.SolidWorksAddin
         public bool ConnectToSW(object ThisSW, int Cookie)
         {
             _swApp = (ISldWorks)ThisSW;
+            _swEvents = (SldWorks)ThisSW;
             _addinCookie = Cookie;
 
-            _swApp.ActiveDocChangeNotify += OnActiveDocChange;
+            _swEvents.ActiveDocChangeNotify += OnActiveDocChange;
 
             CreateTaskPane();
             _taskPaneControl?.StartHealthPolling();
@@ -50,20 +51,21 @@ namespace TrentCAD.SolidWorksAddin
 
         public bool DisconnectFromSW()
         {
-            _swApp.ActiveDocChangeNotify -= OnActiveDocChange;
+            _swEvents.ActiveDocChangeNotify -= OnActiveDocChange;
 
             _taskPaneControl?.StopHealthPolling();
             _taskPaneView?.DeleteView();
             _taskPaneControl?.Dispose();
 
             _swApp = null;
+            _swEvents = null;
             return true;
         }
 
         private void CreateTaskPane()
         {
             _taskPaneControl = new TaskPaneControl();
-            _taskPaneView = _swApp.CreateTaskpaneView3("", "TrentCAD");
+            _taskPaneView = _swApp.CreateTaskpaneView3(null, "TrentCAD");
 
             if (_taskPaneView != null)
             {
