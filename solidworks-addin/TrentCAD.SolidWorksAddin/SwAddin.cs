@@ -20,9 +20,9 @@ namespace TrentCAD.SolidWorksAddin
         public static void RegisterFunction(Type t)
         {
             var keyPath = @"SOFTWARE\SolidWorks\AddIns\" + t.GUID.ToString("B");
-            using (var key = Registry.CurrentUser.CreateSubKey(keyPath))
+            using (var key = Registry.LocalMachine.CreateSubKey(keyPath))
             {
-                key.SetValue(null, 0);
+                key.SetValue(null, 1);
                 key.SetValue("Description", "TrentCAD - CAD Collaboration for FRC 2129");
                 key.SetValue("Title", "TrentCAD");
             }
@@ -32,7 +32,7 @@ namespace TrentCAD.SolidWorksAddin
         public static void UnregisterFunction(Type t)
         {
             var keyPath = @"SOFTWARE\SolidWorks\AddIns\" + t.GUID.ToString("B");
-            Registry.CurrentUser.DeleteSubKey(keyPath, false);
+            Registry.LocalMachine.DeleteSubKey(keyPath, false);
         }
 
         public bool ConnectToSW(object ThisSW, int Cookie)
