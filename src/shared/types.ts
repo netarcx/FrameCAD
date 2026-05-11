@@ -234,13 +234,20 @@ export interface IpcApi {
   getGitIdentity(): Promise<{ name: string; email: string }>
   setGitIdentity(name: string, email: string): Promise<void>
   restartToUpdate(): Promise<void>
+  checkForUpdate(): Promise<{
+    success: boolean
+    currentVersion?: string
+    latestVersion?: string
+    updateAvailable?: boolean
+    error?: string
+  }>
   getAppVersion(): Promise<string>
   checkDependencies(): Promise<DependencyStatus>
   openExternal(url: string): Promise<void>
   githubAuthStatus(): Promise<GitHubAuthStatus>
   githubLogin(): Promise<{ launched: boolean; error?: string }>
   reportIssue(errorMessage: string): Promise<{ success: boolean; url?: string; number?: number; error?: string }>
-  generateDocument(type: 'bom' | 'manufacturing' | 'summary'): Promise<{ success: boolean; filePath?: string; relPath?: string; pdfFilePath?: string; pdfRelPath?: string; pdfError?: string; error?: string }>
+  generateDocument(type: 'bom' | 'manufacturing' | 'summary' | 'bom-by-subsystem'): Promise<{ success: boolean; filePath?: string; relPath?: string; pdfFilePath?: string; pdfRelPath?: string; pdfError?: string; error?: string }>
   openPath(absPath: string): Promise<{ success: boolean; error?: string }>
   revealInFolder(absPath: string): Promise<{ success: boolean; error?: string }>
   scanLargeFiles(): Promise<{
@@ -277,6 +284,15 @@ export interface IpcApi {
   setManufacturingMethod(filePath: string, method: ManufacturingMethod | null): Promise<void>
   setManufacturingMaterial(filePath: string, material: string): Promise<void>
   getManufacturingQueue(): Promise<ManufacturingQueueItem[]>
+  getAllPartsMeta(): Promise<Record<string, PartMeta>>
+  checkManifestIntegrity(): Promise<{
+    success: boolean
+    duplicates?: Array<{ partNumber: string; paths: string[] }>
+    orphanedDrawings?: Array<{ path: string; linkedTo: string }>
+    tombstones?: string[]
+    error?: string
+  }>
+  renormalizeAll(): Promise<{ success: boolean; error?: string }>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void

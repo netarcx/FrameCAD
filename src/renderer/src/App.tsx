@@ -242,6 +242,31 @@ export default function App() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ctrl+Shift+R = manual "check for updates now". Independent of
+      // the every-launch auto-check; useful when the user knows a
+      // newer build just shipped and doesn't want to wait for the
+      // scheduled poll.
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault()
+        ;(async () => {
+          try {
+            const r = await window.api.checkForUpdate()
+            if (!r.success) {
+              alert(`Could not check for updates: ${r.error || 'unknown error'}`)
+            } else if (r.updateAvailable) {
+              // Auto-update will fire its 'update-available' event and the
+              // existing banner shows the download progress. Just confirm
+              // the user that an update was found.
+              alert(`Update available — v${r.latestVersion} is downloading in the background.`)
+            } else {
+              alert(`You're on the latest version (v${r.currentVersion}).`)
+            }
+          } catch (err) {
+            alert(`Could not check for updates: ${(err as Error).message}`)
+          }
+        })()
+        return
+      }
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault()
         if (showAdmin) {

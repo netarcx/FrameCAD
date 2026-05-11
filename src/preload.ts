@@ -80,6 +80,9 @@ const api: IpcApi = {
   restartToUpdate: () =>
     ipcRenderer.invoke('restart-to-update'),
 
+  checkForUpdate: () =>
+    ipcRenderer.invoke('check-for-update'),
+
   getAppVersion: () =>
     ipcRenderer.invoke('get-app-version'),
 
@@ -178,6 +181,15 @@ const api: IpcApi = {
 
   getManufacturingQueue: () =>
     ipcRenderer.invoke('get-manufacturing-queue'),
+
+  getAllPartsMeta: () =>
+    ipcRenderer.invoke('get-all-parts-meta'),
+
+  checkManifestIntegrity: () =>
+    ipcRenderer.invoke('check-manifest-integrity'),
+
+  renormalizeAll: () =>
+    ipcRenderer.invoke('renormalize-all'),
 
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>

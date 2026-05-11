@@ -407,6 +407,71 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     return metaOps.getManufacturingQueue()
   })
 
+  // Bulk loader used by the admin Parts Manager tab so we don't fire
+  // N IPC calls (one per part) to render the table. Returns the entire
+  // parts-meta.json file keyed by relative path; the renderer joins
+  // against the parts manifest client-side.
+  ipcMain.handle('get-all-parts-meta', async () => {
+    return metaOps.loadAllMeta()
+  })
+
+  // Scans the parts manifest for integrity problems mentors should
+  // know about: duplicate part numbers (rare but breaks the BOM),
+  // drawings whose linkedTo target no longer exists in the manifest,
+  // and tombstone entries (manifest entry with no file on disk).
+  ipcMain.handle('check-manifest-integrity', async () => {
+    try {
+      const manifest = await partsOps.loadManifest()
+      const fs = await import('fs/promises')
+      const path = await import('path')
+      const projectDir = gitOps.getProjectPath()
+
+      // Duplicates: any partNumber appearing on more than one entry path
+      const byNumber: Record<string, string[]> = {}
+      for (const [p, e] of Object.entries(manifest.entries)) {
+        if (!byNumber[e.partNumber]) byNumber[e.partNumber] = []
+        byNumber[e.partNumber].push(p)
+      }
+      const duplicates = Object.entries(byNumber)
+        .filter(([, paths]) => paths.length > 1)
+        .map(([partNumber, paths]) => ({ partNumber, paths }))
+
+      // Orphaned drawings: drawing entries whose `linkedTo` is set but
+      // points at a path the manifest no longer has
+      const orphanedDrawings: { path: string; linkedTo: string }[] = []
+      for (const [p, e] of Object.entries(manifest.entries)) {
+        if (e.type === 'drawing' && e.linkedTo && !manifest.entries[e.linkedTo]) {
+          orphanedDrawings.push({ path: p, linkedTo: e.linkedTo })
+        }
+      }
+
+      // Tombstones: manifest entries whose file no longer exists on disk
+      const tombstones: string[] = []
+      for (const p of Object.keys(manifest.entries)) {
+        const abs = path.join(projectDir, p)
+        try { await fs.stat(abs) } catch { tombstones.push(p) }
+      }
+
+      return { success: true, duplicates, orphanedDrawings, tombstones }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  // Force `git add --renormalize -A` across the whole working tree.
+  // Useful when .gitattributes was updated (e.g. v0.7.7 added zip/exe
+  // to LFS) but existing files in the index are still stored as raw
+  // blobs. Publish already does this on each invocation, but a
+  // standalone button lets mentors run it explicitly for diagnosis.
+  ipcMain.handle('renormalize-all', async () => {
+    try {
+      await gitOps.getGit().raw(['add', '--renormalize', '-A'])
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle('get-main-remote-url', async () => {
     try {
       const remotes = await gitOps.getGit().getRemotes(true)

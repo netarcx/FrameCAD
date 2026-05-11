@@ -7,7 +7,7 @@ import { loadManifest } from './parts'
 import { loadAllMeta } from './meta'
 import type { PartEntry, PartMeta, PartsManifest } from '@shared/types'
 
-export type DocType = 'bom' | 'manufacturing' | 'summary'
+export type DocType = 'bom' | 'manufacturing' | 'summary' | 'bom-by-subsystem'
 
 export interface GenerateResult {
   success: boolean
@@ -21,21 +21,22 @@ export interface GenerateResult {
 }
 
 const DOCS_DIR = 'Documents'
-const FILES: Record<DocType, string> = {
+const FILES: Record<Exclude<DocType, 'bom-by-subsystem'>, string> = {
   bom: 'BOM.csv',
   manufacturing: 'Manufacturing-Queue.csv',
   summary: 'Project-Summary.md'
 }
-const PDF_FILES: Record<DocType, string> = {
+const PDF_FILES: Record<Exclude<DocType, 'bom-by-subsystem'>, string> = {
   bom: 'BOM.pdf',
   manufacturing: 'Manufacturing-Queue.pdf',
   summary: 'Project-Summary.pdf'
 }
-const PDF_TITLES: Record<DocType, string> = {
+const PDF_TITLES: Record<Exclude<DocType, 'bom-by-subsystem'>, string> = {
   bom: 'Bill of Materials',
   manufacturing: 'Manufacturing Queue',
   summary: 'Project Summary'
 }
+const BOM_BY_SUBSYSTEM_DIR = 'BOM-by-subsystem'
 const FRC_WEIGHT_LIMIT_LB = 125
 
 function csvEscape(v: unknown): string {
@@ -283,6 +284,10 @@ const PDF_BASE_STYLES = `
   th, td { padding: 5px 7px; border-bottom: 1px solid #eaeaea; text-align: left; vertical-align: top; }
   th { background: #f5f5f5; font-weight: 600; border-bottom: 1px solid #c0c0c0; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* Part numbers (e.g. "26-2129-01-005") must stay on one line — they're
+     hyphenated which would otherwise let the browser wrap inside the
+     number when a tight page column shrinks the cell width. */
+  td.pn, th.pn { white-space: nowrap; font-family: 'SF Mono', Consolas, Menlo, monospace; }
   .badge { padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; white-space: nowrap; }
   .badge-released { background: #d1fae5; color: #065f46; }
   .badge-in-review { background: #fef3c7; color: #92400e; }
@@ -305,7 +310,7 @@ function badgeFor(state?: string): string {
 
 function buildBomHtml(rows: JoinedRow[], generatedBy: string): string {
   const tableRows = rows.map(r => `<tr>
-    <td><strong>${escapeHtml(r.entry.partNumber)}</strong></td>
+    <td class="pn"><strong>${escapeHtml(r.entry.partNumber)}</strong></td>
     <td>${escapeHtml(basenameOf(r.relPath))}</td>
     <td>${escapeHtml(r.entry.type)}</td>
     <td>${escapeHtml(r.topLevel)}</td>
@@ -320,7 +325,7 @@ function buildBomHtml(rows: JoinedRow[], generatedBy: string): string {
     <div class="meta">Generated ${dateStamp()} by ${escapeHtml(generatedBy || 'TrentCAD')} · ${rows.length} entries</div>
     <table>
       <thead><tr>
-        <th>Part #</th><th>File</th><th>Type</th><th>Subsystem</th>
+        <th class="pn">Part #</th><th>File</th><th>Type</th><th>Subsystem</th>
         <th>Status</th><th>Method</th><th>Material</th>
         <th class="num">Mass (lb)</th><th class="num">Cost ($)</th>
       </tr></thead>
@@ -353,7 +358,7 @@ function buildManufacturingHtml(rows: JoinedRow[], generatedBy: string): string 
       return a.entry.partNumber.localeCompare(b.entry.partNumber)
     })
     const tableRows = list.map(r => `<tr>
-      <td><strong>${escapeHtml(r.entry.partNumber)}</strong></td>
+      <td class="pn"><strong>${escapeHtml(r.entry.partNumber)}</strong></td>
       <td>${escapeHtml(basenameOf(r.relPath))}</td>
       <td>${escapeHtml(r.meta.manufacturingMaterial ?? '')}</td>
       <td>${escapeHtml(r.topLevel)}</td>
@@ -365,7 +370,7 @@ function buildManufacturingHtml(rows: JoinedRow[], generatedBy: string): string 
       <h2>${escapeHtml(method)} <span style="font-weight:400;color:#666;font-size:12px">(${list.length})</span></h2>
       <table>
         <thead><tr>
-          <th>Part #</th><th>File</th><th>Material</th><th>Subsystem</th>
+          <th class="pn">Part #</th><th>File</th><th>Material</th><th>Subsystem</th>
           <th>Status</th><th class="num">Mass (lb)</th><th>Notes</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
@@ -545,9 +550,53 @@ export async function generateDocument(type: DocType, generatedBy: string): Prom
     const meta = await loadAllMeta()
     const rows = joinManifestAndMeta(manifest, meta)
 
+    // BOM-by-subsystem produces N files (one per top-level folder)
+    // rather than a single combined document. Path return values point
+    // at the containing folder so "Open" in the UI reveals all the
+    // PDFs the user just generated.
+    if (type === 'bom-by-subsystem') {
+      const subsystems = new Map<string, JoinedRow[]>()
+      for (const r of rows) {
+        const sub = r.topLevel || '(root)'
+        if (!subsystems.has(sub)) subsystems.set(sub, [])
+        subsystems.get(sub)!.push(r)
+      }
+      const outDir = path.join(projectDir, DOCS_DIR, BOM_BY_SUBSYSTEM_DIR)
+      await fs.mkdir(outDir, { recursive: true })
+      let pdfFailures = 0
+      let count = 0
+      for (const [sub, subRows] of subsystems) {
+        const safeName = sub.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '-')
+        const csvPath = path.join(outDir, `BOM-${safeName}.csv`)
+        await fs.writeFile(csvPath, buildBomCsv(subRows), 'utf-8')
+        try {
+          const subHtml = buildBomHtml(subRows, generatedBy)
+            .replace('<h1>Bill of Materials</h1>', `<h1>Bill of Materials — ${escapeHtml(sub)}</h1>`)
+          const pdfBuf = await htmlToPdf(subHtml, `BOM — ${sub}`)
+          await fs.writeFile(path.join(outDir, `BOM-${safeName}.pdf`), pdfBuf)
+        } catch {
+          pdfFailures++
+        }
+        count++
+      }
+      const relOutDir = `${DOCS_DIR}/${BOM_BY_SUBSYSTEM_DIR}`
+      return {
+        success: true,
+        filePath: outDir,
+        relPath: relOutDir,
+        pdfFilePath: pdfFailures < count ? outDir : undefined,
+        pdfRelPath: pdfFailures < count ? relOutDir : undefined,
+        pdfError: pdfFailures > 0 ? `${pdfFailures} of ${count} PDFs failed; CSVs all wrote OK` : undefined
+      }
+    }
+
+    // narrow type — TypeScript can't infer that bom-by-subsystem was
+    // handled above, so explicitly assert
+    const t = type as Exclude<DocType, 'bom-by-subsystem'>
+
     let content: string
     let html: string
-    switch (type) {
+    switch (t) {
       case 'bom':
         content = buildBomCsv(rows)
         html = buildBomHtml(rows, generatedBy)
@@ -562,19 +611,19 @@ export async function generateDocument(type: DocType, generatedBy: string): Prom
         break
     }
 
-    const relPath = `${DOCS_DIR}/${FILES[type]}`
-    const absPath = path.join(projectDir, DOCS_DIR, FILES[type])
+    const relPath = `${DOCS_DIR}/${FILES[t]}`
+    const absPath = path.join(projectDir, DOCS_DIR, FILES[t])
     await fs.mkdir(path.dirname(absPath), { recursive: true })
     await fs.writeFile(absPath, content, 'utf-8')
 
     // PDF is best-effort — if it fails, we still return the source-file
     // path so the user can use the CSV/MD. PDF errors come back in
     // pdfError without flipping the top-level success flag.
-    const pdfRelPath = `${DOCS_DIR}/${PDF_FILES[type]}`
-    const pdfAbsPath = path.join(projectDir, DOCS_DIR, PDF_FILES[type])
+    const pdfRelPath = `${DOCS_DIR}/${PDF_FILES[t]}`
+    const pdfAbsPath = path.join(projectDir, DOCS_DIR, PDF_FILES[t])
     let pdfError: string | undefined
     try {
-      const pdfBuf = await htmlToPdf(html, PDF_TITLES[type])
+      const pdfBuf = await htmlToPdf(html, PDF_TITLES[t])
       await fs.writeFile(pdfAbsPath, pdfBuf)
     } catch (err) {
       pdfError = (err as Error).message
