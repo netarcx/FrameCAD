@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using TrentCAD.SolidWorksAddin.Models;
 
@@ -567,6 +568,26 @@ namespace TrentCAD.SolidWorksAddin
 
         private void DoOpenApp()
         {
+            // If TrentCAD is already running, just bring its window to the foreground
+            var existing = System.Diagnostics.Process.GetProcessesByName("TrentCAD");
+            try
+            {
+                foreach (var proc in existing)
+                {
+                    var hwnd = proc.MainWindowHandle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+                        SetForegroundWindow(hwnd);
+                        return;
+                    }
+                }
+            }
+            finally
+            {
+                foreach (var proc in existing) proc.Dispose();
+            }
+
             var localApp = System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Programs", "trentcad", "TrentCAD.exe");
@@ -583,6 +604,17 @@ namespace TrentCAD.SolidWorksAddin
             else
                 ShowMessage("TrentCAD not found", true);
         }
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        private const int SW_RESTORE = 9;
     }
 
     internal class StatusDot : Control
