@@ -2,7 +2,7 @@ import simpleGit, { SimpleGit } from 'simple-git'
 import path from 'path'
 import fs from 'fs/promises'
 import type { FileEntry, FileState, HistoryEntry, PartsManifest, PublishProgress, PublishResult, SyncResult } from '@shared/types'
-import { getLocks } from './locking'
+import { getLocks, verifyLocks } from './locking'
 import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
 import { loadAllMeta, annotateMeta } from './meta'
 
@@ -968,10 +968,24 @@ export async function getStatus(): Promise<FileEntry[]> {
   const g = getGit()
   const dirPath = getProjectPath()
   const status = await g.status()
-  const locks = await getLocks()
 
-  const lockMap = new Map(locks.map(l => [l.path, l]))
+  // Prefer `git lfs locks --verify` because it tells us authoritatively
+  // which locks are *ours* based on the authenticated GitHub identity.
+  // Falling back to name-compare against `git config user.name` was the
+  // old approach and silently mis-labeled the user's own locks whenever
+  // their GitHub display name (e.g. "Trent Fox") differed from their
+  // local git config (e.g. "trentfox1") — making Check In impossible
+  // from the UI because the button only enables for `locked-by-you`.
+  const verified = await verifyLocks()
+  const oursSet = new Set(verified.ours.map(l => l.path))
+  const allLocks = verified.ours.length + verified.theirs.length > 0
+    ? [...verified.ours, ...verified.theirs]
+    : await getLocks()
 
+  const lockMap = new Map(allLocks.map(l => [l.path, l]))
+
+  // Used only as a last-resort fallback when --verify returns nothing
+  // (offline, anonymous LFS server, etc.) and we have to guess.
   const gitUsername = (await g.getConfig('user.name')).value || ''
 
   async function buildTree(dir: string, relativeTo: string): Promise<FileEntry[]> {
@@ -1011,7 +1025,12 @@ export async function getStatus(): Promise<FileEntry[]> {
         const lock = lockMap.get(relPath)
         if (lock) {
           lockedBy = lock.owner
-          state = lock.owner === gitUsername ? 'locked-by-you' : 'locked-by-other'
+          // verified.ours is the source of truth when available; only
+          // fall back to name-compare if --verify gave us nothing.
+          const isOurs = verified.ours.length + verified.theirs.length > 0
+            ? oursSet.has(relPath)
+            : lock.owner === gitUsername
+          state = isOurs ? 'locked-by-you' : 'locked-by-other'
         }
       }
 
