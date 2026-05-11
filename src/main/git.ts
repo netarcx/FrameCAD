@@ -103,6 +103,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
     await git.init()
     await git.raw(['lfs', 'install', '--local'])
   })
+  await applyUploadTunings()
 
   await fs.writeFile(path.join(dirPath, '.gitattributes'), buildGitAttributes())
 
@@ -165,6 +166,33 @@ export async function joinProject(url: string, dirPath: string): Promise<void> {
     git = simpleGit(dirPath)
     projectPath = dirPath
   })
+  await applyUploadTunings()
+}
+
+/**
+ * Apply the upload-tuning git config to the current repo. These are
+ * cheap one-time writes to .git/config that survive across pulls and
+ * pushes; running every open is fine and idempotent.
+ *
+ * - lfs.concurrenttransfers 12 — git's default is 8; bumping to 12 helps
+ *   multi-file CAD publishes saturate the connection. Higher than ~16
+ *   tends to choke residential up-links.
+ * - http.postBuffer 500 MB — large CAD pushes occasionally trip git's
+ *   default ~1 MB stream buffer and fail mid-push with HTTP 500. The
+ *   buffer only allocates as needed; it doesn't waste 500 MB up front.
+ * - lfs.activitytimeout 600 — give a slow chunk 10 minutes before
+ *   declaring the upload dead, instead of the default 30s.
+ * - lfs.dialtimeout 30 — wait 30s for the initial TLS handshake to
+ *   github-lfs.s3 instead of failing fast on a slow link.
+ */
+async function applyUploadTunings(): Promise<void> {
+  const g = getGit()
+  await Promise.all([
+    g.raw(['config', '--local', 'lfs.concurrenttransfers', '12']).catch(() => {}),
+    g.raw(['config', '--local', 'http.postBuffer', '524288000']).catch(() => {}),
+    g.raw(['config', '--local', 'lfs.activitytimeout', '600']).catch(() => {}),
+    g.raw(['config', '--local', 'lfs.dialtimeout', '30']).catch(() => {})
+  ])
 }
 
 async function addSafeDirectory(dirPath: string): Promise<void> {
@@ -220,6 +248,7 @@ export async function openProject(dirPath: string): Promise<void> {
     // so files added today never get the default text-merge treatment
     await ensureGitAttributes().catch(() => { /* best-effort */ })
   })
+  await applyUploadTunings()
 }
 
 export async function createProgressTag(

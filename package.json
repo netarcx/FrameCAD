@@ -1,6 +1,6 @@
 {
   "name": "trentcad",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "CAD collaboration tool for FRC robotics teams",
   "main": "./out/main/index.js",
   "scripts": {
