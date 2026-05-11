@@ -156,6 +156,19 @@ namespace TrentCAD.SolidWorksAddin
                 var doc = created as ModelDoc2;
                 if (doc == null) return "Unexpected document type from SolidWorks";
 
+                // Force IPS (inch / pound / second) on every part TrentCAD
+                // creates. FRC teams build in pounds and inches; the team
+                // template might be MMGS or MKS, so we override here.
+                // SetUserPreferenceIntegerValue on the model affects only
+                // this document, not the user's global settings.
+                try
+                {
+                    doc.SetUserPreferenceIntegerValue(
+                        (int)swUserPreferenceIntegerValue_e.swUnitSystem,
+                        (int)swUnitSystem_e.swUnitSystem_IPS);
+                }
+                catch { /* template's units win if SW rejects the call */ }
+
                 var dir = Path.GetDirectoryName(absolutePath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
