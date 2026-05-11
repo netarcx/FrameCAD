@@ -582,9 +582,37 @@ export async function publish(
 
       // git add doesn't accept too many args at once on Windows command
       // lines (cmd.exe caps argv at ~8 KB). Chunk in batches of 200 paths.
+      //
+      // Defensive retry: even with the freshStatus filter above, edge
+      // cases (case-insensitive Windows FS reporting a renamed-by-case
+      // path; race between fresh-status and add where a watcher event
+      // is still propagating; simple-git path quoting/encoding quirks)
+      // can leave a stale entry that `git add` rejects with "fatal:
+      // pathspec '...' did not match any files". When that happens we
+      // parse the offending path out of the error, drop it, and retry
+      // the same chunk. Tasks are bounded by chunk size so this can
+      // only loop a finite number of times.
       const CHUNK = 200
-      for (let i = 0; i < stagable.length; i += CHUNK) {
-        await g.raw(['add', '--', ...stagable.slice(i, i + CHUNK)])
+      let cursor = 0
+      let remaining = stagable.slice()
+      while (cursor < remaining.length) {
+        const batch = remaining.slice(cursor, cursor + CHUNK)
+        try {
+          await g.raw(['add', '--', ...batch])
+          cursor += batch.length
+        } catch (addErr) {
+          const msg = (addErr as Error).message || ''
+          const m = msg.match(/pathspec ['"]([^'"]+)['"] did not match/)
+          if (!m) throw addErr
+          const badPath = m[1]
+          const idx = remaining.indexOf(badPath, cursor)
+          if (idx < 0) throw addErr
+          // Drop the offender in place; cursor stays put so we retry
+          // the rest of the batch (including paths that came AFTER the
+          // offender, which git add never processed because the whole
+          // call errored).
+          remaining.splice(idx, 1)
+        }
       }
 
       // Staging may have produced an empty diff (e.g. files reverted in
