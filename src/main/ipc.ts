@@ -71,6 +71,10 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     await addRecentProject(currentProject)
     setRestProject(currentProject)
     driveOps.initDrive().catch(() => {})
+    // If the joined project already has admin-configured COTS, pull it now
+    adminOps.loadAdminConfig().then(cfg => {
+      if (cfg.cotsRepoUrl) gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch).catch(() => {})
+    }).catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
   })

@@ -190,6 +190,16 @@ export async function syncCotsRepo(repoUrl: string, branch?: string): Promise<{ 
   }
 }
 
+async function getCurrentBranch(g: SimpleGit): Promise<string> {
+  try {
+    const r = await g.revparse(['--abbrev-ref', 'HEAD'])
+    const branch = r.trim()
+    return branch && branch !== 'HEAD' ? branch : 'main'
+  } catch {
+    return 'main'
+  }
+}
+
 export async function pullPartsJson(): Promise<void> {
   const g = getGit()
   try {
@@ -200,8 +210,9 @@ export async function pullPartsJson(): Promise<void> {
     // pending reservation
     const status = await g.status()
     if (status.files.some(f => f.path === 'parts.json')) return
+    const branch = await getCurrentBranch(g)
     try {
-      await g.raw(['checkout', 'origin/main', '--', 'parts.json'])
+      await g.raw(['checkout', `origin/${branch}`, '--', 'parts.json'])
     } catch {
       // parts.json may not exist on remote yet — ignore
     }
