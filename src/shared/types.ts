@@ -98,6 +98,12 @@ export interface DependencyStatus {
   lfs: { installed: boolean; version?: string }
 }
 
+export interface GitHubAuthStatus {
+  ghCliAvailable: boolean
+  loggedIn: boolean
+  username?: string
+}
+
 export interface AdminConfig {
   teamName?: string
   welcomeMessage?: string
@@ -147,6 +153,9 @@ export interface IpcApi {
   getAppVersion(): Promise<string>
   checkDependencies(): Promise<DependencyStatus>
   openExternal(url: string): Promise<void>
+  githubAuthStatus(): Promise<GitHubAuthStatus>
+  githubLogin(): Promise<{ launched: boolean; error?: string }>
+  gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }>
   getAdminConfig(): Promise<AdminConfig>
   saveAdminConfig(config: AdminConfig): Promise<void>
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>

@@ -89,6 +89,15 @@ const api: IpcApi = {
   openExternal: (url) =>
     ipcRenderer.invoke('open-external', url),
 
+  githubAuthStatus: () =>
+    ipcRenderer.invoke('github-auth-status'),
+
+  githubLogin: () =>
+    ipcRenderer.invoke('github-login'),
+
+  gitResetup: () =>
+    ipcRenderer.invoke('git-resetup'),
+
   getAdminConfig: () =>
     ipcRenderer.invoke('get-admin-config'),
 

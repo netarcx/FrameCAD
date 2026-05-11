@@ -1026,6 +1026,48 @@ input {
   text-align: center;
 }
 
+.setup-toolbar {
+  width: 500px;
+  max-width: 90vw;
+}
+
+.setup-auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.setup-auth-status {
+  flex: 1;
+  min-width: 180px;
+  font-size: 12px;
+  color: var(--green);
+}
+
+.setup-auth-status.muted {
+  color: var(--text-muted);
+}
+
+.setup-auth-status strong {
+  color: var(--text-primary);
+}
+
+.setup-toolbar-msg {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: 'SF Mono', 'Consolas', monospace;
+}
+
 .recent-projects {
   width: 500px;
   max-width: 90vw;

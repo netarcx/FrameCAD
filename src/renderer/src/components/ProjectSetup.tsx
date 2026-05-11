@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import logoUrl from '../assets/logo.png'
-import type { ProjectConfig } from '@shared/types'
+import type { GitHubAuthStatus, ProjectConfig } from '@shared/types'
 
 interface Props {
   onCreateProject: (name: string, path: string, remote: string, isCotsProject?: boolean) => Promise<void>
@@ -19,10 +19,45 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   const [url, setUrl] = useState('')
   const [isCotsProject, setIsCotsProject] = useState(false)
   const [recentProjects, setRecentProjects] = useState<ProjectConfig[]>([])
+  const [authStatus, setAuthStatus] = useState<GitHubAuthStatus | null>(null)
+  const [resetupMsg, setResetupMsg] = useState<string | null>(null)
+  const [loggingIn, setLoggingIn] = useState(false)
+  const [resetting, setResetting] = useState(false)
+
+  const refreshAuth = useCallback(() => {
+    window.api.githubAuthStatus().then(setAuthStatus).catch(() => {})
+  }, [])
 
   useEffect(() => {
     window.api.getRecentProjects().then(setRecentProjects).catch(() => {})
-  }, [])
+    refreshAuth()
+  }, [refreshAuth])
+
+  const handleGitHubLogin = async () => {
+    setLoggingIn(true)
+    setResetupMsg(null)
+    try {
+      const result = await window.api.githubLogin()
+      if (!result.launched) {
+        setResetupMsg(result.error || 'Could not launch GitHub login')
+      } else {
+        setResetupMsg('Sign-in opened in a new window — when done, click "Check sign-in" to refresh')
+      }
+    } finally {
+      setLoggingIn(false)
+    }
+  }
+
+  const handleResetup = async () => {
+    setResetting(true)
+    setResetupMsg(null)
+    try {
+      const result = await window.api.gitResetup()
+      setResetupMsg((result.success ? '✓ ' : '✗ ') + (result.error || result.messages.join(' · ')))
+    } finally {
+      setResetting(false)
+    }
+  }
 
   const handleBrowse = async () => {
     const dir = await window.api.selectDirectory()
@@ -52,6 +87,36 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <span className="card-desc">Open an existing<br />project folder</span>
           </button>
         </div>
+        <div className="setup-toolbar">
+          <div className="setup-auth">
+            {authStatus?.loggedIn ? (
+              <span className="setup-auth-status">
+                ✓ Signed in to GitHub as <strong>{authStatus.username}</strong>
+              </span>
+            ) : (
+              <span className="setup-auth-status muted">
+                {authStatus?.ghCliAvailable === false
+                  ? 'GitHub CLI not detected — install to enable sign-in'
+                  : 'Not signed in to GitHub'}
+              </span>
+            )}
+            <button
+              className="toolbar-btn"
+              onClick={handleGitHubLogin}
+              disabled={loggingIn || authStatus?.ghCliAvailable === false}
+            >
+              {loggingIn ? 'Opening...' : authStatus?.loggedIn ? 'Re-sign in' : 'Sign in with GitHub'}
+            </button>
+            <button className="toolbar-btn" onClick={refreshAuth}>
+              Check sign-in
+            </button>
+            <button className="toolbar-btn" onClick={handleResetup} disabled={resetting}>
+              {resetting ? 'Resetting...' : 'Re-setup Git'}
+            </button>
+          </div>
+          {resetupMsg && <div className="setup-toolbar-msg">{resetupMsg}</div>}
+        </div>
+
         {recentProjects.length > 0 && (
           <div className="recent-projects">
             <h3>Recent Projects</h3>
