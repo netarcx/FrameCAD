@@ -182,7 +182,7 @@ async function collectSolidWorksFiles(dirPath: string, relativeTo: string): Prom
     }
 
     for (const item of items) {
-      if (item === '.git' || item === '.claude' || item === '.trentcad' || item === 'COTS') continue
+      if (item.startsWith('.') || item === 'COTS') continue
       const fullPath = path.join(dir, item)
       const stat = await fs.stat(fullPath).catch(() => null)
       if (!stat) continue

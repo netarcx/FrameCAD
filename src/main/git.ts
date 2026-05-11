@@ -252,7 +252,9 @@ export async function getStatus(): Promise<FileEntry[]> {
     }
 
     for (const item of items) {
-      if (item === '.git' || item === '.claude' || item === '.trentcad') continue
+      // Hide system / dotfiles and the parts manifest from the browser so
+      // students don't see (or accidentally edit) the metadata layer
+      if (item.startsWith('.') || item === 'parts.json') continue
 
       const fullPath = path.join(dir, item)
       const relPath = path.relative(relativeTo, fullPath).replace(/\\/g, '/')
