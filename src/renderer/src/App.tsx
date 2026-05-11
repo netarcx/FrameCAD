@@ -8,7 +8,7 @@ import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
 import logoUrl from './assets/logo.png'
-import type { AdminConfig, DependencyStatus, FileEntry, PublishProgress, UpdateInfo } from '@shared/types'
+import type { AdminConfig, DependencyStatus, FileEntry, ProjectTotals, PublishProgress, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
   let count = 0
@@ -60,6 +60,7 @@ export default function App() {
   const [missingDeps, setMissingDeps] = useState<DependencyStatus | null>(null)
   const [checkingDeps, setCheckingDeps] = useState(false)
   const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null)
+  const [projectTotals, setProjectTotals] = useState<ProjectTotals | null>(null)
 
   useEffect(() => {
     const cleanup = window.api.onPublishProgress((p) => {
@@ -90,6 +91,21 @@ export default function App() {
     if (!project) return
     window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
   }, [project])
+
+  useEffect(() => {
+    if (!project) {
+      setProjectTotals(null)
+      return
+    }
+    const refresh = () =>
+      window.api.getProjectTotals().then(setProjectTotals).catch(() => setProjectTotals(null))
+    refresh()
+    // Files state changes whenever the watcher fires, but mass/cost lives in
+    // the meta file the watcher doesn't follow; re-fetch every 5s while a
+    // project is open so totals stay current after team uploads
+    const id = setInterval(refresh, 5000)
+    return () => clearInterval(id)
+  }, [project, files])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -401,6 +417,17 @@ export default function App() {
       {depsModal}
 
       <div className="status-bar">
+        {projectTotals && projectTotals.totalParts > 0 && (
+          <>
+            <span className="status-item robot-totals" title={`From ${projectTotals.partsWithMass} of ${projectTotals.totalParts} parts`}>
+              <strong>Robot:</strong> {projectTotals.mass.toFixed(1)} lb
+            </span>
+            <span className="status-item robot-totals" title={`From ${projectTotals.partsWithCost} of ${projectTotals.totalParts} parts`}>
+              <strong>$</strong>{projectTotals.cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </span>
+            <span className="status-sep" />
+          </>
+        )}
         {stats.modified > 0 && (
           <span className="status-item">
             <span className="status-dot modified" />

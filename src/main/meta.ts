@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs/promises'
-import type { PartMeta, ReleaseState } from '@shared/types'
+import type { PartMeta, ProjectTotals, ReleaseState } from '@shared/types'
 import { getProjectPath, getGit, pullRemoteFile, commitAndPushFile } from './git'
 
 const META_DIR = '.trentcad'
@@ -110,6 +110,57 @@ export async function setManufacturingNotes(filePath: string, notes: string): Pr
     entry => { entry.manufacturingNotes = notes },
     `[mfg-notes] ${path.basename(filePath)}`
   )
+}
+
+export async function setPartMass(filePath: string, mass: number | null): Promise<void> {
+  if (mass !== null && (!isFinite(mass) || mass < 0)) {
+    throw new Error('Mass must be a non-negative number')
+  }
+  await modifyAndSync(
+    filePath,
+    entry => {
+      if (mass === null) delete entry.mass
+      else entry.mass = mass
+    },
+    `[mass] ${path.basename(filePath)} = ${mass === null ? 'cleared' : `${mass} lb`}`
+  )
+}
+
+export async function setPartCost(filePath: string, cost: number | null): Promise<void> {
+  if (cost !== null && (!isFinite(cost) || cost < 0)) {
+    throw new Error('Cost must be a non-negative number')
+  }
+  await modifyAndSync(
+    filePath,
+    entry => {
+      if (cost === null) delete entry.cost
+      else entry.cost = cost
+    },
+    `[cost] ${path.basename(filePath)} = ${cost === null ? 'cleared' : `$${cost}`}`
+  )
+}
+
+/**
+ * Sum mass and cost across every entry in parts-meta.json. Counts also
+ * how many entries have each field populated so the UI can show
+ * "(based on N of M parts)".
+ */
+export async function getProjectTotals(): Promise<ProjectTotals> {
+  const all = await loadAllMeta()
+  const totals: ProjectTotals = { mass: 0, cost: 0, partsWithMass: 0, partsWithCost: 0, totalParts: 0 }
+  for (const key of Object.keys(all)) {
+    totals.totalParts++
+    const entry = all[key]
+    if (typeof entry.mass === 'number' && entry.mass > 0) {
+      totals.mass += entry.mass
+      totals.partsWithMass++
+    }
+    if (typeof entry.cost === 'number' && entry.cost > 0) {
+      totals.cost += entry.cost
+      totals.partsWithCost++
+    }
+  }
+  return totals
 }
 
 /**

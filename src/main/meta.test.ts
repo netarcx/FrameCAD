@@ -177,6 +177,90 @@ describe('meta module', () => {
     })
   })
 
+  describe('setPartMass / setPartCost', () => {
+    it('stores and clears mass via null', async () => {
+      await meta.setPartMass('foo.sldprt', 1.25)
+      expect((await meta.getPartMeta('foo.sldprt')).mass).toBe(1.25)
+      await meta.setPartMass('foo.sldprt', null)
+      expect((await meta.getPartMeta('foo.sldprt')).mass).toBeUndefined()
+    })
+
+    it('stores and clears cost via null', async () => {
+      await meta.setPartCost('foo.sldprt', 99.99)
+      expect((await meta.getPartMeta('foo.sldprt')).cost).toBe(99.99)
+      await meta.setPartCost('foo.sldprt', null)
+      expect((await meta.getPartMeta('foo.sldprt')).cost).toBeUndefined()
+    })
+
+    it('rejects negative mass', async () => {
+      await expect(meta.setPartMass('foo.sldprt', -1)).rejects.toThrow(/non-negative/i)
+    })
+
+    it('rejects non-finite mass', async () => {
+      await expect(meta.setPartMass('foo.sldprt', NaN)).rejects.toThrow(/non-negative/i)
+      await expect(meta.setPartMass('foo.sldprt', Infinity)).rejects.toThrow(/non-negative/i)
+    })
+
+    it('rejects negative cost', async () => {
+      await expect(meta.setPartCost('foo.sldprt', -10)).rejects.toThrow(/non-negative/i)
+    })
+
+    it('keeps mass and cost independent', async () => {
+      await meta.setPartMass('foo.sldprt', 2.5)
+      await meta.setPartCost('foo.sldprt', 50)
+      const result = await meta.getPartMeta('foo.sldprt')
+      expect(result.mass).toBe(2.5)
+      expect(result.cost).toBe(50)
+    })
+
+    it('preserves comments and release state', async () => {
+      await meta.addComment('foo.sldprt', 'hello')
+      await meta.setReleaseState('foo.sldprt', 'released')
+      await meta.setPartMass('foo.sldprt', 1.0)
+      const result = await meta.getPartMeta('foo.sldprt')
+      expect(result.comments).toHaveLength(1)
+      expect(result.release?.state).toBe('released')
+      expect(result.mass).toBe(1.0)
+    })
+  })
+
+  describe('getProjectTotals', () => {
+    it('returns zeros for an empty project', async () => {
+      const totals = await meta.getProjectTotals()
+      expect(totals).toEqual({ mass: 0, cost: 0, partsWithMass: 0, partsWithCost: 0, totalParts: 0 })
+    })
+
+    it('sums mass and cost across all parts', async () => {
+      await meta.setPartMass('a.sldprt', 1.5)
+      await meta.setPartMass('b.sldprt', 2.5)
+      await meta.setPartMass('c.sldprt', 0.25)
+      await meta.setPartCost('a.sldprt', 100)
+      await meta.setPartCost('b.sldprt', 200)
+      const totals = await meta.getProjectTotals()
+      expect(totals.mass).toBeCloseTo(4.25, 4)
+      expect(totals.cost).toBe(300)
+      expect(totals.partsWithMass).toBe(3)
+      expect(totals.partsWithCost).toBe(2)
+      expect(totals.totalParts).toBe(3)
+    })
+
+    it('ignores zero mass or cost when counting populated parts', async () => {
+      await meta.setPartMass('a.sldprt', 1.5)
+      await meta.setPartMass('b.sldprt', 0)
+      const totals = await meta.getProjectTotals()
+      expect(totals.partsWithMass).toBe(1)
+      expect(totals.mass).toBe(1.5)
+    })
+
+    it('counts parts that have any metadata at all', async () => {
+      await meta.addComment('a.sldprt', 'no mass yet')
+      const totals = await meta.getProjectTotals()
+      expect(totals.totalParts).toBe(1)
+      expect(totals.partsWithMass).toBe(0)
+      expect(totals.partsWithCost).toBe(0)
+    })
+  })
+
   it('multiple files keep independent metadata', async () => {
     await meta.setReleaseState('a.sldprt', 'released')
     await meta.setReleaseState('b.sldprt', 'in-review')

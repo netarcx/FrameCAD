@@ -283,6 +283,18 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     await metaOps.setManufacturingNotes(filePath, notes)
   })
 
+  ipcMain.handle('set-part-mass', async (_e, filePath: string, mass: number | null) => {
+    await metaOps.setPartMass(filePath, mass)
+  })
+
+  ipcMain.handle('set-part-cost', async (_e, filePath: string, cost: number | null) => {
+    await metaOps.setPartCost(filePath, cost)
+  })
+
+  ipcMain.handle('get-project-totals', async () => {
+    return metaOps.getProjectTotals()
+  })
+
   ipcMain.handle('get-main-remote-url', async () => {
     try {
       const remotes = await gitOps.getGit().getRemotes(true)

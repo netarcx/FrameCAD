@@ -27,6 +27,18 @@ export interface PartMeta {
   release?: PartReleaseInfo
   comments?: PartComment[]
   manufacturingNotes?: string
+  /** Mass in pounds */
+  mass?: number
+  /** Cost in USD */
+  cost?: number
+}
+
+export interface ProjectTotals {
+  mass: number
+  cost: number
+  partsWithMass: number
+  partsWithCost: number
+  totalParts: number
 }
 
 export interface FileEntry {
@@ -189,6 +201,9 @@ export interface IpcApi {
   setReleaseState(filePath: string, state: ReleaseState, note?: string): Promise<void>
   addComment(filePath: string, text: string): Promise<void>
   setManufacturingNotes(filePath: string, notes: string): Promise<void>
+  setPartMass(filePath: string, mass: number | null): Promise<void>
+  setPartCost(filePath: string, cost: number | null): Promise<void>
+  getProjectTotals(): Promise<ProjectTotals>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void

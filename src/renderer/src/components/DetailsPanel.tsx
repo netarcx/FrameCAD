@@ -58,6 +58,8 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
   const [commentText, setCommentText] = useState('')
   const [posting, setPosting] = useState(false)
   const [mfgNotes, setMfgNotes] = useState('')
+  const [massText, setMassText] = useState('')
+  const [costText, setCostText] = useState('')
   const [savingState, setSavingState] = useState<ReleaseState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const mfgTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -68,9 +70,13 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
       const m = await window.api.getPartMeta(path)
       setMeta(m || {})
       setMfgNotes(m?.manufacturingNotes || '')
+      setMassText(typeof m?.mass === 'number' ? String(m.mass) : '')
+      setCostText(typeof m?.cost === 'number' ? String(m.cost) : '')
     } catch {
       setMeta({})
       setMfgNotes('')
+      setMassText('')
+      setCostText('')
     } finally {
       setLoading(false)
     }
@@ -139,6 +145,42 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
         setError((err as Error).message)
       }
     }, 1500)
+  }
+
+  const commitMass = async () => {
+    setError(null)
+    const trimmed = massText.trim()
+    if (trimmed === '' && typeof meta.mass !== 'number') return
+    const parsed = trimmed === '' ? null : parseFloat(trimmed)
+    if (parsed !== null && (isNaN(parsed) || parsed < 0)) {
+      setError('Mass must be a positive number')
+      return
+    }
+    if (parsed === meta.mass) return
+    try {
+      await window.api.setPartMass(file.path, parsed)
+      await refreshMeta(file.path)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  const commitCost = async () => {
+    setError(null)
+    const trimmed = costText.trim()
+    if (trimmed === '' && typeof meta.cost !== 'number') return
+    const parsed = trimmed === '' ? null : parseFloat(trimmed)
+    if (parsed !== null && (isNaN(parsed) || parsed < 0)) {
+      setError('Cost must be a positive number')
+      return
+    }
+    if (parsed === meta.cost) return
+    try {
+      await window.api.setPartCost(file.path, parsed)
+      await refreshMeta(file.path)
+    } catch (err) {
+      setError((err as Error).message)
+    }
   }
 
   return (
@@ -237,6 +279,39 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
                 {posting ? 'Posting...' : 'Post'}
               </button>
             </div>
+          </div>
+
+          <div className="details-section">
+            <div className="section-title">Mass & Cost</div>
+            <div className="mass-cost-grid">
+              <label className="mass-cost-field">
+                <span>Mass (lb)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={massText}
+                  onChange={e => setMassText(e.target.value)}
+                  onBlur={commitMass}
+                  onKeyDown={e => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
+                  placeholder="0.0"
+                />
+              </label>
+              <label className="mass-cost-field">
+                <span>Cost ($)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={costText}
+                  onChange={e => setCostText(e.target.value)}
+                  onBlur={commitCost}
+                  onKeyDown={e => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
+                  placeholder="0.00"
+                />
+              </label>
+            </div>
+            <div className="mfg-hint">Press Enter or click away to save</div>
           </div>
 
           <div className="details-section">

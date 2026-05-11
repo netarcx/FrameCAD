@@ -125,6 +125,15 @@ const api: IpcApi = {
   setManufacturingNotes: (filePath, notes) =>
     ipcRenderer.invoke('set-manufacturing-notes', filePath, notes),
 
+  setPartMass: (filePath, mass) =>
+    ipcRenderer.invoke('set-part-mass', filePath, mass),
+
+  setPartCost: (filePath, cost) =>
+    ipcRenderer.invoke('set-part-cost', filePath, cost),
+
+  getProjectTotals: () =>
+    ipcRenderer.invoke('get-project-totals'),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

@@ -892,6 +892,38 @@ input {
 
 .comment-form textarea:focus { border-color: var(--accent); }
 
+.mass-cost-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mass-cost-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mass-cost-field span {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.mass-cost-field input {
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.mass-cost-field input:focus { border-color: var(--accent); }
+
 .mfg-notes-input {
   width: 100%;
   padding: 6px 8px;
@@ -1012,6 +1044,23 @@ input {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.status-bar .robot-totals {
+  color: var(--text-secondary);
+}
+
+.status-bar .robot-totals strong {
+  color: var(--accent);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.status-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin: 0 4px;
 }
 
 /* ─── Context Menu ─── */
