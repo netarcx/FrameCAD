@@ -75,6 +75,7 @@ namespace TrentCAD.SolidWorksAddin
             _taskPaneControl = new TaskPaneControl();
             _taskPaneControl.OnProjectPathChanged = SetSolidWorksWorkingDirectory;
             _taskPaneControl.OnCreateSolidWorksFile = CreateSolidWorksFile;
+            _taskPaneControl.OnStageFile = StageFileViaApi;
             _taskPaneView = _swApp.CreateTaskpaneView2("", "TrentCAD");
 
             if (_taskPaneView != null)
@@ -98,20 +99,32 @@ namespace TrentCAD.SolidWorksAddin
             }
         }
 
-        private bool CreateSolidWorksFile(string absolutePath, bool isAssembly)
+        private string CreateSolidWorksFile(string absolutePath, bool isAssembly)
         {
-            if (_swApp == null || string.IsNullOrEmpty(absolutePath)) return false;
+            if (_swApp == null) return "SolidWorks not connected";
+            if (string.IsNullOrEmpty(absolutePath)) return "Empty target path";
             try
             {
-                var templateKey = isAssembly
-                    ? (int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly
-                    : (int)swUserPreferenceStringValue_e.swDefaultTemplatePart;
-                var template = _swApp.GetUserPreferenceStringValue(templateKey);
-                if (string.IsNullOrEmpty(template) || !File.Exists(template))
-                    return false;
+                // NewPart/NewAssembly use the default template configured in
+                // SolidWorks options. Fall back to NewDocument with the
+                // explicit template path if the simple call fails.
+                object created = isAssembly ? _swApp.NewAssembly() : _swApp.NewPart();
+                if (created == null)
+                {
+                    var templateKey = isAssembly
+                        ? (int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly
+                        : (int)swUserPreferenceStringValue_e.swDefaultTemplatePart;
+                    var template = _swApp.GetUserPreferenceStringValue(templateKey);
+                    if (string.IsNullOrEmpty(template))
+                        return "No default " + (isAssembly ? "assembly" : "part") + " template configured in SolidWorks (Tools > Options > File Locations)";
+                    if (!File.Exists(template))
+                        return "Configured template not found: " + template;
+                    created = _swApp.NewDocument(template, 0, 0, 0);
+                    if (created == null) return "SolidWorks refused to create document from template";
+                }
 
-                var doc = _swApp.NewDocument(template, 0, 0, 0) as ModelDoc2;
-                if (doc == null) return false;
+                var doc = created as ModelDoc2;
+                if (doc == null) return "Unexpected document type from SolidWorks";
 
                 var dir = Path.GetDirectoryName(absolutePath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -125,11 +138,33 @@ namespace TrentCAD.SolidWorksAddin
                     null,
                     ref errors,
                     ref warnings);
-                return saved;
+                if (!saved) return "SaveAs failed (errors=" + errors + " warnings=" + warnings + ")";
+                if (!File.Exists(absolutePath)) return "SolidWorks reported success but file is missing on disk";
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        private async System.Threading.Tasks.Task StageFileViaApi(string relativePath)
+        {
+            // Tell TrentCAD to git-add the new file so it's actively tracked
+            try
+            {
+                using (var client = new System.Net.Http.HttpClient(
+                    new System.Net.Http.HttpClientHandler { UseProxy = false, Proxy = null }))
+                {
+                    client.Timeout = TimeSpan.FromSeconds(5);
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { path = relativePath });
+                    var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                    await client.PostAsync("http://127.0.0.1:42129/api/stage", content);
+                }
             }
             catch
             {
-                return false;
+                // Best-effort - file will still show up as untracked
             }
         }
 

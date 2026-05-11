@@ -209,6 +209,19 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         return
       }
 
+      case 'POST /api/stage': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const body = parseJson(await readBody(req)) as { path?: string } | null
+        if (!body?.path) { json(res, 400, { error: 'Missing path' }); return }
+        try {
+          await serialWrite(() => gitOps.getGit().raw(['add', '--', body.path!]))
+          json(res, 200, { success: true })
+        } catch (err) {
+          json(res, 500, { success: false, error: (err as Error).message })
+        }
+        return
+      }
+
       case 'GET /api/pending-creates': {
         json(res, 200, pendingCreates)
         return

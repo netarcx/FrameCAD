@@ -260,7 +260,8 @@ namespace TrentCAD.SolidWorksAddin
         private bool _processingPending;
 
         public Action<string> OnProjectPathChanged { get; set; }
-        public Func<string, bool, bool> OnCreateSolidWorksFile { get; set; }
+        public Func<string, bool, string> OnCreateSolidWorksFile { get; set; }
+        public Func<string, System.Threading.Tasks.Task> OnStageFile { get; set; }
 
         private void SetButtonStates(bool canCheckOut, bool canCheckIn)
         {
@@ -375,13 +376,21 @@ namespace TrentCAD.SolidWorksAddin
                     // CheckConnection runs on the WinForms UI thread (Timer.Tick fires there and
                     // the continuation preserves the SynchronizationContext), so it's safe to
                     // call into the SolidWorks COM API directly here.
-                    var created = OnCreateSolidWorksFile?.Invoke(p.AbsolutePath, isAssembly) ?? false;
+                    var error = OnCreateSolidWorksFile?.Invoke(p.AbsolutePath, isAssembly);
                     // Always mark done so a broken pending entry doesn't loop forever
                     try { await _api.MarkPendingDoneAsync(p.Id); } catch { }
-                    if (created)
+                    if (error == null)
+                    {
                         ShowMessage("Created " + (p.PartNumber ?? System.IO.Path.GetFileName(p.AbsolutePath)));
+                        if (OnStageFile != null && !string.IsNullOrEmpty(p.RelativePath))
+                        {
+                            try { await OnStageFile(p.RelativePath); } catch { }
+                        }
+                    }
                     else
-                        ShowMessage("Couldn't auto-create " + (p.PartNumber ?? "part") + " — check SolidWorks templates", true);
+                    {
+                        ShowMessage("Create failed: " + error, true);
+                    }
                 }
             }
             catch
@@ -613,10 +622,19 @@ namespace TrentCAD.SolidWorksAddin
                         else
                         {
                             var abs = _api.ToAbsolutePath(result.FilePath);
-                            var created = OnCreateSolidWorksFile?.Invoke(abs, true) ?? false;
-                            ShowMessage(created
-                                ? $"Created {result.PartNumber}"
-                                : $"Reserved {result.PartNumber} - check SolidWorks templates");
+                            var error = OnCreateSolidWorksFile?.Invoke(abs, true);
+                            if (error == null)
+                            {
+                                ShowMessage($"Created {result.PartNumber}");
+                                if (OnStageFile != null)
+                                {
+                                    try { await OnStageFile(result.FilePath); } catch { }
+                                }
+                            }
+                            else
+                            {
+                                ShowMessage($"Reserved {result.PartNumber} - {error}", true);
+                            }
                         }
                     }
                     else
@@ -629,10 +647,19 @@ namespace TrentCAD.SolidWorksAddin
                         else
                         {
                             var abs = _api.ToAbsolutePath(result.FilePath);
-                            var created = OnCreateSolidWorksFile?.Invoke(abs, false) ?? false;
-                            ShowMessage(created
-                                ? $"Created {result.PartNumber}"
-                                : $"Reserved {result.PartNumber} - check SolidWorks templates");
+                            var error = OnCreateSolidWorksFile?.Invoke(abs, false);
+                            if (error == null)
+                            {
+                                ShowMessage($"Created {result.PartNumber}");
+                                if (OnStageFile != null)
+                                {
+                                    try { await OnStageFile(result.FilePath); } catch { }
+                                }
+                            }
+                            else
+                            {
+                                ShowMessage($"Reserved {result.PartNumber} - {error}", true);
+                            }
                         }
                     }
                 }
