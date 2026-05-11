@@ -1,97 +1,97 @@
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace TrentCAD.SolidWorksAddin.Models
 {
     public class HealthResponse
     {
-        [JsonPropertyName("running")]
+        [JsonProperty("running")]
         public bool Running { get; set; }
 
-        [JsonPropertyName("project")]
+        [JsonProperty("project")]
         public ProjectInfo Project { get; set; }
     }
 
     public class ProjectInfo
     {
-        [JsonPropertyName("name")]
+        [JsonProperty("name")]
         public string Name { get; set; }
 
-        [JsonPropertyName("path")]
+        [JsonProperty("path")]
         public string Path { get; set; }
 
-        [JsonPropertyName("remote")]
+        [JsonProperty("remote")]
         public string Remote { get; set; }
     }
 
     public class ApiResult
     {
-        [JsonPropertyName("success")]
+        [JsonProperty("success")]
         public bool Success { get; set; }
 
-        [JsonPropertyName("error")]
+        [JsonProperty("error")]
         public string Error { get; set; }
     }
 
     public class SyncResult
     {
-        [JsonPropertyName("success")]
+        [JsonProperty("success")]
         public bool Success { get; set; }
 
-        [JsonPropertyName("filesUpdated")]
+        [JsonProperty("filesUpdated")]
         public int FilesUpdated { get; set; }
 
-        [JsonPropertyName("error")]
+        [JsonProperty("error")]
         public string Error { get; set; }
     }
 
     public class PublishResult
     {
-        [JsonPropertyName("success")]
+        [JsonProperty("success")]
         public bool Success { get; set; }
 
-        [JsonPropertyName("hash")]
+        [JsonProperty("hash")]
         public string Hash { get; set; }
 
-        [JsonPropertyName("error")]
+        [JsonProperty("error")]
         public string Error { get; set; }
     }
 
     public class CreatePartResult
     {
-        [JsonPropertyName("success")]
+        [JsonProperty("success")]
         public bool Success { get; set; }
 
-        [JsonPropertyName("partNumber")]
+        [JsonProperty("partNumber")]
         public string PartNumber { get; set; }
 
-        [JsonPropertyName("filePath")]
+        [JsonProperty("filePath")]
         public string FilePath { get; set; }
 
-        [JsonPropertyName("error")]
+        [JsonProperty("error")]
         public string Error { get; set; }
     }
 
     public class CreateSubsystemResult
     {
-        [JsonPropertyName("success")]
+        [JsonProperty("success")]
         public bool Success { get; set; }
 
-        [JsonPropertyName("folderPath")]
+        [JsonProperty("folderPath")]
         public string FolderPath { get; set; }
 
-        [JsonPropertyName("error")]
+        [JsonProperty("error")]
         public string Error { get; set; }
     }
 
     public class LockInfo
     {
-        [JsonPropertyName("path")]
+        [JsonProperty("path")]
         public string Path { get; set; }
 
-        [JsonPropertyName("owner")]
+        [JsonProperty("owner")]
         public string Owner { get; set; }
 
-        [JsonPropertyName("id")]
+        [JsonProperty("id")]
         public string Id { get; set; }
     }
 }

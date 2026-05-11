@@ -1,32 +1,32 @@
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace TrentCAD.SolidWorksAddin.Models
 {
     public class FileStatus
     {
-        [JsonPropertyName("path")]
+        [JsonProperty("path")]
         public string Path { get; set; } = "";
 
-        [JsonPropertyName("name")]
+        [JsonProperty("name")]
         public string Name { get; set; } = "";
 
-        [JsonPropertyName("isDirectory")]
+        [JsonProperty("isDirectory")]
         public bool IsDirectory { get; set; }
 
-        [JsonPropertyName("state")]
+        [JsonProperty("state")]
         public string State { get; set; } = "synced";
 
-        [JsonPropertyName("lockedBy")]
+        [JsonProperty("lockedBy")]
         public string LockedBy { get; set; }
 
-        [JsonPropertyName("partNumber")]
+        [JsonProperty("partNumber")]
         public string PartNumber { get; set; }
 
-        [JsonPropertyName("partDescription")]
+        [JsonProperty("partDescription")]
         public string PartDescription { get; set; }
 
-        [JsonPropertyName("children")]
+        [JsonProperty("children")]
         public List<FileStatus> Children { get; set; }
     }
 }

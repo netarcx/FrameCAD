@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
 using System.Threading.Tasks;
 using TrentCAD.SolidWorksAddin.Models;
 
@@ -43,7 +43,7 @@ namespace TrentCAD.SolidWorksAddin
             var response = await Client.GetAsync($"{_baseUrl}/api/health");
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync();
-            var health = JsonSerializer.Deserialize<HealthResponse>(json);
+            var health = JsonConvert.DeserializeObject<HealthResponse>(json);
 
             if (health?.Project?.Path != null)
                 _projectRoot = health.Project.Path;
@@ -74,75 +74,75 @@ namespace TrentCAD.SolidWorksAddin
                 return null;
 
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<FileStatus>(json);
+            return JsonConvert.DeserializeObject<FileStatus>(json);
         }
 
         public async Task<ApiResult> CheckOutAsync(string absolutePath)
         {
             var relativePath = ToRelativePath(absolutePath);
-            var body = JsonSerializer.Serialize(new { path = relativePath });
+            var body = JsonConvert.SerializeObject(new { path = relativePath });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await Client.PostAsync($"{_baseUrl}/api/checkout", content);
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ApiResult>(json);
+            return JsonConvert.DeserializeObject<ApiResult>(json);
         }
 
         public async Task<ApiResult> CheckInAsync(string absolutePath)
         {
             var relativePath = ToRelativePath(absolutePath);
-            var body = JsonSerializer.Serialize(new { path = relativePath });
+            var body = JsonConvert.SerializeObject(new { path = relativePath });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await Client.PostAsync($"{_baseUrl}/api/checkin", content);
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ApiResult>(json);
+            return JsonConvert.DeserializeObject<ApiResult>(json);
         }
 
         public async Task<SyncResult> SyncAsync()
         {
             var response = await Client.PostAsync($"{_baseUrl}/api/sync", new StringContent("{}", Encoding.UTF8, "application/json"));
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<SyncResult>(json);
+            return JsonConvert.DeserializeObject<SyncResult>(json);
         }
 
         public async Task<PublishResult> PublishAsync(string message)
         {
-            var body = JsonSerializer.Serialize(new { message });
+            var body = JsonConvert.SerializeObject(new { message });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await Client.PostAsync($"{_baseUrl}/api/publish", content);
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<PublishResult>(json);
+            return JsonConvert.DeserializeObject<PublishResult>(json);
         }
 
         public async Task<CreatePartResult> CreateNewPartAsync(string folder = "", string description = null)
         {
             var obj = new Dictionary<string, string> { { "folder", folder } };
             if (description != null) obj["description"] = description;
-            var body = JsonSerializer.Serialize(obj);
+            var body = JsonConvert.SerializeObject(obj);
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await Client.PostAsync($"{_baseUrl}/api/parts/new-part", content);
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<CreatePartResult>(json);
+            return JsonConvert.DeserializeObject<CreatePartResult>(json);
         }
 
         public async Task<CreatePartResult> CreateNewAssemblyAsync(string name, string parentFolder = "", string description = null)
         {
             var obj = new Dictionary<string, string> { { "name", name }, { "parentFolder", parentFolder } };
             if (description != null) obj["description"] = description;
-            var body = JsonSerializer.Serialize(obj);
+            var body = JsonConvert.SerializeObject(obj);
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await Client.PostAsync($"{_baseUrl}/api/parts/new-assembly", content);
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<CreatePartResult>(json);
+            return JsonConvert.DeserializeObject<CreatePartResult>(json);
         }
 
         public async Task<CreateSubsystemResult> CreateSubsystemAsync(string name, string parentFolder = "")
         {
             var obj = new Dictionary<string, string> { { "name", name }, { "parentFolder", parentFolder } };
-            var body = JsonSerializer.Serialize(obj);
+            var body = JsonConvert.SerializeObject(obj);
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await Client.PostAsync($"{_baseUrl}/api/parts/new-subsystem", content);
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<CreateSubsystemResult>(json);
+            return JsonConvert.DeserializeObject<CreateSubsystemResult>(json);
         }
 
         public async Task<List<LockInfo>> GetLocksAsync()
@@ -150,7 +150,7 @@ namespace TrentCAD.SolidWorksAddin
             var response = await Client.GetAsync($"{_baseUrl}/api/locks");
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<List<LockInfo>>(json);
+            return JsonConvert.DeserializeObject<List<LockInfo>>(json);
         }
     }
 }
