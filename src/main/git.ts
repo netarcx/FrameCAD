@@ -560,23 +560,41 @@ export async function publish(
       detailLabel: string
     ): Promise<string | null> => {
       if (phaseFiles.length === 0) return null
+
+      // Re-query status RIGHT BEFORE staging. Between the initial
+      // status capture at the top of publish() and this point, the
+      // user may have removed or moved files in Windows Explorer / the
+      // SolidWorks file dialog. A path that was untracked-and-present
+      // in the original snapshot can now be missing from disk, and
+      // `git add <gone-untracked-path>` fails with
+      // "fatal: pathspec '...' did not match any files".
+      //
+      // Filtering against fresh status ensures we only stage paths
+      // git still sees as changed (either still in the working tree,
+      // or tracked-and-now-deleted). Anything that vanished from disk
+      // AND was never tracked gets silently dropped from this phase
+      // — exactly the right behavior since the user clearly didn't
+      // want it published.
+      const freshStatus = await g.status()
+      const freshSet = new Set(freshStatus.files.map(f => f.path))
+      const stagable = phaseFiles.filter(p => freshSet.has(p))
+      if (stagable.length === 0) return null
+
       // git add doesn't accept too many args at once on Windows command
       // lines (cmd.exe caps argv at ~8 KB). Chunk in batches of 200 paths.
       const CHUNK = 200
-      for (let i = 0; i < phaseFiles.length; i += CHUNK) {
-        await g.raw(['add', '--', ...phaseFiles.slice(i, i + CHUNK)])
+      for (let i = 0; i < stagable.length; i += CHUNK) {
+        await g.raw(['add', '--', ...stagable.slice(i, i + CHUNK)])
       }
 
       // Staging may have produced an empty diff (e.g. files reverted in
-      // the working tree but still listed in status; or staged-then-
-      // unmodified; or every file was already in the index from an
-      // earlier failed publish). git commit would throw "nothing to
+      // the working tree, or every file was already in the index from
+      // an earlier failed publish). git commit would throw "nothing to
       // commit" — treat as a successful no-op for this phase and skip
-      // the push. Critical so a metadata-only phase 1 doesn't blow up
-      // the LFS phase on a retry where only LFS changes remain.
+      // the push.
       const statusAfter = await g.status()
       if (statusAfter.staged.length === 0 && !statusAfter.files.some(f =>
-        phaseFiles.includes(f.path) && (f.index === 'A' || f.index === 'M' || f.index === 'D' || f.index === 'R')
+        stagable.includes(f.path) && (f.index === 'A' || f.index === 'M' || f.index === 'D' || f.index === 'R')
       )) {
         return null
       }

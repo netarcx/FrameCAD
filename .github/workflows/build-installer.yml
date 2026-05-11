@@ -10,7 +10,38 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Pre-create the GitHub Release (idempotent) BEFORE the matrix runs.
+  # Without this, all three matrix jobs race to POST /releases and two
+  # of them die with HTTP 422 "already_exists" — electron-builder
+  # doesn't retry on that error. By guaranteeing the release exists
+  # before any matrix job starts, electron-builder's GET succeeds on
+  # every job and they all happily upload assets to the same release.
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      - name: Ensure GitHub Release v${{ steps.version.outputs.version }} exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists — matrix jobs will upload to it."
+          else
+            gh release create "$tag" \
+              --title "$tag" \
+              --notes "Auto-built from ${{ github.sha }}"
+            echo "Created release $tag."
+          fi
+
   release:
+    needs: prepare-release
     strategy:
       fail-fast: false
       matrix:
