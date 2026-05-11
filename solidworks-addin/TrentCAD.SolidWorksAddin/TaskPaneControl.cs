@@ -278,47 +278,55 @@ namespace TrentCAD.SolidWorksAddin
 
         private async System.Threading.Tasks.Task CheckConnection()
         {
+            var wasConnected = _connected;
+            HealthResponse health = null;
+            Exception error = null;
             try
             {
-                var wasConnected = _connected;
-                var health = await _api.GetHealthAsync();
-                var isConnected = health?.Running == true;
-                SafeInvoke(() =>
-                {
-                    var hasProject = health?.Project != null;
-                    _connected = isConnected && hasProject;
-                    if (isConnected && hasProject)
-                    {
-                        _dot.DotColor = CGreen;
-                        _lblConnection.Text = health.Project.Name;
-                        SetButtonStates(false, false);
-                        if (!wasConnected && !string.IsNullOrEmpty(_currentFilePath))
-                            UpdateForDocument(_currentFilePath);
-                    }
-                    else if (isConnected)
-                    {
-                        _dot.DotColor = CYellow;
-                        _lblConnection.Text = "No Project Open";
-                        SetButtonStates(false, false);
-                    }
-                    else
-                    {
-                        _dot.DotColor = CRed;
-                        _lblConnection.Text = "Not Running";
-                        SetButtonStates(false, false);
-                    }
-                });
+                health = await _api.GetHealthAsync();
             }
-            catch
+            catch (Exception ex)
             {
-                SafeInvoke(() =>
+                error = ex;
+            }
+
+            SafeInvoke(() =>
+            {
+                if (error != null)
                 {
                     _connected = false;
                     _dot.DotColor = CRed;
+                    var msg = error.InnerException?.Message ?? error.Message;
+                    if (msg.Length > 60) msg = msg.Substring(0, 57) + "...";
+                    _lblConnection.Text = "Conn error: " + msg;
+                    SetButtonStates(false, false);
+                    return;
+                }
+
+                var isConnected = health?.Running == true;
+                var hasProject = health?.Project != null;
+                _connected = isConnected && hasProject;
+                if (isConnected && hasProject)
+                {
+                    _dot.DotColor = CGreen;
+                    _lblConnection.Text = health.Project.Name;
+                    SetButtonStates(false, false);
+                    if (!wasConnected && !string.IsNullOrEmpty(_currentFilePath))
+                        UpdateForDocument(_currentFilePath);
+                }
+                else if (isConnected)
+                {
+                    _dot.DotColor = CYellow;
+                    _lblConnection.Text = "No Project Open";
+                    SetButtonStates(false, false);
+                }
+                else
+                {
+                    _dot.DotColor = CRed;
                     _lblConnection.Text = "Not Running";
                     SetButtonStates(false, false);
-                });
-            }
+                }
+            });
         }
 
         public async void UpdateForDocument(string absolutePath)

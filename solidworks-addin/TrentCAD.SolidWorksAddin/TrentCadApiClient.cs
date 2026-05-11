@@ -10,7 +10,8 @@ namespace TrentCAD.SolidWorksAddin
 {
     public class TrentCadApiClient
     {
-        private static readonly HttpClient Client = new HttpClient
+        private static readonly HttpClient Client = new HttpClient(
+            new HttpClientHandler { UseProxy = false, Proxy = null, UseDefaultCredentials = false })
         {
             Timeout = TimeSpan.FromSeconds(10)
         };
