@@ -109,7 +109,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
         await gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch)
       }
     } catch { /* best effort */ }
-    const win = getMainWindow()
     if (win) startWatching(dirPath, win)
   })
 
