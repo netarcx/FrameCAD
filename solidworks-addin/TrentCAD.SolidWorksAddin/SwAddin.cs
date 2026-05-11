@@ -159,8 +159,12 @@ namespace TrentCAD.SolidWorksAddin
                 var ext = doc.Extension;
                 if (ext == null) return;
 
-                // angle=0, deflection=0, UseSystemUnits=true → props[5] is mass in kg
-                var props = ext.GetMassProperties2(0, 0, true) as double[];
+                // GetMassProperties2 signature in this interop:
+                //   double[] GetMassProperties2(int Accuracy, out int Status, bool UseSystemUnits)
+                // The second arg is OUT, not a regular value. UseSystemUnits=true
+                // returns props[5] in kg regardless of the document's configured units.
+                int massStatus;
+                var props = ext.GetMassProperties2(0, out massStatus, true) as double[];
                 if (props == null || props.Length < 6) return;
                 var kg = props[5];
                 if (kg <= 0) return;
@@ -295,16 +299,13 @@ namespace TrentCAD.SolidWorksAddin
                     }
                     catch { /* skip and continue with the rest */ }
                 }
-                // Force the active sheet to re-evaluate property links so the
-                // user sees the new values without having to scroll the
-                // viewport. Skip silently if it's not a drawing or refresh
-                // isn't available.
-                try
-                {
-                    var drawing = doc as DrawingDoc;
-                    drawing?.RebuildTemplate();
-                }
-                catch { /* not a drawing or RebuildTemplate unavailable */ }
+                // Refresh the rendered title block so the user sees the new
+                // custom-property values without manually scrolling/zooming.
+                // ForceRebuild3 is on IModelDoc2 (works for drawings and parts)
+                // and is far more universally available than DrawingDoc-specific
+                // refresh APIs (RebuildTemplate doesn't exist in this interop).
+                try { doc.ForceRebuild3(false); }
+                catch { /* if rebuild fails, the user can save manually to refresh */ }
                 return written;
             }
             catch
