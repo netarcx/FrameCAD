@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -46,7 +47,11 @@ namespace TrentCAD.SolidWorksAddin
             _addinCookie = Cookie;
 
             _swEvents.ActiveDocChangeNotify += OnActiveDocChange;
-            _swEvents.FileSavePostNotify += OnFileSavePost;
+            // FileSaveNotify fires pre-save at the SldWorks-application level for
+            // ALL document types. (FileSavePostNotify only exists per-ModelDoc.)
+            // Reading mass before the save commits is fine — SW computes mass
+            // from the in-memory model, not the on-disk file.
+            _swEvents.FileSaveNotify += OnFileSave;
 
             CreateTaskPane();
             _taskPaneControl?.StartHealthPolling();
@@ -59,7 +64,7 @@ namespace TrentCAD.SolidWorksAddin
         public bool DisconnectFromSW()
         {
             _swEvents.ActiveDocChangeNotify -= OnActiveDocChange;
-            _swEvents.FileSavePostNotify -= OnFileSavePost;
+            _swEvents.FileSaveNotify -= OnFileSave;
 
             _taskPaneControl?.StopHealthPolling();
             _taskPaneHost?.ReleaseHandle();
@@ -211,11 +216,11 @@ namespace TrentCAD.SolidWorksAddin
             }
         }
 
-        private int OnFileSavePost(int saveType, string fileName)
+        private int OnFileSave(string fileName)
         {
-            // After a save, push the doc's current mass (from SW's mass-properties
-            // engine) to TrentCAD so the project totals update without manual
-            // entry. Done best-effort — any failure is silent.
+            // Pre-save hook: push the doc's current mass (from SW's mass-
+            // properties engine) to TrentCAD so the project totals update
+            // without manual entry. Done best-effort — any failure is silent.
             if (string.IsNullOrEmpty(fileName) || _swApp == null) return 0;
             try
             {
