@@ -107,6 +107,9 @@ const api: IpcApi = {
   getAdminConfig: () =>
     ipcRenderer.invoke('get-admin-config'),
 
+  getCachedBrowseConfig: () =>
+    ipcRenderer.invoke('get-cached-browse-config'),
+
   saveAdminConfig: (config) =>
     ipcRenderer.invoke('save-admin-config', config),
 

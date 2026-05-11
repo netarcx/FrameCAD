@@ -121,6 +121,20 @@ export default function App() {
   }, [project])
 
   useEffect(() => {
+    // On app start (no project yet), seed adminConfig with cached browse
+    // fields so the welcome screen can show the Browse Projects button.
+    // The full per-project admin.json takes over once a project opens.
+    if (project) return
+    window.api.getCachedBrowseConfig().then(cached => {
+      setAdminConfig(prev => ({
+        ...prev,
+        gitHubOrg: prev.gitHubOrg || cached.gitHubOrg,
+        projectPrefix: prev.projectPrefix || cached.projectPrefix
+      }))
+    }).catch(() => {})
+  }, [project])
+
+  useEffect(() => {
     if (!project) {
       setProjectTotals(null)
       return
