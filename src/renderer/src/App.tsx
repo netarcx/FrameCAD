@@ -7,7 +7,7 @@ import Toolbar from './components/Toolbar'
 import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
-import type { AdminConfig, FileEntry, UpdateInfo } from '@shared/types'
+import type { AdminConfig, DependencyStatus, FileEntry, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
   let count = 0
@@ -56,10 +56,20 @@ export default function App() {
   const [appVersion, setAppVersion] = useState<string>('')
   const [adminConfig, setAdminConfig] = useState<AdminConfig>({})
   const [showAdmin, setShowAdmin] = useState(false)
+  const [missingDeps, setMissingDeps] = useState<DependencyStatus | null>(null)
+  const [checkingDeps, setCheckingDeps] = useState(false)
+
+  const recheckDeps = useCallback(() => {
+    setCheckingDeps(true)
+    window.api.checkDependencies().then(status => {
+      setMissingDeps(!status.git.installed || !status.lfs.installed ? status : null)
+    }).catch(() => {}).finally(() => setCheckingDeps(false))
+  }, [])
 
   useEffect(() => {
     window.api.getAppVersion().then(setAppVersion).catch(() => {})
-  }, [])
+    recheckDeps()
+  }, [recheckDeps])
 
   useEffect(() => {
     if (!project) return
@@ -156,6 +166,45 @@ export default function App() {
 
   const versionCorner = appVersion && <div className="app-version-corner">v{appVersion}</div>
 
+  const depsModal = missingDeps && (
+    <div className="modal-overlay">
+      <div className="modal deps-modal">
+        <h2>Required software missing</h2>
+        <p className="deps-intro">
+          TrentCAD uses Git and Git LFS under the hood to manage CAD files.
+          Install whichever is missing and click "Check again" to continue.
+        </p>
+        {!missingDeps.git.installed && (
+          <div className="deps-row">
+            <div>
+              <strong>Git</strong>
+              <div className="deps-sub">Not found in PATH</div>
+            </div>
+            <button className="toolbar-btn primary" onClick={() => window.api.openExternal('https://git-scm.com/download/win')}>
+              Download Git
+            </button>
+          </div>
+        )}
+        {!missingDeps.lfs.installed && (
+          <div className="deps-row">
+            <div>
+              <strong>Git LFS</strong>
+              <div className="deps-sub">Not found in PATH</div>
+            </div>
+            <button className="toolbar-btn primary" onClick={() => window.api.openExternal('https://git-lfs.com')}>
+              Download Git LFS
+            </button>
+          </div>
+        )}
+        <div className="actions">
+          <button className="toolbar-btn primary" onClick={recheckDeps} disabled={checkingDeps}>
+            {checkingDeps ? 'Checking...' : 'Check again'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (needsProfile || showProfileEdit) {
     return (
       <div className="app">
@@ -166,6 +215,7 @@ export default function App() {
           initialName={gitName}
           initialEmail={gitEmail}
         />
+        {depsModal}
         {versionCorner}
       </div>
     )
@@ -190,6 +240,7 @@ export default function App() {
           onOpenProject={openProject}
           isLoading={isLoading}
         />
+        {depsModal}
         {versionCorner}
       </div>
     )
@@ -286,6 +337,8 @@ export default function App() {
           window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
         }} />
       )}
+
+      {depsModal}
 
       <div className="status-bar">
         {stats.modified > 0 && (

@@ -208,6 +208,43 @@ input {
   font-size: 12px;
 }
 
+.deps-modal {
+  width: 480px;
+}
+
+.deps-modal h2 {
+  color: var(--red);
+}
+
+.deps-intro {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.deps-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+}
+
+.deps-row strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.deps-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .app-version-corner {
   position: fixed;
   bottom: 6px;

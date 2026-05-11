@@ -5,6 +5,7 @@ import * as gitOps from './git'
 import * as lockOps from './locking'
 import * as partsOps from './parts'
 import * as adminOps from './admin'
+import * as depsOps from './deps'
 import { addRecentProject, getRecentProjects } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
@@ -210,6 +211,14 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('get-app-version', () => app.getVersion())
+
+  ipcMain.handle('check-dependencies', async () => depsOps.checkDependencies())
+
+  ipcMain.handle('open-external', async (_e, url: string) => {
+    if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+      await shell.openExternal(url)
+    }
+  })
 
   ipcMain.handle('get-admin-config', async () => {
     try { return await adminOps.loadAdminConfig() } catch { return {} }

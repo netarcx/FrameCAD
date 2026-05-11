@@ -85,6 +85,11 @@ export interface UpdateInfo {
   version: string
 }
 
+export interface DependencyStatus {
+  git: { installed: boolean; version?: string }
+  lfs: { installed: boolean; version?: string }
+}
+
 export interface AdminConfig {
   teamName?: string
   welcomeMessage?: string
@@ -131,6 +136,8 @@ export interface IpcApi {
   setGitIdentity(name: string, email: string): Promise<void>
   restartToUpdate(): Promise<void>
   getAppVersion(): Promise<string>
+  checkDependencies(): Promise<DependencyStatus>
+  openExternal(url: string): Promise<void>
   getAdminConfig(): Promise<AdminConfig>
   saveAdminConfig(config: AdminConfig): Promise<void>
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>

@@ -83,6 +83,12 @@ const api: IpcApi = {
   getAppVersion: () =>
     ipcRenderer.invoke('get-app-version'),
 
+  checkDependencies: () =>
+    ipcRenderer.invoke('check-dependencies'),
+
+  openExternal: (url) =>
+    ipcRenderer.invoke('open-external', url),
+
   getAdminConfig: () =>
     ipcRenderer.invoke('get-admin-config'),
 
