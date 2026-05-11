@@ -405,6 +405,51 @@ export async function publish(
   try {
     await syncManifest()
 
+    // BEFORE we look at status, clean up any local-ahead commits from
+    // previous failed publish attempts. Reason: those commits may have
+    // been made when .gitattributes didn't yet have an LFS pattern for
+    // some extension (e.g. *.zip pre-v0.7.7), so they store the file as
+    // a raw git blob that exceeds GitHub's 100 MB hard limit. No
+    // amount of fixing the current commit helps because the OLD bad
+    // commits are pushed too. We can safely reset because (a) the
+    // working tree isn't touched, (b) those commits never reached
+    // origin (the push has been failing), (c) the publish flow will
+    // rebuild a fresh commit from the working tree below.
+    //
+    // We follow with `git add --renormalize -u` so any already-tracked
+    // file whose .gitattributes filter has CHANGED since it was last
+    // staged gets re-run through the new filter (e.g. a .zip that was
+    // staged as a raw blob before *.zip was LFS-tracked becomes a
+    // pointer in the index).
+    try {
+      const branchSummary = await g.branchLocal()
+      const branch = branchSummary.current || 'main'
+      const remoteRef = `origin/${branch}`
+      const remoteExists = await g.raw(['rev-parse', '--verify', remoteRef])
+        .then(() => true).catch(() => false)
+      if (remoteExists) {
+        const aheadCount = parseInt(
+          (await g.raw(['rev-list', '--count', `${remoteRef}..HEAD`])).trim(),
+          10
+        )
+        if (aheadCount > 0) {
+          onProgress?.({
+            phase: 'preparing',
+            files: [],
+            detail: `Cleaning up ${aheadCount} unpushed commit${aheadCount === 1 ? '' : 's'} from earlier failed uploads…`
+          })
+          await g.raw(['reset', '--mixed', remoteRef])
+        }
+      }
+    } catch { /* best-effort — fall through to normal flow */ }
+
+    // Re-apply current .gitattributes filters to all tracked files.
+    // Catches the case where a file is in the index as a raw blob but
+    // .gitattributes was later updated to LFS-track its extension.
+    try {
+      await g.raw(['add', '--renormalize', '-u'])
+    } catch { /* best-effort */ }
+
     const status = await g.status()
     if (status.files.length === 0) {
       return { success: false, error: 'No changes to upload' }

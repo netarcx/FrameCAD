@@ -53,6 +53,14 @@ jobs:
           - os: ubuntu-latest
             platform: linux
 
+    # Windows builds on every push; Mac and Linux only build when the
+    # workflow is dispatched manually (Actions tab → Run workflow). Most
+    # pushes only need a Windows installer for the team's SolidWorks
+    # users — skipping mac/linux saves ~5 minutes of CI runner time per
+    # push and a meaningful chunk of macOS-runner minutes if the repo
+    # ever becomes private.
+    if: matrix.platform == 'win' || github.event_name == 'workflow_dispatch'
+
     runs-on: ${{ matrix.os }}
 
     permissions:
