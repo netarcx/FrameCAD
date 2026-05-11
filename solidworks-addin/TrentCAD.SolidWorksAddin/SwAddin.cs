@@ -46,6 +46,7 @@ namespace TrentCAD.SolidWorksAddin
             _addinCookie = Cookie;
 
             _swEvents.ActiveDocChangeNotify += OnActiveDocChange;
+            _swEvents.FileSavePostNotify += OnFileSavePost;
 
             CreateTaskPane();
             _taskPaneControl?.StartHealthPolling();
@@ -58,6 +59,7 @@ namespace TrentCAD.SolidWorksAddin
         public bool DisconnectFromSW()
         {
             _swEvents.ActiveDocChangeNotify -= OnActiveDocChange;
+            _swEvents.FileSavePostNotify -= OnFileSavePost;
 
             _taskPaneControl?.StopHealthPolling();
             _taskPaneHost?.ReleaseHandle();
@@ -76,6 +78,7 @@ namespace TrentCAD.SolidWorksAddin
             _taskPaneControl.OnProjectPathChanged = SetSolidWorksWorkingDirectory;
             _taskPaneControl.OnCreateSolidWorksFile = CreateSolidWorksFile;
             _taskPaneControl.OnStageFile = StageFileViaApi;
+            _taskPaneControl.OnGetAssemblyChildren = GetAssemblyChildren;
             _taskPaneView = _swApp.CreateTaskpaneView2("", "TrentCAD");
 
             if (_taskPaneView != null)
@@ -97,6 +100,33 @@ namespace TrentCAD.SolidWorksAddin
             {
                 // SolidWorks may reject the call if the path is invalid; ignore silently
             }
+        }
+
+        private System.Collections.Generic.List<string> GetAssemblyChildren(string assemblyPath)
+        {
+            var result = new System.Collections.Generic.List<string>();
+            if (_swApp == null || string.IsNullOrEmpty(assemblyPath)) return result;
+            try
+            {
+                var doc = _swApp.ActiveDoc as ModelDoc2;
+                if (doc == null) return result;
+                if (!string.Equals(doc.GetPathName(), assemblyPath, StringComparison.OrdinalIgnoreCase))
+                    return result;
+                var asm = doc as AssemblyDoc;
+                if (asm == null) return result;
+                var components = asm.GetComponents(false) as object[];
+                if (components == null) return result;
+                foreach (var c in components)
+                {
+                    var comp = c as Component2;
+                    if (comp == null) continue;
+                    var path = comp.GetPathName();
+                    if (!string.IsNullOrEmpty(path) && !result.Contains(path, StringComparer.OrdinalIgnoreCase))
+                        result.Add(path);
+                }
+            }
+            catch { /* SW API rejected — return what we have */ }
+            return result;
         }
 
         private string CreateSolidWorksFile(string absolutePath, bool isAssembly)
@@ -166,6 +196,61 @@ namespace TrentCAD.SolidWorksAddin
             {
                 // Best-effort - file will still show up as untracked
             }
+        }
+
+        private int OnFileSavePost(int saveType, string fileName)
+        {
+            // After a save, push the doc's current mass (from SW's mass-properties
+            // engine) to TrentCAD so the project totals update without manual
+            // entry. Done best-effort — any failure is silent.
+            if (string.IsNullOrEmpty(fileName) || _swApp == null) return 0;
+            try
+            {
+                var doc = _swApp.ActiveDoc as ModelDoc2;
+                if (doc == null) return 0;
+                // Only push for the file that was actually saved
+                if (!string.Equals(doc.GetPathName(), fileName, StringComparison.OrdinalIgnoreCase))
+                    return 0;
+                int errors = 0;
+                var props = doc.Extension.GetMassProperties2(1, out errors, false) as double[];
+                if (props == null || props.Length < 6) return 0;
+                var massKg = props[5];
+                if (massKg <= 0) return 0;
+                var massLb = massKg * 2.20462262;
+                // POST to local TrentCAD API. Best effort, fire and forget.
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    try
+                    {
+                        using (var client = new System.Net.Http.HttpClient(
+                            new System.Net.Http.HttpClientHandler { UseProxy = false, Proxy = null }))
+                        {
+                            client.Timeout = TimeSpan.FromSeconds(5);
+                            // Convert SW's absolute path to TrentCAD's relative path
+                            // via /api/health (which reports the project root)
+                            var healthResp = await client.GetAsync("http://127.0.0.1:42129/api/health");
+                            if (!healthResp.IsSuccessStatusCode) return;
+                            var healthJson = await healthResp.Content.ReadAsStringAsync();
+                            // Crude string parse to avoid bringing Json into this file
+                            var rootMatch = System.Text.RegularExpressions.Regex.Match(
+                                healthJson, "\"path\"\\s*:\\s*\"([^\"]+)\"");
+                            if (!rootMatch.Success) return;
+                            var projectRoot = rootMatch.Groups[1].Value.Replace("\\\\", "\\");
+                            var norm = fileName.Replace("\\", "/");
+                            var root = projectRoot.Replace("\\", "/").TrimEnd('/') + "/";
+                            if (!norm.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return;
+                            var rel = norm.Substring(root.Length);
+                            var body = $"{{\"path\":\"{rel.Replace("\\", "\\\\").Replace("\"", "\\\"")}\",\"mass\":{massLb:F4}}}";
+                            var content = new System.Net.Http.StringContent(
+                                body, System.Text.Encoding.UTF8, "application/json");
+                            await client.PostAsync("http://127.0.0.1:42129/api/part-mass-auto", content);
+                        }
+                    }
+                    catch { /* best effort */ }
+                });
+            }
+            catch { /* SW API rejected — skip */ }
+            return 0;
         }
 
         private int OnActiveDocChange()

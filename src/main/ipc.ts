@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell, app, BrowserWindow } from 'electron'
+import { ipcMain, dialog, shell, app, BrowserWindow, Notification } from 'electron'
 import path from 'path'
 import { watch } from 'chokidar'
 import * as gitOps from './git'
@@ -118,7 +118,17 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('sync', async () => {
-    return gitOps.sync()
+    const result = await gitOps.sync()
+    if (result.success && result.filesUpdated > 0 && Notification.isSupported()) {
+      try {
+        new Notification({
+          title: 'TrentCAD — Downloaded',
+          body: `${result.filesUpdated} file${result.filesUpdated === 1 ? '' : 's'} updated from the team`,
+          silent: false
+        }).show()
+      } catch { /* not all platforms support */ }
+    }
+    return result
   })
 
   ipcMain.handle('publish', async (_e, message: string) => {
