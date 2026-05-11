@@ -66,6 +66,8 @@ namespace TrentCAD.SolidWorksAddin
         private Label _lblMaterialLabel;
         private Label _lblMaterialValue;
         private Button _btnUseSwMaterial;
+        private Label _lblMethodLabel;
+        private ComboBox _cmbMfgMethod;
         private Label _lblCommentsLabel;
         private ListBox _lstComments;
         private TextBox _txtComment;
@@ -74,6 +76,7 @@ namespace TrentCAD.SolidWorksAddin
         // freshly-loaded metadata — suppresses the SelectedIndexChanged
         // handler from re-saving the state right back to the server.
         private bool _suppressReleaseChange;
+        private bool _suppressMethodChange;
 
         // "Newer version available" banner shown when origin has a commit
         // ahead of HEAD that touched the active document
@@ -326,6 +329,42 @@ namespace TrentCAD.SolidWorksAddin
             _pnlMeta.Controls.Add(_btnUseSwMaterial);
             y += 28;
 
+            // Manufacturing method — required for released parts to land
+            // on the right tab of TrentCAD's shop-floor queue. Mirrors
+            // the desktop DetailsPanel's method picker.
+            _lblMethodLabel = new Label
+            {
+                Text = "Method",
+                ForeColor = CSubtext,
+                Font = new Font("Segoe UI", 8.25f),
+                Location = new Point(10, y),
+                AutoSize = false,
+                Size = new Size(180, 16)
+            };
+            _pnlMeta.Controls.Add(_lblMethodLabel);
+            y += 18;
+
+            _cmbMfgMethod = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = CSurface1,
+                ForeColor = CText,
+                Font = new Font("Segoe UI", 9.5f),
+                Location = new Point(10, y),
+                Size = new Size(180, 24)
+            };
+            // "(not set)" sentinel maps to a null write so the user can
+            // clear the field from the add-in too.
+            _cmbMfgMethod.Items.AddRange(new object[] { "(not set)", "print", "cnc", "manual", "other" });
+            _cmbMfgMethod.SelectedIndexChanged += async (s, e) =>
+            {
+                if (_suppressMethodChange) return;
+                await DoSetMfgMethod();
+            };
+            _pnlMeta.Controls.Add(_cmbMfgMethod);
+            y += 30;
+
             _lblCommentsLabel = new Label
             {
                 Text = "Comments",
@@ -479,6 +518,8 @@ namespace TrentCAD.SolidWorksAddin
                 _lblReleaseLabel.Width = inner;
                 _cmbReleaseState.Width = inner;
                 _lblMaterialLabel.Width = inner;
+                _lblMethodLabel.Width = inner;
+                _cmbMfgMethod.Width = inner;
                 _lblCommentsLabel.Width = inner;
                 _lstComments.Width = inner;
                 _txtComment.Width = Math.Max(40, inner - 64);
@@ -900,6 +941,27 @@ namespace TrentCAD.SolidWorksAddin
                 ? "(not set)"
                 : meta.ManufacturingMaterial;
 
+            // Populate the manufacturing-method combo without firing
+            // the change handler (same pattern as release state).
+            _suppressMethodChange = true;
+            try
+            {
+                var method = meta.ManufacturingMethod;
+                if (string.IsNullOrEmpty(method))
+                {
+                    _cmbMfgMethod.SelectedIndex = 0; // "(not set)"
+                }
+                else
+                {
+                    var idx = _cmbMfgMethod.Items.IndexOf(method);
+                    _cmbMfgMethod.SelectedIndex = idx >= 0 ? idx : 0;
+                }
+            }
+            finally
+            {
+                _suppressMethodChange = false;
+            }
+
             // Render comments newest-first, cap at 8 entries to keep the
             // pane compact. Each line shows "<author>: <truncated text>".
             _lstComments.Items.Clear();
@@ -939,6 +1001,26 @@ namespace TrentCAD.SolidWorksAddin
             else
             {
                 ShowMessage(result?.Error ?? "Could not set release state", true);
+            }
+        }
+
+        private async System.Threading.Tasks.Task DoSetMfgMethod()
+        {
+            if (string.IsNullOrEmpty(_currentFilePath)) return;
+            var selected = _cmbMfgMethod.SelectedItem?.ToString();
+            // "(not set)" — first item — clears the field via null payload.
+            var method = (selected == "(not set)" || string.IsNullOrEmpty(selected)) ? null : selected;
+
+            var result = await _api.SetManufacturingMethodAsync(_currentFilePath, method);
+            if (result?.Success == true)
+            {
+                ShowMessage(method == null
+                    ? "Manufacturing method cleared."
+                    : $"Manufacturing method set to {method}.", false);
+            }
+            else
+            {
+                ShowMessage(result?.Error ?? "Could not set manufacturing method", true);
             }
         }
 

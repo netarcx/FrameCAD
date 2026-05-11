@@ -301,6 +301,30 @@ namespace TrentCAD.SolidWorksAddin
         }
 
         /// <summary>
+        /// Set the part's manufacturing method (print/cnc/manual/other).
+        /// Pass null or empty to clear. Required so released parts show up
+        /// on the correct tab of TrentCAD's manufacturing queue.
+        /// </summary>
+        public async Task<ApiResult> SetManufacturingMethodAsync(string absolutePath, string method)
+        {
+            var relativePath = ToRelativePath(absolutePath);
+            // method = null sends `{ path, method: null }` so the server
+            // clears the field. JsonConvert serializes null literally.
+            var body = JsonConvert.SerializeObject(new { path = relativePath, method });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            try
+            {
+                var response = await Client.PostAsync($"{_baseUrl}/api/manufacturing-method", content);
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ApiResult>(json) ?? new ApiResult { Success = false, Error = "Empty response" };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResult { Success = false, Error = ex.Message };
+            }
+        }
+
+        /// <summary>
         /// Append a comment to the part's metadata. Author is resolved server-side
         /// from `git config user.name`.
         /// </summary>

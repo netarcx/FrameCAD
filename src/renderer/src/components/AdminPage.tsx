@@ -71,6 +71,7 @@ export default function AdminPage({ hasProject, onClose }: Props) {
     duplicates?: Array<{ partNumber: string; paths: string[] }>
     orphanedDrawings?: Array<{ path: string; linkedTo: string }>
     tombstones?: string[]
+    orphanedMeta?: string[]
   }>(null)
   const [integrityRunning, setIntegrityRunning] = useState(false)
   const [renormRunning, setRenormRunning] = useState(false)
@@ -304,6 +305,25 @@ export default function AdminPage({ hasProject, onClose }: Props) {
     }
   }, [tab, hasProject, allParts.length, partsLoading, loadAllParts])
 
+  // Refresh the parts cache whenever the main process broadcasts a
+  // file-change. Meta writes go through broadcastStatus() in ipc.ts so
+  // approvals/parts table picks up DetailsPanel / SW add-in edits
+  // without the mentor having to click Refresh. Only fires for the
+  // tabs that actually render the cached data.
+  useEffect(() => {
+    if (!hasProject) return
+    if (tab !== 'parts' && tab !== 'approvals') return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const cleanup = window.api.onFileChange(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { loadAllParts() }, 250)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      cleanup()
+    }
+  }, [tab, hasProject, loadAllParts])
+
   // Save a single editable cell. Updates the row in-place after success
   // so the table reflects the new value without a full reload.
   const updatePart = async (
@@ -351,7 +371,8 @@ export default function AdminPage({ hasProject, onClose }: Props) {
         setIntegrity({
           duplicates: r.duplicates,
           orphanedDrawings: r.orphanedDrawings,
-          tombstones: r.tombstones
+          tombstones: r.tombstones,
+          orphanedMeta: r.orphanedMeta
         })
       } else {
         setError(r.error || 'Integrity check failed')
@@ -1053,6 +1074,7 @@ interface ToolsTabProps {
     duplicates?: Array<{ partNumber: string; paths: string[] }>
     orphanedDrawings?: Array<{ path: string; linkedTo: string }>
     tombstones?: string[]
+    orphanedMeta?: string[]
   }
   integrityRunning: boolean
   onIntegrityCheck: () => void
@@ -1081,7 +1103,8 @@ function ToolsTab(props: ToolsTabProps) {
           <div className="integrity-results">
             {(!integrity.duplicates || integrity.duplicates.length === 0) &&
              (!integrity.orphanedDrawings || integrity.orphanedDrawings.length === 0) &&
-             (!integrity.tombstones || integrity.tombstones.length === 0) && (
+             (!integrity.tombstones || integrity.tombstones.length === 0) &&
+             (!integrity.orphanedMeta || integrity.orphanedMeta.length === 0) && (
               <div className="admin-status">✓ No integrity problems found.</div>
             )}
             {integrity.duplicates && integrity.duplicates.length > 0 && (
@@ -1114,6 +1137,18 @@ function ToolsTab(props: ToolsTabProps) {
                   Only worry if you actually deleted a file you didn't mean to.
                 </p>
                 <ul>{integrity.tombstones.map(t => <li key={t}>{t}</li>)}</ul>
+              </div>
+            )}
+            {integrity.orphanedMeta && integrity.orphanedMeta.length > 0 && (
+              <div className="integrity-block">
+                <h4>Orphaned metadata ({integrity.orphanedMeta.length})</h4>
+                <p className="admin-hint">
+                  parts-meta.json has entries for paths that don't exist in
+                  parts.json. Usually leftover from a rename or delete that
+                  happened before v0.8.5 — new renames migrate cleanly.
+                  Safe to leave; can be removed by hand if it bothers you.
+                </p>
+                <ul>{integrity.orphanedMeta.map(m => <li key={m}>{m}</li>)}</ul>
               </div>
             )}
           </div>

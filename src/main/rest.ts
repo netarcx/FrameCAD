@@ -43,6 +43,20 @@ export function queuePendingCreate(
 
 let writeLock: Promise<void> = Promise.resolve()
 
+/**
+ * Mirror of ipc.ts broadcastStatus — push a fresh getStatus() to the
+ * renderer so views (file tree, AdminPage, ManufacturingQueue) pick up
+ * meta changes made over REST from the SolidWorks add-in. The chokidar
+ * watcher ignores `.trentcad/`, so meta writes need an explicit nudge.
+ */
+function broadcastStatus(): void {
+  const win = getMainWindowRef?.()
+  if (!win || win.isDestroyed()) return
+  gitOps.getStatus()
+    .then(files => { if (!win.isDestroyed()) win.webContents.send('file-change', files) })
+    .catch(() => {})
+}
+
 function serialWrite<T>(fn: () => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     writeLock = writeLock.then(async () => {
@@ -227,6 +241,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           // Lazy import so rest.ts doesn't pull in meta on load
           const meta = await import('./meta')
           await serialWrite(() => meta.setPartMass(body.path!, body.mass!))
+          broadcastStatus()
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })
@@ -284,6 +299,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             body.state as 'draft' | 'in-review' | 'released' | 'manufactured',
             body.note
           ))
+          broadcastStatus()
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })
@@ -336,6 +352,34 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         try {
           const meta = await import('./meta')
           await serialWrite(() => meta.setManufacturingMaterial(body.path!, body.material!))
+          broadcastStatus()
+          json(res, 200, { success: true })
+        } catch (err) {
+          json(res, 500, { success: false, error: (err as Error).message })
+        }
+        return
+      }
+
+      case 'POST /api/manufacturing-method': {
+        // SolidWorks add-in sets manufacturing method directly so the
+        // designer doesn't have to alt-tab to TrentCAD to make their
+        // part show up on the shop-floor queue.
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const body = parseJson(await readBody(req)) as { path?: string; method?: string | null } | null
+        if (!body?.path) { json(res, 400, { error: 'Missing path' }); return }
+        const validMethods = ['print', 'cnc', 'manual', 'other']
+        const method = body.method === null || body.method === '' ? null : body.method
+        if (method !== null && !validMethods.includes(method)) {
+          json(res, 400, { error: `Invalid method. Expected one of: ${validMethods.join(', ')}, or null to clear` })
+          return
+        }
+        try {
+          const meta = await import('./meta')
+          await serialWrite(() => meta.setManufacturingMethod(
+            body.path!,
+            method as 'print' | 'cnc' | 'manual' | 'other' | null
+          ))
+          broadcastStatus()
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })
@@ -353,6 +397,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         try {
           const meta = await import('./meta')
           await serialWrite(() => meta.addComment(body.path!, body.text!.trim()))
+          broadcastStatus()
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })

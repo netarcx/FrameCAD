@@ -51,6 +51,22 @@ function notifyFileChange(win: BrowserWindow): void {
     })
 }
 
+/**
+ * Broadcast a fresh getStatus() to the renderer without re-running the
+ * manifest sync. Used after meta-mutating IPC calls so the file tree,
+ * AdminPage caches, and ManufacturingQueue all pick up the new
+ * release-state / comments / mass / cost / method / material without
+ * waiting for the next file-watcher tick. The chokidar watcher ignores
+ * `.trentcad/` so parts-meta.json writes never fire it on their own.
+ */
+function broadcastStatus(getMainWindow: () => BrowserWindow | null): void {
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return
+  gitOps.getStatus()
+    .then(files => { if (!win.isDestroyed()) win.webContents.send('file-change', files) })
+    .catch(() => {})
+}
+
 function startWatching(dirPath: string, win: BrowserWindow): void {
   stopWatching()
   const debouncedNotify = debounce(() => notifyFileChange(win), 500)
@@ -373,22 +389,27 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('set-release-state', async (_e, filePath: string, state: string, note?: string) => {
     await metaOps.setReleaseState(filePath, state as Parameters<typeof metaOps.setReleaseState>[1], note)
+    broadcastStatus(getMainWindow)
   })
 
   ipcMain.handle('add-comment', async (_e, filePath: string, text: string) => {
     await metaOps.addComment(filePath, text)
+    broadcastStatus(getMainWindow)
   })
 
   ipcMain.handle('set-manufacturing-notes', async (_e, filePath: string, notes: string) => {
     await metaOps.setManufacturingNotes(filePath, notes)
+    broadcastStatus(getMainWindow)
   })
 
   ipcMain.handle('set-part-mass', async (_e, filePath: string, mass: number | null) => {
     await metaOps.setPartMass(filePath, mass)
+    broadcastStatus(getMainWindow)
   })
 
   ipcMain.handle('set-part-cost', async (_e, filePath: string, cost: number | null) => {
     await metaOps.setPartCost(filePath, cost)
+    broadcastStatus(getMainWindow)
   })
 
   ipcMain.handle('get-project-totals', async () => {
@@ -397,10 +418,12 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('set-mfg-method', async (_e, filePath: string, method: string | null) => {
     await metaOps.setManufacturingMethod(filePath, method as Parameters<typeof metaOps.setManufacturingMethod>[1])
+    broadcastStatus(getMainWindow)
   })
 
   ipcMain.handle('set-mfg-material', async (_e, filePath: string, material: string) => {
     await metaOps.setManufacturingMaterial(filePath, material)
+    broadcastStatus(getMainWindow)
   })
 
   ipcMain.handle('get-manufacturing-queue', async () => {
@@ -452,7 +475,13 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
         try { await fs.stat(abs) } catch { tombstones.push(p) }
       }
 
-      return { success: true, duplicates, orphanedDrawings, tombstones }
+      // Orphaned meta: parts-meta.json keys with no corresponding entry
+      // in parts.json (rename history from before the migration fix, or
+      // hand-edited meta). Surfaced so mentors can clean up the file.
+      const manifestPathSet = new Set(Object.keys(manifest.entries))
+      const orphanedMeta = await metaOps.findOrphanMetaPaths(manifestPathSet)
+
+      return { success: true, duplicates, orphanedDrawings, tombstones, orphanedMeta }
     } catch (err) {
       return { success: false, error: (err as Error).message }
     }

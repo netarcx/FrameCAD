@@ -290,6 +290,7 @@ export interface IpcApi {
     duplicates?: Array<{ partNumber: string; paths: string[] }>
     orphanedDrawings?: Array<{ path: string; linkedTo: string }>
     tombstones?: string[]
+    orphanedMeta?: string[]
     error?: string
   }>
   renormalizeAll(): Promise<{ success: boolean; error?: string }>

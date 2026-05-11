@@ -54,6 +54,22 @@ export default function ManufacturingQueue({ onClose, embedded = false }: Props)
 
   useEffect(() => { refresh() }, [refresh])
 
+  // Listen for cross-window meta changes (DetailsPanel, SW add-in,
+  // Admin) so the shop-floor queue reflects new releases / methods
+  // without anyone having to click Refresh. ipc.ts broadcasts a
+  // file-change after every meta-mutating IPC handler.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const cleanup = window.api.onFileChange(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { refresh() }, 250)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      cleanup()
+    }
+  }, [refresh])
+
   const counts = METHODS.reduce<Record<string, number>>((acc, m) => {
     acc[m] = items.filter(i => i.method === m).length
     return acc

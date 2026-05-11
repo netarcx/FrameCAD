@@ -31,6 +31,50 @@ async function saveAllMeta(meta: PartsMetaFile): Promise<void> {
   await fs.writeFile(full, JSON.stringify(meta, null, 2) + '\n')
 }
 
+/**
+ * Move the parts-meta.json entry for `oldPath` to `newPath` after a
+ * file rename. Called from parts.ts handleFileMoves so release state,
+ * comments, mass/cost/method/material follow the file. No-op if the
+ * source key doesn't exist or the destination is already populated
+ * (we don't want to overwrite metadata on a path collision).
+ *
+ * Writes are local-only — the parts.json save cycle in parts.ts
+ * commits both files in the same git operation so meta and manifest
+ * stay in sync on push.
+ */
+export async function migrateMetaPath(oldPath: string, newPath: string): Promise<void> {
+  if (oldPath === newPath) return
+  const all = await loadAllMeta()
+  if (!all[oldPath]) return
+  if (all[newPath]) return
+  all[newPath] = all[oldPath]
+  delete all[oldPath]
+  await saveAllMeta(all)
+}
+
+/**
+ * Drop the parts-meta.json entry for a path that no longer exists on
+ * disk. Used when parts.json detects a missing file and is about to
+ * leave a tombstone — the part number stays reserved but the metadata
+ * should not.
+ */
+export async function pruneMetaPath(filePath: string): Promise<void> {
+  const all = await loadAllMeta()
+  if (!all[filePath]) return
+  delete all[filePath]
+  await saveAllMeta(all)
+}
+
+/**
+ * Return parts-meta.json keys that have no corresponding entry in the
+ * given parts.json manifest. Used by checkManifestIntegrity to surface
+ * orphans from before the migrateMetaPath / pruneMetaPath fixes landed.
+ */
+export async function findOrphanMetaPaths(manifestPaths: Set<string>): Promise<string[]> {
+  const all = await loadAllMeta()
+  return Object.keys(all).filter(p => !manifestPaths.has(p))
+}
+
 async function gitUsername(): Promise<string> {
   try {
     const value = (await getGit().getConfig('user.name')).value

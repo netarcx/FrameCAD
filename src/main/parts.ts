@@ -252,7 +252,7 @@ async function collectSolidWorksFiles(dirPath: string, relativeTo: string): Prom
   return results
 }
 
-function handleFileMoves(manifest: PartsManifest, currentPaths: Set<string>): void {
+async function handleFileMoves(manifest: PartsManifest, currentPaths: Set<string>): Promise<void> {
   const missing: [string, PartEntry][] = []
 
   for (const [entryPath, entry] of Object.entries(manifest.entries)) {
@@ -260,6 +260,10 @@ function handleFileMoves(manifest: PartsManifest, currentPaths: Set<string>): vo
       missing.push([entryPath, entry])
     }
   }
+
+  // Lazy-import to avoid a circular dep between parts.ts and meta.ts.
+  // meta.ts already imports from git.ts which has no parts dependency.
+  const meta = await import('./meta')
 
   for (const [oldPath, entry] of missing) {
     const filename = path.basename(oldPath)
@@ -269,13 +273,20 @@ function handleFileMoves(manifest: PartsManifest, currentPaths: Set<string>): vo
       if (path.basename(currentPath) === filename && !manifest.entries[currentPath]) {
         manifest.entries[currentPath] = entry
         delete manifest.entries[oldPath]
+        // Drag the parts-meta.json entry along so release state,
+        // comments, mass/cost/method/material survive the rename
+        // instead of orphaning at the old path key.
+        try { await meta.migrateMetaPath(oldPath, currentPath) } catch { /* best effort */ }
         found = true
         break
       }
     }
 
     if (!found) {
-      // File was deleted — leave tombstone so number is never reused
+      // File was deleted — leave the tombstone so the number is never
+      // reused, but prune the corresponding meta entry. The metadata
+      // belonged to the file, not the number.
+      try { await meta.pruneMetaPath(oldPath) } catch { /* best effort */ }
     }
   }
 }
@@ -286,7 +297,7 @@ async function syncManifestImpl(): Promise<PartsManifest> {
   const swFiles = await collectSolidWorksFiles(projectDir, projectDir)
   const currentPaths = new Set(swFiles)
 
-  handleFileMoves(manifest, currentPaths)
+  await handleFileMoves(manifest, currentPaths)
 
   // Assign assemblies first (folders with .sldasm), then parts, then drawings
   const assemblies = swFiles.filter(f => classifyFile(path.basename(f)) === 'assembly')
