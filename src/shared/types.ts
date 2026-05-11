@@ -219,6 +219,8 @@ export interface IpcApi {
   listGitHubRepos(org: string, prefix?: string): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }>
   createGitHubRepo(org: string, name: string, isPrivate: boolean, description?: string): Promise<{ success: boolean; url?: string; error?: string }>
   getAdminConfig(): Promise<AdminConfig>
+  adminPinRequired(): Promise<boolean>
+  adminPinVerify(pin: string): Promise<boolean>
   getCachedBrowseConfig(): Promise<{ gitHubOrg?: string; projectPrefix?: string }>
   saveAdminConfig(config: AdminConfig): Promise<void>
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>
