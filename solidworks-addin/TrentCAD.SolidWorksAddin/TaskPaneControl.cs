@@ -257,8 +257,10 @@ namespace TrentCAD.SolidWorksAddin
 
         private bool _connected;
         private string _currentProjectPath;
+        private bool _processingPending;
 
         public Action<string> OnProjectPathChanged { get; set; }
+        public Func<string, bool, bool> OnCreateSolidWorksFile { get; set; }
 
         private void SetButtonStates(bool canCheckOut, bool canCheckIn)
         {
@@ -308,6 +310,11 @@ namespace TrentCAD.SolidWorksAddin
                 error = ex;
             }
 
+            if (error == null && health?.Running == true && health?.Project != null)
+            {
+                await ProcessPendingCreates();
+            }
+
             SafeInvoke(() =>
             {
                 if (error != null)
@@ -351,6 +358,40 @@ namespace TrentCAD.SolidWorksAddin
                     SetButtonStates(false, false);
                 }
             });
+        }
+
+        private async System.Threading.Tasks.Task ProcessPendingCreates()
+        {
+            if (_processingPending) return;
+            _processingPending = true;
+            try
+            {
+                var pending = await _api.GetPendingCreatesAsync();
+                if (pending == null) return;
+                foreach (var p in pending)
+                {
+                    if (string.IsNullOrEmpty(p?.AbsolutePath)) continue;
+                    var isAssembly = p.Type == "assembly";
+                    // CheckConnection runs on the WinForms UI thread (Timer.Tick fires there and
+                    // the continuation preserves the SynchronizationContext), so it's safe to
+                    // call into the SolidWorks COM API directly here.
+                    var created = OnCreateSolidWorksFile?.Invoke(p.AbsolutePath, isAssembly) ?? false;
+                    // Always mark done so a broken pending entry doesn't loop forever
+                    try { await _api.MarkPendingDoneAsync(p.Id); } catch { }
+                    if (created)
+                        ShowMessage("Created " + (p.PartNumber ?? System.IO.Path.GetFileName(p.AbsolutePath)));
+                    else
+                        ShowMessage("Couldn't auto-create " + (p.PartNumber ?? "part") + " — check SolidWorks templates", true);
+                }
+            }
+            catch
+            {
+                // Ignore network/HTTP errors here; the next health tick will retry
+            }
+            finally
+            {
+                _processingPending = false;
+            }
         }
 
         public async void UpdateForDocument(string absolutePath)
@@ -553,11 +594,8 @@ namespace TrentCAD.SolidWorksAddin
                             return;
                         }
                         var result = await _api.CreateSubsystemAsync(name);
-                        SafeInvoke(() =>
-                        {
-                            if (result.Success) ShowMessage($"Created {result.FolderPath}");
-                            else ShowMessage(result.Error ?? "Failed", true);
-                        });
+                        if (result.Success) ShowMessage($"Created {result.FolderPath}");
+                        else ShowMessage(result.Error ?? "Failed", true);
                     }
                     else if (dialog.SelectedType == NewItemType.Assembly)
                     {
@@ -568,20 +606,34 @@ namespace TrentCAD.SolidWorksAddin
                             return;
                         }
                         var result = await _api.CreateNewAssemblyAsync(name, "", desc);
-                        SafeInvoke(() =>
+                        if (!result.Success)
                         {
-                            if (result.Success) ShowMessage($"Created {result.PartNumber}");
-                            else ShowMessage(result.Error ?? "Failed", true);
-                        });
+                            ShowMessage(result.Error ?? "Failed", true);
+                        }
+                        else
+                        {
+                            var abs = _api.ToAbsolutePath(result.FilePath);
+                            var created = OnCreateSolidWorksFile?.Invoke(abs, true) ?? false;
+                            ShowMessage(created
+                                ? $"Created {result.PartNumber}"
+                                : $"Reserved {result.PartNumber} - check SolidWorks templates");
+                        }
                     }
                     else
                     {
                         var result = await _api.CreateNewPartAsync("", desc);
-                        SafeInvoke(() =>
+                        if (!result.Success)
                         {
-                            if (result.Success) ShowMessage($"Created {result.PartNumber}");
-                            else ShowMessage(result.Error ?? "Failed", true);
-                        });
+                            ShowMessage(result.Error ?? "Failed", true);
+                        }
+                        else
+                        {
+                            var abs = _api.ToAbsolutePath(result.FilePath);
+                            var created = OnCreateSolidWorksFile?.Invoke(abs, false) ?? false;
+                            ShowMessage(created
+                                ? $"Created {result.PartNumber}"
+                                : $"Reserved {result.PartNumber} - check SolidWorks templates");
+                        }
                     }
                 }
                 catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }

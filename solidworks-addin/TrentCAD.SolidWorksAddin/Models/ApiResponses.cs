@@ -83,6 +83,24 @@ namespace TrentCAD.SolidWorksAddin.Models
         public string Error { get; set; }
     }
 
+    public class PendingCreate
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("type")]
+        public string Type { get; set; }
+
+        [JsonProperty("relativePath")]
+        public string RelativePath { get; set; }
+
+        [JsonProperty("absolutePath")]
+        public string AbsolutePath { get; set; }
+
+        [JsonProperty("partNumber")]
+        public string PartNumber { get; set; }
+    }
+
     public class LockInfo
     {
         [JsonProperty("path")]

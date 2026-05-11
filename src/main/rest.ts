@@ -1,4 +1,5 @@
 import http from 'http'
+import path from 'path'
 import type { FileEntry, ProjectConfig, PublishResult, SyncResult } from '@shared/types'
 import * as gitOps from './git'
 import * as lockOps from './locking'
@@ -10,6 +11,32 @@ const MAX_BODY_SIZE = 1024 * 64 // 64 KB
 let server: http.Server | null = null
 let currentProject: ProjectConfig | null = null
 let activePort: number | null = null
+
+interface PendingCreate {
+  id: string
+  type: 'part' | 'assembly'
+  relativePath: string
+  absolutePath: string
+  partNumber?: string
+}
+
+const pendingCreates: PendingCreate[] = []
+let pendingIdCounter = 1
+
+export function queuePendingCreate(
+  type: 'part' | 'assembly',
+  relativePath: string,
+  partNumber?: string
+): void {
+  if (!currentProject) return
+  pendingCreates.push({
+    id: `pc-${Date.now()}-${pendingIdCounter++}`,
+    type,
+    relativePath,
+    absolutePath: path.join(currentProject.path, relativePath),
+    partNumber
+  })
+}
 
 let writeLock: Promise<void> = Promise.resolve()
 
@@ -179,6 +206,23 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         const folder = body?.folder ?? ''
         const result = await serialWrite(() => partsOps.createNewPart(folder, body?.description))
         json(res, 200, { success: true, ...result })
+        return
+      }
+
+      case 'GET /api/pending-creates': {
+        json(res, 200, pendingCreates)
+        return
+      }
+
+      case 'POST /api/pending-creates/done': {
+        const body = parseJson(await readBody(req)) as { id?: string } | null
+        if (!body?.id) {
+          json(res, 400, { error: 'Missing id' })
+          return
+        }
+        const idx = pendingCreates.findIndex(p => p.id === body.id)
+        if (idx >= 0) pendingCreates.splice(idx, 1)
+        json(res, 200, { success: true })
         return
       }
 

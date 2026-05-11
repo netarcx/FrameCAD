@@ -38,6 +38,15 @@ namespace TrentCAD.SolidWorksAddin
             return absolutePath;
         }
 
+        public string ToAbsolutePath(string relativePath)
+        {
+            if (string.IsNullOrEmpty(_projectRoot) || string.IsNullOrEmpty(relativePath))
+                return relativePath;
+            return System.IO.Path.Combine(
+                _projectRoot,
+                relativePath.Replace("/", System.IO.Path.DirectorySeparatorChar.ToString()));
+        }
+
         public async Task<HealthResponse> GetHealthAsync()
         {
             var response = await Client.GetAsync($"{_baseUrl}/api/health");
@@ -143,6 +152,21 @@ namespace TrentCAD.SolidWorksAddin
             var response = await Client.PostAsync($"{_baseUrl}/api/parts/new-subsystem", content);
             var json = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<CreateSubsystemResult>(json);
+        }
+
+        public async Task<List<PendingCreate>> GetPendingCreatesAsync()
+        {
+            var response = await Client.GetAsync($"{_baseUrl}/api/pending-creates");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<List<PendingCreate>>(json);
+        }
+
+        public async Task MarkPendingDoneAsync(string id)
+        {
+            var body = JsonConvert.SerializeObject(new { id });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            await Client.PostAsync($"{_baseUrl}/api/pending-creates/done", content);
         }
 
         public async Task<List<LockInfo>> GetLocksAsync()

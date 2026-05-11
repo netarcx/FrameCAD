@@ -1,8 +1,10 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
 using SolidWorks.Interop.swpublished;
 
 namespace TrentCAD.SolidWorksAddin
@@ -72,6 +74,7 @@ namespace TrentCAD.SolidWorksAddin
         {
             _taskPaneControl = new TaskPaneControl();
             _taskPaneControl.OnProjectPathChanged = SetSolidWorksWorkingDirectory;
+            _taskPaneControl.OnCreateSolidWorksFile = CreateSolidWorksFile;
             _taskPaneView = _swApp.CreateTaskpaneView2("", "TrentCAD");
 
             if (_taskPaneView != null)
@@ -92,6 +95,41 @@ namespace TrentCAD.SolidWorksAddin
             catch
             {
                 // SolidWorks may reject the call if the path is invalid; ignore silently
+            }
+        }
+
+        private bool CreateSolidWorksFile(string absolutePath, bool isAssembly)
+        {
+            if (_swApp == null || string.IsNullOrEmpty(absolutePath)) return false;
+            try
+            {
+                var templateKey = isAssembly
+                    ? (int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly
+                    : (int)swUserPreferenceStringValue_e.swDefaultTemplatePart;
+                var template = _swApp.GetUserPreferenceStringValue(templateKey);
+                if (string.IsNullOrEmpty(template) || !File.Exists(template))
+                    return false;
+
+                var doc = _swApp.NewDocument(template, 0, 0, 0) as ModelDoc2;
+                if (doc == null) return false;
+
+                var dir = Path.GetDirectoryName(absolutePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                int errors = 0, warnings = 0;
+                var saved = doc.Extension.SaveAs(
+                    absolutePath,
+                    (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                    (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                    null,
+                    ref errors,
+                    ref warnings);
+                return saved;
+            }
+            catch
+            {
+                return false;
             }
         }
 

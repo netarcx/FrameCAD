@@ -5,7 +5,7 @@ import * as gitOps from './git'
 import * as lockOps from './locking'
 import * as partsOps from './parts'
 import { addRecentProject, getRecentProjects } from './config'
-import { setRestProject, stopRestServer } from './rest'
+import { setRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
 
@@ -151,11 +151,15 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('create-new-part', async (_e, folder: string, description?: string) => {
-    return partsOps.createNewPart(folder, description)
+    const result = await partsOps.createNewPart(folder, description)
+    queuePendingCreate('part', result.filePath, result.partNumber)
+    return result
   })
 
   ipcMain.handle('create-new-assembly', async (_e, parentFolder: string, name: string, description?: string) => {
-    return partsOps.createNewAssembly(parentFolder, name, description)
+    const result = await partsOps.createNewAssembly(parentFolder, name, description)
+    queuePendingCreate('assembly', result.filePath, result.partNumber)
+    return result
   })
 
   ipcMain.handle('connect-drive', async () => {
