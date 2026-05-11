@@ -133,10 +133,19 @@ export default function App() {
   const [checkingDeps, setCheckingDeps] = useState(false)
   const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null)
   const [progressHidden, setProgressHidden] = useState(false)
+  // Tracks which long-running git operation drove the current progress
+  // modal. Using `project` to derive this is wrong: a join completes
+  // by opening the new project, which flips `project` from null to set
+  // BEFORE the "done" event fires, so the final label would flicker
+  // from "Downloading" to "Upload complete". This state is set when
+  // each subscription receives its first event and stays stable
+  // through the run.
+  const [progressKind, setProgressKind] = useState<'publish' | 'join'>('publish')
   const [projectTotals, setProjectTotals] = useState<ProjectTotals | null>(null)
 
   useEffect(() => {
-    const cleanup = window.api.onPublishProgress((p) => {
+    const cleanupPublish = window.api.onPublishProgress((p) => {
+      setProgressKind('publish')
       setPublishProgress(p)
       // On error, force the full modal back open even if it was hidden —
       // the user needs to see what went wrong, not a thin strip at the
@@ -152,7 +161,23 @@ export default function App() {
         }, 2000)
       }
     })
-    return cleanup
+    // Join (Download a teammate's project) reuses the same progress
+    // modal — same shape (PublishProgress), same UI, just driven by a
+    // different IPC channel.
+    const cleanupJoin = window.api.onJoinProgress((p) => {
+      setProgressKind('join')
+      setPublishProgress(p)
+      if (p.phase === 'error' || p.phase === 'preparing') {
+        setProgressHidden(false)
+      }
+      if (p.phase === 'done') {
+        setTimeout(() => {
+          setPublishProgress(null)
+          setProgressHidden(false)
+        }, 2000)
+      }
+    })
+    return () => { cleanupPublish(); cleanupJoin() }
   }, [])
 
   const recheckDeps = useCallback(() => {
@@ -570,10 +595,10 @@ export default function App() {
         <div className="modal-overlay">
           <div className="modal publish-progress-modal">
             <h2>
-              {publishProgress.phase === 'preparing' && 'Preparing upload...'}
-              {publishProgress.phase === 'uploading' && 'Uploading to GitHub'}
-              {publishProgress.phase === 'done' && 'Upload complete'}
-              {publishProgress.phase === 'error' && 'Upload failed'}
+              {publishProgress.phase === 'preparing' && (progressKind === 'join' ? 'Preparing download…' : 'Preparing upload...')}
+              {publishProgress.phase === 'uploading' && (progressKind === 'join' ? 'Downloading from GitHub' : 'Uploading to GitHub')}
+              {publishProgress.phase === 'done' && (progressKind === 'join' ? 'Download complete' : 'Upload complete')}
+              {publishProgress.phase === 'error' && (progressKind === 'join' ? 'Download failed' : 'Upload failed')}
             </h2>
             {publishProgress.detail && <p className="publish-detail">{publishProgress.detail}</p>}
             {typeof publishProgress.percent === 'number' && (
@@ -630,10 +655,10 @@ export default function App() {
           title="Click to expand the upload details"
         >
           <span className="publish-mini-bar-title">
-            {publishProgress.phase === 'preparing' && 'Preparing upload…'}
-            {publishProgress.phase === 'uploading' && 'Uploading to GitHub'}
-            {publishProgress.phase === 'done' && 'Upload complete'}
-            {publishProgress.phase === 'error' && 'Upload failed'}
+            {publishProgress.phase === 'preparing' && (progressKind === 'join' ? 'Preparing download…' : 'Preparing upload…')}
+            {publishProgress.phase === 'uploading' && (progressKind === 'join' ? 'Downloading from GitHub' : 'Uploading to GitHub')}
+            {publishProgress.phase === 'done' && (progressKind === 'join' ? 'Download complete' : 'Upload complete')}
+            {publishProgress.phase === 'error' && (progressKind === 'join' ? 'Download failed' : 'Upload failed')}
           </span>
           {publishProgress.detail && (
             <span className="publish-mini-bar-detail">{publishProgress.detail}</span>

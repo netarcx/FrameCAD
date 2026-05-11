@@ -21,6 +21,16 @@ namespace TrentCAD.SolidWorksAddin
         private ITaskpaneView _taskPaneView;
         private TaskPaneHost _taskPaneHost;
 
+        // Per-doc FileSavePostNotify hook used by mass auto-push. The
+        // SldWorks co-class doesn't expose FileSavePostNotify directly —
+        // only PartDoc/AssemblyDoc/DrawingDoc do — so we re-hook every
+        // time the active document changes. The delegate is stored so
+        // we can `-=` it before re-hooking on the next doc; otherwise
+        // handlers leak and every save fires N times for the N docs
+        // the user has opened this session.
+        private PartDoc _massHookPart;
+        private DPartDocEvents_FileSavePostNotifyEventHandler _massHookHandler;
+
         [ComRegisterFunction]
         public static void RegisterFunction(Type t)
         {
@@ -59,6 +69,7 @@ namespace TrentCAD.SolidWorksAddin
         public bool DisconnectFromSW()
         {
             _swEvents.ActiveDocChangeNotify -= OnActiveDocChange;
+            UnhookMassNotify();
 
             _taskPaneControl?.StopHealthPolling();
             _taskPaneHost?.ReleaseHandle();
@@ -71,6 +82,100 @@ namespace TrentCAD.SolidWorksAddin
             return true;
         }
 
+        /// <summary>
+        /// Detach any FileSavePostNotify handler we previously attached.
+        /// Safe to call when no hook is active.
+        /// </summary>
+        private void UnhookMassNotify()
+        {
+            if (_massHookPart != null && _massHookHandler != null)
+            {
+                try { _massHookPart.FileSavePostNotify -= _massHookHandler; } catch { /* doc may already be closed */ }
+            }
+            _massHookPart = null;
+            _massHookHandler = null;
+        }
+
+        /// <summary>
+        /// Hook FileSavePostNotify on the currently-active PartDoc so that
+        /// every save automatically pushes the part's mass to TrentCAD's
+        /// metadata. Assemblies and drawings are skipped (only parts have a
+        /// single mass property). Called from OnActiveDocChange whenever
+        /// the user switches documents.
+        /// </summary>
+        private void HookMassNotifyOnActiveDoc()
+        {
+            UnhookMassNotify();
+            if (_swApp == null) return;
+            try
+            {
+                var part = _swApp.ActiveDoc as PartDoc;
+                if (part == null) return;  // not a part — nothing to mass-track
+
+                // Capture the part in the closure rather than re-reading
+                // _swApp.ActiveDoc when the save fires — by then the user
+                // may have switched documents and ActiveDoc would point at
+                // a different model, making us compute mass for the wrong
+                // part.
+                var hookedPart = part;
+                _massHookHandler = (int saveType, string fileName) =>
+                {
+                    // Fire-and-forget; mass push must NOT block the SW save.
+                    // Errors here would corrupt the save event chain, so
+                    // swallow them and let the user retry manually if needed.
+                    try { _ = OnPartSavedPushMassAsync(hookedPart, fileName); }
+                    catch { /* never throw from a SW event handler */ }
+                    return 0;  // event handlers return HRESULT-like int
+                };
+                part.FileSavePostNotify += _massHookHandler;
+                _massHookPart = part;
+            }
+            catch
+            {
+                // Some SW versions throw on attaching to closed/invalid docs
+                _massHookHandler = null;
+                _massHookPart = null;
+            }
+        }
+
+        /// <summary>
+        /// Read the saved part's mass via GetMassProperties2 and POST it
+        /// to TrentCAD's REST API. UseSystemUnits=true (SI/kg) so we know
+        /// what unit we're converting from, regardless of the document's
+        /// configured units. Converts kg→lb and posts in pounds.
+        ///
+        /// The PartDoc is passed explicitly (captured in the event-hook
+        /// closure) rather than read from ActiveDoc — if the user
+        /// switches documents between save and our async handler firing,
+        /// ActiveDoc would point at the wrong model.
+        /// </summary>
+        private async System.Threading.Tasks.Task OnPartSavedPushMassAsync(PartDoc hookedPart, string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName) || hookedPart == null) return;
+            try
+            {
+                var doc = hookedPart as ModelDoc2;
+                if (doc == null) return;
+                var ext = doc.Extension;
+                if (ext == null) return;
+
+                // angle=0, deflection=0, UseSystemUnits=true → props[5] is mass in kg
+                var props = ext.GetMassProperties2(0, 0, true) as double[];
+                if (props == null || props.Length < 6) return;
+                var kg = props[5];
+                if (kg <= 0) return;
+                var lb = kg * 2.20462262;
+
+                _taskPaneControl?.NotifyPartMassFromSwAsync(fileName, lb);
+            }
+            catch
+            {
+                // Any failure (model not fully loaded, units edge case,
+                // network drop) silently aborts — user can set mass
+                // manually via the TrentCAD app
+            }
+        }
+
         private void CreateTaskPane()
         {
             _taskPaneControl = new TaskPaneControl();
@@ -78,6 +183,8 @@ namespace TrentCAD.SolidWorksAddin
             _taskPaneControl.OnCreateSolidWorksFile = CreateSolidWorksFile;
             _taskPaneControl.OnStageFile = StageFileViaApi;
             _taskPaneControl.OnGetAssemblyChildren = GetAssemblyChildren;
+            _taskPaneControl.OnGetActiveDocMaterial = GetActiveDocMaterial;
+            _taskPaneControl.OnFillTitleBlock = FillActiveDrawingTitleBlock;
 
             // Task-pane chrome icon (the small bitmap SolidWorks shows next to
             // "TrentCAD" in the right-side panel tabs). CreateTaskpaneView2
@@ -109,6 +216,100 @@ namespace TrentCAD.SolidWorksAddin
             catch
             {
                 // SolidWorks may reject the call if the path is invalid; ignore silently
+            }
+        }
+
+        /// <summary>
+        /// Read the SolidWorks-assigned material for the active part. Returns
+        /// empty string if no document is active, the active doc is an
+        /// assembly/drawing (only parts have a single material), or no
+        /// material is set in the model.
+        ///
+        /// **Caveat**: only PartDoc.GetMaterialPropertyName2 is documented;
+        /// assemblies have per-component materials accessed differently and
+        /// are out of scope for this button.
+        /// </summary>
+        private string GetActiveDocMaterial()
+        {
+            if (_swApp == null) return "";
+            try
+            {
+                var doc = _swApp.ActiveDoc as ModelDoc2;
+                if (doc == null) return "";
+                var part = doc as PartDoc;
+                if (part == null) return "";  // assembly/drawing — skip
+                // Empty configuration name = active configuration
+                string database = null;
+                var name = part.GetMaterialPropertyName2("", out database);
+                return string.IsNullOrWhiteSpace(name) ? "" : name.Trim();
+            }
+            catch
+            {
+                // SW API hit a snag — fail silent, button just shows
+                // "No material set in SW" via the empty return
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// Write the supplied key/value pairs into the active document's
+        /// custom properties. Drawing templates whose title blocks link
+        /// to these property names ($PRPSHEET:"PartNumber", etc.) will
+        /// pick up the values automatically on the next sheet refresh.
+        ///
+        /// Returns the count of properties successfully written. Properties
+        /// with empty values are skipped (we don't want to wipe an
+        /// existing title-block value with a blank from TrentCAD).
+        ///
+        /// **SW API caveat**: Add3 returns 0 on success and a small int
+        /// otherwise — we treat any non-throw as success and let the
+        /// user verify in the title block. The `swCustomPropertyReplaceValue`
+        /// option (= 2) replaces existing values rather than appending.
+        /// </summary>
+        private int FillActiveDrawingTitleBlock(System.Collections.Generic.IDictionary<string, string> props)
+        {
+            if (_swApp == null || props == null || props.Count == 0) return 0;
+            try
+            {
+                var doc = _swApp.ActiveDoc as ModelDoc2;
+                if (doc == null) return 0;
+                var ext = doc.Extension;
+                if (ext == null) return 0;
+                // Empty config name = document-level (root) custom properties,
+                // which is what drawing title blocks read via $PRP:"name".
+                var cpm = ext.get_CustomPropertyManager("") as ICustomPropertyManager;
+                if (cpm == null) return 0;
+
+                int written = 0;
+                foreach (var kv in props)
+                {
+                    if (string.IsNullOrEmpty(kv.Key) || string.IsNullOrEmpty(kv.Value)) continue;
+                    try
+                    {
+                        cpm.Add3(
+                            kv.Key,
+                            (int)swCustomInfoType_e.swCustomInfoText,
+                            kv.Value,
+                            (int)swCustomPropertyAddOption_e.swCustomPropertyReplaceValue);
+                        written++;
+                    }
+                    catch { /* skip and continue with the rest */ }
+                }
+                // Force the active sheet to re-evaluate property links so the
+                // user sees the new values without having to scroll the
+                // viewport. Skip silently if it's not a drawing or refresh
+                // isn't available.
+                try
+                {
+                    var drawing = doc as DrawingDoc;
+                    drawing?.RebuildTemplate();
+                }
+                catch { /* not a drawing or RebuildTemplate unavailable */ }
+                return written;
+            }
+            catch
+            {
+                return 0;
             }
         }
 
@@ -232,6 +433,10 @@ namespace TrentCAD.SolidWorksAddin
             {
                 _taskPaneControl?.ClearDocument();
             }
+            // Re-attach the mass-save hook to whichever PartDoc is now active.
+            // Done AFTER the task pane updates so the user sees doc info
+            // first; mass push happens later on save.
+            HookMassNotifyOnActiveDoc();
             return 0;
         }
     }

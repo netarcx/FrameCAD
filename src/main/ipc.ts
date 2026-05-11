@@ -20,7 +20,7 @@ import {
   migrateFromCachedBrowseConfig
 } from './global-admin'
 import { addRecentProject, getRecentProjects, getCachedBrowseConfig } from './config'
-import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate } from './rest'
+import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate, setRestMainWindow } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
 
@@ -73,6 +73,10 @@ function stopWatching(): void {
 export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   let currentProject: ProjectConfig | null = null
 
+  // Let the REST server bring the main window forward when the SW
+  // add-in's "Show in TrentCAD" button is clicked
+  setRestMainWindow(getMainWindow)
+
   ipcMain.handle('create-project', async (_e, name: string, dirPath: string, remote: string, isCotsProject?: boolean) => {
     await gitOps.createProject(name, dirPath, remote)
     if (isCotsProject) {
@@ -87,7 +91,10 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('join-project', async (_e, url: string, dirPath: string) => {
-    await gitOps.joinProject(url, dirPath)
+    const win = getMainWindow()
+    await gitOps.joinProject(url, dirPath, (progress) => {
+      if (win && !win.isDestroyed()) win.webContents.send('join-progress', progress)
+    })
     const name = path.basename(dirPath)
     currentProject = { name, path: dirPath, remote: url }
     await addRecentProject(currentProject)

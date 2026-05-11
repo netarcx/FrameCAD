@@ -176,5 +176,149 @@ namespace TrentCAD.SolidWorksAddin
             var json = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<List<LockInfo>>(json);
         }
+
+        /// <summary>
+        /// Bring the TrentCAD main window to the foreground.
+        /// </summary>
+        public async Task<ApiResult> FocusTrentCadAsync()
+        {
+            try
+            {
+                var response = await Client.PostAsync($"{_baseUrl}/api/focus",
+                    new StringContent("{}", Encoding.UTF8, "application/json"));
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ApiResult>(json) ?? new ApiResult { Success = false, Error = "Empty response" };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResult { Success = false, Error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Fetch the per-part metadata blob (release state, comments, mass, cost, etc.)
+        /// for the file at the given absolute path. Returns null if no metadata exists.
+        /// </summary>
+        public async Task<PartMetaDto> GetPartMetaAsync(string absolutePath)
+        {
+            var relativePath = ToRelativePath(absolutePath);
+            var encoded = Uri.EscapeDataString(relativePath);
+            try
+            {
+                var response = await Client.GetAsync($"{_baseUrl}/api/meta?path={encoded}");
+                if (!response.IsSuccessStatusCode) return null;
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<PartMetaDto>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Set the part's release state (draft / in-review / released / manufactured).
+        /// </summary>
+        public async Task<ApiResult> SetReleaseStateAsync(string absolutePath, string state)
+        {
+            var relativePath = ToRelativePath(absolutePath);
+            var body = JsonConvert.SerializeObject(new { path = relativePath, state });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            try
+            {
+                var response = await Client.PostAsync($"{_baseUrl}/api/release-state", content);
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ApiResult>(json) ?? new ApiResult { Success = false, Error = "Empty response" };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResult { Success = false, Error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Fetch the bundle of values to fill into a drawing's title
+        /// block (part number, description, material, mass, designer,
+        /// date). Returns null on any failure.
+        /// </summary>
+        public async Task<TitleBlockDataDto> GetTitleBlockDataAsync(string absolutePath)
+        {
+            var relativePath = ToRelativePath(absolutePath);
+            var encoded = Uri.EscapeDataString(relativePath);
+            try
+            {
+                var response = await Client.GetAsync($"{_baseUrl}/api/title-block-data?path={encoded}");
+                if (!response.IsSuccessStatusCode) return null;
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<TitleBlockDataDto>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Push a SolidWorks-computed mass (in pounds) for the given file.
+        /// Used by the SW add-in's FileSavePostNotify hook so the user
+        /// doesn't have to manually type mass into TrentCAD every save.
+        /// </summary>
+        public async Task<ApiResult> SetPartMassAutoAsync(string absolutePath, double massPounds)
+        {
+            var relativePath = ToRelativePath(absolutePath);
+            var body = JsonConvert.SerializeObject(new { path = relativePath, mass = massPounds });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            try
+            {
+                var response = await Client.PostAsync($"{_baseUrl}/api/part-mass-auto", content);
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ApiResult>(json) ?? new ApiResult { Success = false, Error = "Empty response" };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResult { Success = false, Error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Set the part's manufacturing material in TrentCAD metadata.
+        /// </summary>
+        public async Task<ApiResult> SetManufacturingMaterialAsync(string absolutePath, string material)
+        {
+            var relativePath = ToRelativePath(absolutePath);
+            var body = JsonConvert.SerializeObject(new { path = relativePath, material });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            try
+            {
+                var response = await Client.PostAsync($"{_baseUrl}/api/material", content);
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ApiResult>(json) ?? new ApiResult { Success = false, Error = "Empty response" };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResult { Success = false, Error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Append a comment to the part's metadata. Author is resolved server-side
+        /// from `git config user.name`.
+        /// </summary>
+        public async Task<ApiResult> AddCommentAsync(string absolutePath, string text)
+        {
+            var relativePath = ToRelativePath(absolutePath);
+            var body = JsonConvert.SerializeObject(new { path = relativePath, text });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            try
+            {
+                var response = await Client.PostAsync($"{_baseUrl}/api/comments", content);
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ApiResult>(json) ?? new ApiResult { Success = false, Error = "Empty response" };
+            }
+            catch (Exception ex)
+            {
+                return new ApiResult { Success = false, Error = ex.Message };
+            }
+        }
     }
 }

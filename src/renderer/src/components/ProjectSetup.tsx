@@ -28,7 +28,10 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   const [authStatus, setAuthStatus] = useState<GitHubAuthStatus | null>(null)
   const [resetupMsg, setResetupMsg] = useState<string | null>(null)
   const [loggingIn, setLoggingIn] = useState(false)
-  const [resetting, setResetting] = useState(false)
+  // True between clicking "Sign in" and seeing the gh CLI flip to
+  // logged-in. While true we auto-poll status every 3 s so most users
+  // never need to click anything to confirm sign-in landed.
+  const [signInPending, setSignInPending] = useState(false)
   const [showBrowse, setShowBrowse] = useState(false)
   const [creatingOnGitHub, setCreatingOnGitHub] = useState(false)
   const [createMsg, setCreateMsg] = useState<string | null>(null)
@@ -52,10 +55,12 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     try {
       const result = await window.api.githubLogin()
       if (result.launched) {
-        setResetupMsg('Sign-in opened in a new window — when done, click "Check sign-in" to refresh')
+        setSignInPending(true)
+        setResetupMsg('Sign-in opened in a new window. Finish there — TrentCAD will detect it automatically.')
       } else if (result.error?.startsWith('MANUAL_SIGNIN_REQUIRED:')) {
         // Mac/Linux: we can't reliably spawn a terminal, so we tell the
         // user to run the command themselves. Strip the sentinel prefix.
+        setSignInPending(true)
         setResetupMsg(result.error.slice('MANUAL_SIGNIN_REQUIRED:'.length))
       } else {
         setResetupMsg(result.error || 'Could not launch GitHub login')
@@ -65,16 +70,31 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     }
   }
 
-  const handleResetup = async () => {
-    setResetting(true)
-    setResetupMsg(null)
-    try {
-      const result = await window.api.gitResetup()
-      setResetupMsg((result.success ? '✓ ' : '✗ ') + (result.error || result.messages.join(' · ')))
-    } finally {
-      setResetting(false)
-    }
-  }
+  // While sign-in is pending, poll auth status every 3 s so we can
+  // auto-detect when the user completes sign-in in the other window.
+  // Stops itself once we see loggedIn=true; bounded at ~2 minutes so we
+  // don't poll forever if the user abandons sign-in.
+  useEffect(() => {
+    if (!signInPending) return
+    let cancelled = false
+    const start = Date.now()
+    const interval = setInterval(async () => {
+      if (cancelled || Date.now() - start > 120000) {
+        setSignInPending(false)
+        return
+      }
+      try {
+        const status = await window.api.githubAuthStatus()
+        if (cancelled) return
+        setAuthStatus(status)
+        if (status.loggedIn) {
+          setSignInPending(false)
+          setResetupMsg(`✓ Signed in as ${status.username}`)
+        }
+      } catch { /* ignore — try again next tick */ }
+    }, 3000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [signInPending])
 
   const handleBrowse = async () => {
     const dir = await window.api.selectDirectory()
@@ -132,29 +152,41 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
         <div className="setup-toolbar">
           <div className="setup-auth">
             {authStatus?.loggedIn ? (
+              // Already signed in — just show the badge, no buttons
               <span className="setup-auth-status">
                 ✓ Signed in to GitHub as <strong>{authStatus.username}</strong>
               </span>
+            ) : signInPending ? (
+              // Sign-in launched, waiting for the user to finish in the
+              // browser/terminal. We auto-poll every 3s; the manual refresh
+              // button is here as a fallback if polling misses.
+              <>
+                <span className="setup-auth-status muted">
+                  Waiting for sign-in to complete…
+                </span>
+                <button
+                  className="toolbar-btn"
+                  onClick={refreshAuth}
+                >
+                  I signed in — refresh
+                </button>
+              </>
             ) : (
-              <span className="setup-auth-status muted">
-                {authStatus?.ghCliAvailable === false
-                  ? 'GitHub CLI not detected — install to enable sign-in'
-                  : 'Not signed in to GitHub'}
-              </span>
+              <>
+                <span className="setup-auth-status muted">
+                  {authStatus?.ghCliAvailable === false
+                    ? 'GitHub CLI not detected — install to enable sign-in'
+                    : 'Not signed in to GitHub'}
+                </span>
+                <button
+                  className="toolbar-btn primary"
+                  onClick={handleGitHubLogin}
+                  disabled={loggingIn || authStatus?.ghCliAvailable === false}
+                >
+                  {loggingIn ? 'Opening…' : 'Sign in with GitHub'}
+                </button>
+              </>
             )}
-            <button
-              className="toolbar-btn"
-              onClick={handleGitHubLogin}
-              disabled={loggingIn || authStatus?.ghCliAvailable === false}
-            >
-              {loggingIn ? 'Opening...' : authStatus?.loggedIn ? 'Re-sign in' : 'Sign in with GitHub'}
-            </button>
-            <button className="toolbar-btn" onClick={refreshAuth}>
-              Check sign-in
-            </button>
-            <button className="toolbar-btn" onClick={handleResetup} disabled={resetting}>
-              {resetting ? 'Resetting...' : 'Re-setup Git'}
-            </button>
           </div>
           {resetupMsg && <div className="setup-toolbar-msg">{resetupMsg}</div>}
         </div>

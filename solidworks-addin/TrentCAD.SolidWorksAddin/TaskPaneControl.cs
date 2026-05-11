@@ -48,12 +48,68 @@ namespace TrentCAD.SolidWorksAddin
         private Label _lblDescription;
         private Label _lblStatus;
         private Label _lblLockedBy;
+        // Warning shown when the active file's name doesn't include its
+        // TrentCAD part number — likely the user did a Save As and broke
+        // the parts.json link to this file
+        private Label _lblRenameWarning;
 
         private Button _btnCheckOut, _btnCheckIn;
         private Button _btnSync, _btnPublish;
         private Button _btnNewPart;
         private Button _btnOpenApp;
         private Label _lblMessage;
+
+        // Per-part metadata panel (release state + comments + material)
+        private Panel _pnlMeta;
+        private Label _lblReleaseLabel;
+        private ComboBox _cmbReleaseState;
+        private Label _lblMaterialLabel;
+        private Label _lblMaterialValue;
+        private Button _btnUseSwMaterial;
+        private Label _lblCommentsLabel;
+        private ListBox _lstComments;
+        private TextBox _txtComment;
+        private Button _btnAddComment;
+        // True while we're programmatically setting the combo from
+        // freshly-loaded metadata — suppresses the SelectedIndexChanged
+        // handler from re-saving the state right back to the server.
+        private bool _suppressReleaseChange;
+
+        // "Newer version available" banner shown when origin has a commit
+        // ahead of HEAD that touched the active document
+        private Panel _pnlNewerVersion;
+        private Label _lblNewerVersion;
+        private Button _btnDownloadNewer;
+
+        // "Fill title block" button — only meaningful for drawings, hidden otherwise
+        private Button _btnFillTitleBlock;
+
+        /// <summary>
+        /// Read the SolidWorks-assigned material name for the active document.
+        /// Wired by SwAddin so TaskPaneControl can ask without holding a SW
+        /// API reference. Returns empty string on any failure.
+        /// </summary>
+        public Func<string> OnGetActiveDocMaterial;
+
+        /// <summary>
+        /// Write a set of values to the active drawing's custom properties.
+        /// Returns the count successfully written. Wired by SwAddin.
+        /// </summary>
+        public Func<System.Collections.Generic.IDictionary<string, string>, int> OnFillTitleBlock;
+
+        /// <summary>
+        /// Called by SwAddin's FileSavePostNotify hook with the part's
+        /// new mass (in pounds). Pushes to TrentCAD's REST API in the
+        /// background — fire-and-forget so SW's save event isn't blocked.
+        /// Failures are silently ignored; the user can still set mass
+        /// manually if the auto-push misses.
+        /// </summary>
+        public async void NotifyPartMassFromSwAsync(string absolutePath, double massPounds)
+        {
+            if (string.IsNullOrEmpty(absolutePath) || massPounds <= 0) return;
+            try { await _api.SetPartMassAutoAsync(absolutePath, massPounds); }
+            catch { /* silent — SW save must not be blocked by network issues */ }
+        }
 
         public TaskPaneControl()
         {
@@ -136,6 +192,8 @@ namespace TrentCAD.SolidWorksAddin
             cardY += 4;
             _lblStatus = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI", 8.25f), CSubtext);
             _lblLockedBy = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI", 8.25f), CSubtext);
+            _lblRenameWarning = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI Semibold", 8.25f), CYellow);
+            _lblRenameWarning.Visible = false;
             Controls.Add(_pnlFileCard);
 
             // --- Buttons ---
@@ -159,6 +217,11 @@ namespace TrentCAD.SolidWorksAddin
             _btnNewPart.Click += async (s, e) => await DoNewPart();
             Controls.Add(_btnNewPart);
 
+            _btnFillTitleBlock = MakeButton("Fill Title Block");
+            _btnFillTitleBlock.Click += async (s, e) => await DoFillTitleBlock();
+            _btnFillTitleBlock.Visible = false;  // only for .slddrw documents
+            Controls.Add(_btnFillTitleBlock);
+
             _btnOpenApp = MakeButton("Open TrentCAD");
             _btnOpenApp.BackColor = CBlue;
             _btnOpenApp.ForeColor = CMantle;
@@ -179,8 +242,178 @@ namespace TrentCAD.SolidWorksAddin
             };
             Controls.Add(_lblMessage);
 
+            BuildMetaPanel();
+
             SetButtonStates(false, false);
             LayoutAll();
+        }
+
+        private void BuildMetaPanel()
+        {
+            _pnlMeta = new Panel { BackColor = CSurface0, Visible = false };
+
+            var y = 10;
+
+            _lblReleaseLabel = new Label
+            {
+                Text = "Release state",
+                ForeColor = CSubtext,
+                Font = new Font("Segoe UI", 8.25f),
+                Location = new Point(10, y),
+                AutoSize = false,
+                Size = new Size(180, 16)
+            };
+            _pnlMeta.Controls.Add(_lblReleaseLabel);
+            y += 18;
+
+            _cmbReleaseState = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = CSurface1,
+                ForeColor = CText,
+                Font = new Font("Segoe UI", 9.5f),
+                Location = new Point(10, y),
+                Size = new Size(180, 24)
+            };
+            _cmbReleaseState.Items.AddRange(new object[] { "draft", "in-review", "released", "manufactured" });
+            _cmbReleaseState.SelectedIndexChanged += async (s, e) =>
+            {
+                if (_suppressReleaseChange) return;
+                await DoSetReleaseState();
+            };
+            _pnlMeta.Controls.Add(_cmbReleaseState);
+            y += 30;
+
+            _lblMaterialLabel = new Label
+            {
+                Text = "Material",
+                ForeColor = CSubtext,
+                Font = new Font("Segoe UI", 8.25f),
+                Location = new Point(10, y),
+                AutoSize = false,
+                Size = new Size(180, 16)
+            };
+            _pnlMeta.Controls.Add(_lblMaterialLabel);
+            y += 18;
+
+            _lblMaterialValue = new Label
+            {
+                Text = "(not set)",
+                ForeColor = CText,
+                Font = new Font("Segoe UI", 9f),
+                Location = new Point(10, y),
+                AutoSize = false,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Size = new Size(116, 22)
+            };
+            _pnlMeta.Controls.Add(_lblMaterialValue);
+
+            _btnUseSwMaterial = new Button
+            {
+                Text = "Use SW",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = CSurface1,
+                ForeColor = CText,
+                Font = new Font("Segoe UI", 9f),
+                Location = new Point(130, y),
+                Size = new Size(60, 22),
+                Cursor = Cursors.Hand,
+                FlatAppearance = { BorderSize = 0 }
+            };
+            _btnUseSwMaterial.Click += async (s, e) => await DoUseSwMaterial();
+            _pnlMeta.Controls.Add(_btnUseSwMaterial);
+            y += 28;
+
+            _lblCommentsLabel = new Label
+            {
+                Text = "Comments",
+                ForeColor = CSubtext,
+                Font = new Font("Segoe UI", 8.25f),
+                Location = new Point(10, y),
+                AutoSize = false,
+                Size = new Size(180, 16)
+            };
+            _pnlMeta.Controls.Add(_lblCommentsLabel);
+            y += 18;
+
+            _lstComments = new ListBox
+            {
+                BackColor = CMantle,
+                ForeColor = CText,
+                Font = new Font("Segoe UI", 8.5f),
+                BorderStyle = BorderStyle.None,
+                Location = new Point(10, y),
+                Size = new Size(180, 80),
+                IntegralHeight = false
+            };
+            _pnlMeta.Controls.Add(_lstComments);
+            y += 86;
+
+            _txtComment = new TextBox
+            {
+                BackColor = CSurface1,
+                ForeColor = CText,
+                Font = new Font("Segoe UI", 9f),
+                BorderStyle = BorderStyle.FixedSingle,
+                Location = new Point(10, y),
+                Size = new Size(120, 22)
+            };
+            _pnlMeta.Controls.Add(_txtComment);
+
+            _btnAddComment = new Button
+            {
+                Text = "Add",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = CBlue,
+                ForeColor = CMantle,
+                Font = new Font("Segoe UI Semibold", 9f),
+                Location = new Point(134, y),
+                Size = new Size(56, 22),
+                Cursor = Cursors.Hand,
+                FlatAppearance = { BorderSize = 0 }
+            };
+            _btnAddComment.Click += async (s, e) => await DoAddComment();
+            _pnlMeta.Controls.Add(_btnAddComment);
+            y += 28;
+
+            _pnlMeta.Height = y;
+            Controls.Add(_pnlMeta);
+
+            // "Newer version available" banner — separate panel so it can
+            // appear without the meta panel (or vice versa)
+            _pnlNewerVersion = new Panel
+            {
+                BackColor = CYellow,
+                Visible = false,
+                Height = 56
+            };
+            _lblNewerVersion = new Label
+            {
+                Text = "A teammate uploaded a newer version of this file",
+                ForeColor = CMantle,
+                Font = new Font("Segoe UI Semibold", 9f),
+                Location = new Point(10, 8),
+                AutoSize = false,
+                Size = new Size(180, 24)
+            };
+            _pnlNewerVersion.Controls.Add(_lblNewerVersion);
+            _btnDownloadNewer = new Button
+            {
+                Text = "Download",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = CMantle,
+                ForeColor = CYellow,
+                Font = new Font("Segoe UI Semibold", 9f),
+                Location = new Point(10, 30),
+                Size = new Size(110, 22),
+                Cursor = Cursors.Hand,
+                FlatAppearance = { BorderSize = 0 }
+            };
+            _btnDownloadNewer.Click += async (s, e) => { await DoSync(); };
+            _pnlNewerVersion.Controls.Add(_btnDownloadNewer);
+            Controls.Add(_pnlNewerVersion);
         }
 
         private void LayoutAll()
@@ -224,6 +457,39 @@ namespace TrentCAD.SolidWorksAddin
                 y += cardH + SectionGap;
             }
 
+            // Newer-version banner sits at the top of per-file content —
+            // it's the most urgent thing to see, before action buttons
+            if (_pnlNewerVersion != null && _pnlNewerVersion.Visible)
+            {
+                _pnlNewerVersion.Location = new Point(Pad, y);
+                _pnlNewerVersion.Width = w;
+                _lblNewerVersion.Width = Math.Max(40, w - 20);
+                _btnDownloadNewer.Width = Math.Max(60, w - 20);
+                y += _pnlNewerVersion.Height + BtnGap;
+            }
+
+            // Meta panel sits between the file card and the action buttons —
+            // it's per-file context (release state, material, comments) so
+            // it belongs close to the file info, not at the bottom of the pane.
+            if (_pnlMeta != null && _pnlMeta.Visible)
+            {
+                _pnlMeta.Location = new Point(Pad, y);
+                _pnlMeta.Width = w;
+                var inner = Math.Max(40, w - 20);
+                _lblReleaseLabel.Width = inner;
+                _cmbReleaseState.Width = inner;
+                _lblMaterialLabel.Width = inner;
+                _lblCommentsLabel.Width = inner;
+                _lstComments.Width = inner;
+                _txtComment.Width = Math.Max(40, inner - 64);
+                _btnAddComment.Location = new Point(10 + _txtComment.Width + 4, _txtComment.Location.Y);
+                // Material value + Use-SW button share a row; let value
+                // take whatever's left after the 60-px button
+                _lblMaterialValue.Width = Math.Max(40, inner - 64);
+                _btnUseSwMaterial.Location = new Point(10 + _lblMaterialValue.Width + 4, _lblMaterialValue.Location.Y);
+                y += _pnlMeta.Height + SectionGap;
+            }
+
             PlaceButton(_btnCheckOut, ref y, w);
             PlaceButton(_btnCheckIn, ref y, w);
             y += SectionGap - BtnGap;
@@ -233,6 +499,10 @@ namespace TrentCAD.SolidWorksAddin
             y += SectionGap - BtnGap;
 
             PlaceButton(_btnNewPart, ref y, w);
+            if (_btnFillTitleBlock != null && _btnFillTitleBlock.Visible)
+            {
+                PlaceButton(_btnFillTitleBlock, ref y, w);
+            }
             y += SectionGap - BtnGap;
 
             PlaceButton(_btnOpenApp, ref y, w);
@@ -485,11 +755,26 @@ namespace TrentCAD.SolidWorksAddin
         {
             _currentFilePath = absolutePath;
 
+            // Toggle drawing-only buttons immediately so the user doesn't see
+            // them flash on for non-drawings before the API call returns
+            var isDrawing = !string.IsNullOrEmpty(absolutePath) &&
+                absolutePath.EndsWith(".slddrw", StringComparison.OrdinalIgnoreCase);
+            SafeInvoke(() => {
+                if (_btnFillTitleBlock != null)
+                {
+                    _btnFillTitleBlock.Visible = isDrawing;
+                    LayoutAll();
+                }
+            });
+
             try
             {
                 var file = await _api.GetFileAsync(absolutePath);
                 if (_currentFilePath != absolutePath) return;
-                SafeInvoke(() => UpdateFileDisplay(file, absolutePath));
+                SafeInvoke(() => {
+                    UpdateFileDisplay(file, absolutePath);
+                    UpdateNewerVersionBanner(file?.NewerOnRemote == true);
+                });
             }
             catch
             {
@@ -498,16 +783,222 @@ namespace TrentCAD.SolidWorksAddin
                 {
                     ShowFileCard(System.IO.Path.GetFileName(absolutePath), "", "", "Not tracked", COverlay0, "");
                     SetButtonStates(false, false);
+                    UpdateNewerVersionBanner(false);
                 });
             }
+
+            // Fetch metadata in parallel — release state + comments + material.
+            // Best effort: if it fails (file not in parts.json), hide the panel.
+            try
+            {
+                var meta = await _api.GetPartMetaAsync(absolutePath);
+                if (_currentFilePath != absolutePath) return;
+                SafeInvoke(() => UpdateMetaDisplay(meta));
+            }
+            catch
+            {
+                if (_currentFilePath != absolutePath) return;
+                SafeInvoke(() => HideMetaPanel());
+            }
+        }
+
+        private void UpdateNewerVersionBanner(bool newer)
+        {
+            if (_pnlNewerVersion == null) return;
+            var changed = _pnlNewerVersion.Visible != newer;
+            _pnlNewerVersion.Visible = newer;
+            if (changed) LayoutAll();
         }
 
         public void ClearDocument()
         {
             _currentFilePath = null;
             _pnlFileCard.Visible = false;
+            HideMetaPanel();
+            UpdateNewerVersionBanner(false);
+            if (_btnFillTitleBlock != null) _btnFillTitleBlock.Visible = false;
             SetButtonStates(false, false);
             LayoutAll();
+        }
+
+        private async System.Threading.Tasks.Task DoFillTitleBlock()
+        {
+            if (string.IsNullOrEmpty(_currentFilePath)) return;
+            if (OnFillTitleBlock == null)
+            {
+                ShowMessage("SolidWorks API not available", true);
+                return;
+            }
+            _btnFillTitleBlock.Enabled = false;
+            try
+            {
+                var data = await _api.GetTitleBlockDataAsync(_currentFilePath);
+                if (data == null)
+                {
+                    ShowMessage("Could not fetch title-block data from TrentCAD.", true);
+                    return;
+                }
+                var props = new System.Collections.Generic.Dictionary<string, string>
+                {
+                    { "PartNumber", data.PartNumber ?? "" },
+                    { "Description", data.Description ?? "" },
+                    { "Material", data.Material ?? "" },
+                    { "Mass", data.Mass ?? "" },
+                    { "Designer", data.Designer ?? "" },
+                    { "Date", data.Date ?? "" }
+                };
+                var written = OnFillTitleBlock(props);
+                if (written > 0)
+                {
+                    ShowMessage($"Wrote {written} title-block field{(written == 1 ? "" : "s")}. " +
+                        "Drawing template must reference \"PartNumber\", \"Description\", " +
+                        "\"Material\", \"Mass\", \"Designer\", \"Date\" via $PRPSHEET / $PRP.",
+                        false);
+                }
+                else
+                {
+                    ShowMessage("No title-block fields written — TrentCAD had no data for this drawing.", true);
+                }
+            }
+            finally
+            {
+                _btnFillTitleBlock.Enabled = true;
+            }
+        }
+
+        private void HideMetaPanel()
+        {
+            if (_pnlMeta == null) return;
+            _pnlMeta.Visible = false;
+            LayoutAll();
+        }
+
+        private void UpdateMetaDisplay(PartMetaDto meta)
+        {
+            if (_pnlMeta == null) return;
+            if (meta == null)
+            {
+                HideMetaPanel();
+                return;
+            }
+
+            // Populate release-state combo without firing the change
+            // handler (which would re-save the state we just loaded).
+            _suppressReleaseChange = true;
+            try
+            {
+                var state = meta.Release?.State ?? "draft";
+                var idx = _cmbReleaseState.Items.IndexOf(state);
+                _cmbReleaseState.SelectedIndex = idx >= 0 ? idx : 0;
+            }
+            finally
+            {
+                _suppressReleaseChange = false;
+            }
+
+            _lblMaterialValue.Text = string.IsNullOrWhiteSpace(meta.ManufacturingMaterial)
+                ? "(not set)"
+                : meta.ManufacturingMaterial;
+
+            // Render comments newest-first, cap at 8 entries to keep the
+            // pane compact. Each line shows "<author>: <truncated text>".
+            _lstComments.Items.Clear();
+            if (meta.Comments != null && meta.Comments.Count > 0)
+            {
+                var ordered = meta.Comments
+                    .OrderByDescending(c => c.At ?? "")
+                    .Take(8);
+                foreach (var c in ordered)
+                {
+                    var text = (c.Text ?? "").Replace("\r", " ").Replace("\n", " ");
+                    if (text.Length > 60) text = text.Substring(0, 57) + "...";
+                    var author = string.IsNullOrEmpty(c.Author) ? "?" : c.Author;
+                    _lstComments.Items.Add($"{author}: {text}");
+                }
+            }
+            else
+            {
+                _lstComments.Items.Add("(no comments yet)");
+            }
+
+            _pnlMeta.Visible = true;
+            LayoutAll();
+        }
+
+        private async System.Threading.Tasks.Task DoSetReleaseState()
+        {
+            if (string.IsNullOrEmpty(_currentFilePath)) return;
+            var state = _cmbReleaseState.SelectedItem?.ToString();
+            if (string.IsNullOrEmpty(state)) return;
+
+            var result = await _api.SetReleaseStateAsync(_currentFilePath, state);
+            if (result?.Success == true)
+            {
+                ShowMessage($"Release state set to {state}.", false);
+            }
+            else
+            {
+                ShowMessage(result?.Error ?? "Could not set release state", true);
+            }
+        }
+
+        private async System.Threading.Tasks.Task DoUseSwMaterial()
+        {
+            if (string.IsNullOrEmpty(_currentFilePath)) return;
+            var swMaterial = OnGetActiveDocMaterial?.Invoke() ?? "";
+            if (string.IsNullOrWhiteSpace(swMaterial))
+            {
+                ShowMessage("No material set on the active SolidWorks document.", true);
+                return;
+            }
+
+            _btnUseSwMaterial.Enabled = false;
+            try
+            {
+                var result = await _api.SetManufacturingMaterialAsync(_currentFilePath, swMaterial);
+                if (result?.Success == true)
+                {
+                    SafeInvoke(() => _lblMaterialValue.Text = swMaterial);
+                    ShowMessage($"Material set to \"{swMaterial}\".", false);
+                }
+                else
+                {
+                    ShowMessage(result?.Error ?? "Could not set material", true);
+                }
+            }
+            finally
+            {
+                _btnUseSwMaterial.Enabled = true;
+            }
+        }
+
+        private async System.Threading.Tasks.Task DoAddComment()
+        {
+            if (string.IsNullOrEmpty(_currentFilePath)) return;
+            var text = _txtComment.Text?.Trim();
+            if (string.IsNullOrEmpty(text)) return;
+
+            _btnAddComment.Enabled = false;
+            try
+            {
+                var result = await _api.AddCommentAsync(_currentFilePath, text);
+                if (result?.Success == true)
+                {
+                    _txtComment.Text = "";
+                    // Refresh comments list from server so we see what the
+                    // server actually persisted (with author + timestamp)
+                    var fresh = await _api.GetPartMetaAsync(_currentFilePath);
+                    SafeInvoke(() => UpdateMetaDisplay(fresh));
+                }
+                else
+                {
+                    ShowMessage(result?.Error ?? "Could not add comment", true);
+                }
+            }
+            finally
+            {
+                _btnAddComment.Enabled = true;
+            }
         }
 
         private void ShowFileCard(string name, string partNum, string desc, string status, Color statusColor, string lockedBy)
@@ -522,6 +1013,29 @@ namespace TrentCAD.SolidWorksAddin
             _lblStatus.ForeColor = statusColor;
             _lblLockedBy.Text = lockedBy ?? "";
             _lblLockedBy.Visible = !string.IsNullOrEmpty(lockedBy);
+
+            // Rename guard: TrentCAD creates files pre-named with their
+            // part number (e.g. "26-2129-01-005.sldprt"). If the file name
+            // doesn't contain its assigned part number, someone Save-As-d
+            // it to a different name and parts.json may no longer track
+            // the new name. Surface this passively in the card.
+            var renameMismatch = false;
+            if (!string.IsNullOrEmpty(partNum) && !string.IsNullOrEmpty(name))
+            {
+                var nameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(name) ?? "";
+                if (nameWithoutExt.IndexOf(partNum, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    renameMismatch = true;
+                }
+            }
+            if (_lblRenameWarning != null)
+            {
+                _lblRenameWarning.Text = renameMismatch
+                    ? "⚠ Filename doesn't contain the part number — may break tracking"
+                    : "";
+                _lblRenameWarning.Visible = renameMismatch;
+            }
+
             LayoutAll();
         }
 

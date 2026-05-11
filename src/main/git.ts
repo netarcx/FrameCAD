@@ -169,16 +169,87 @@ export async function createProject(name: string, dirPath: string, remote: strin
   })
 }
 
-export async function joinProject(url: string, dirPath: string): Promise<void> {
+export async function joinProject(
+  url: string,
+  dirPath: string,
+  onProgress?: (p: PublishProgress) => void
+): Promise<void> {
   await addSafeDirectory(dirPath)
   await addSafeDirectory(path.dirname(dirPath))
+  onProgress?.({ phase: 'preparing', files: [], detail: 'Starting clone…' })
+
+  try {
+    await runJoinClone(url, dirPath, onProgress)
+    onProgress?.({ phase: 'done', files: [], percent: 100, detail: 'Project ready' })
+  } catch (err) {
+    // Without this, the renderer's progress modal sits in "Downloading"
+    // forever when a clone fails (auth, network, etc.) — the caller's
+    // outer catch returns an error but the modal doesn't know.
+    onProgress?.({ phase: 'error', error: (err as Error).message })
+    throw err
+  }
+}
+
+async function runJoinClone(
+  url: string,
+  dirPath: string,
+  onProgress?: (p: PublishProgress) => void
+): Promise<void> {
   await withDubiousOwnershipRecovery(async () => {
-    git = simpleGit()
-    git.env('GIT_CLONE_PROTECTION_ACTIVE', 'false')
-    await git.clone(url, dirPath)
+    // simple-git surfaces git's --progress lines through this callback
+    // (counting/compressing/receiving objects). For LFS-heavy CAD
+    // repos the LFS smudge happens after clone completes; we parse
+    // those lines from stderr separately.
+    const cloneGit = simpleGit({
+      progress: ({ method, stage, progress }) => {
+        if (!onProgress) return
+        if (method === 'clone') {
+          onProgress({
+            phase: 'uploading',
+            files: [],
+            percent: typeof progress === 'number' ? progress : undefined,
+            detail: stage ? `Cloning: ${stage}` : 'Cloning…'
+          })
+        }
+      }
+    })
+    cloneGit.env('GIT_CLONE_PROTECTION_ACTIVE', 'false')
+
+    cloneGit.outputHandler((_bin, _stdout, stderr) => {
+      stderr.on('data', (chunk: Buffer) => {
+        if (!onProgress) return
+        const text = chunk.toString()
+        // Git LFS smudge emits lines like "Downloading LFS objects: 50% (1/2)..."
+        const lfs = text.match(/Downloading LFS objects:\s+(\d+)%\s+\((\d+)\/(\d+)\)/)
+        if (lfs) {
+          onProgress({
+            phase: 'uploading',
+            files: [],
+            percent: parseInt(lfs[1], 10),
+            detail: `Downloading LFS files (${lfs[2]} of ${lfs[3]})`
+          })
+        }
+      })
+    })
+
+    // Inject our upload tunings into the clone itself via `--config` so
+    // the LFS smudge phase — which dominates wall-clock time for any
+    // real CAD repo — uses 12 parallel transfers and the bigger HTTP
+    // buffer / timeouts from the FIRST object download, not git's
+    // defaults. `applyUploadTunings()` after the clone would write the
+    // same config too late: the smudge has already run.
+    await cloneGit.clone(url, dirPath, [
+      '--config', 'lfs.concurrenttransfers=12',
+      '--config', 'http.postBuffer=524288000',
+      '--config', 'lfs.activitytimeout=600',
+      '--config', 'lfs.dialtimeout=30'
+    ])
     git = simpleGit(dirPath)
     projectPath = dirPath
   })
+  // applyUploadTunings is still useful as a no-op safety net (and to
+  // persist the values if the --config form ever stops working in a
+  // future git version) — it just no-ops on already-set values
   await applyUploadTunings()
 }
 
@@ -262,6 +333,39 @@ export async function openProject(dirPath: string): Promise<void> {
     await ensureGitAttributes().catch(() => { /* best-effort */ })
   })
   await applyUploadTunings()
+
+  // Best-effort background fetch so the SW add-in's "newer version
+  // available" check reflects up-to-date remote state on subsequent
+  // document switches. We don't await this — if it fails (offline,
+  // auth issue, etc.) the rest of the open shouldn't suffer.
+  if (git) {
+    git.fetch(['origin']).catch(() => { /* offline / no remote */ })
+  }
+}
+
+/**
+ * Is there a commit on origin/<currentBranch> that modified relPath but
+ * hasn't been pulled into HEAD yet? Used by the SW add-in's task pane
+ * to show a "newer version available" prompt when the user opens a
+ * stale local file.
+ *
+ * Returns false on any error (no remote, no branch tracking, file
+ * never touched, etc.) so the add-in's check degrades silently rather
+ * than throwing in the user's face.
+ */
+export async function isFileNewerOnRemote(relPath: string): Promise<boolean> {
+  if (!relPath || !git) return false
+  try {
+    const branchSummary = await git.branchLocal()
+    const branch = branchSummary.current || 'main'
+    const remoteRef = `origin/${branch}`
+    // Verify remote ref exists first — if no upstream, rev-list errors
+    await git.raw(['rev-parse', '--verify', remoteRef])
+    const commits = await git.raw(['rev-list', `HEAD..${remoteRef}`, '--', relPath])
+    return commits.trim().length > 0
+  } catch {
+    return false
+  }
 }
 
 export async function createProgressTag(
@@ -394,7 +498,7 @@ const RANDOM_WORDS = [
 
 function randomCommitMessage(): string {
   const pick = () => RANDOM_WORDS[Math.floor(Math.random() * RANDOM_WORDS.length)]
-  return `${pick()} ${pick()} ${pick()}`
+  return `${pick()}-${pick()}-${pick()}`
 }
 
 export async function publish(

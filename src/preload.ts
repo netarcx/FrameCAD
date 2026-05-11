@@ -218,6 +218,13 @@ const api: IpcApi = {
       callback(progress as Parameters<typeof callback>[0])
     ipcRenderer.on('publish-progress', handler)
     return () => ipcRenderer.removeListener('publish-progress', handler)
+  },
+
+  onJoinProgress: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: unknown) =>
+      callback(progress as Parameters<typeof callback>[0])
+    ipcRenderer.on('join-progress', handler)
+    return () => ipcRenderer.removeListener('join-progress', handler)
   }
 }
 

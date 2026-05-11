@@ -1,5 +1,6 @@
 import http from 'http'
 import path from 'path'
+import type { BrowserWindow } from 'electron'
 import type { FileEntry, ProjectConfig, PublishResult, SyncResult } from '@shared/types'
 import * as gitOps from './git'
 import * as lockOps from './locking'
@@ -11,6 +12,8 @@ const MAX_BODY_SIZE = 1024 * 64 // 64 KB
 let server: http.Server | null = null
 let currentProject: ProjectConfig | null = null
 let activePort: number | null = null
+/** Set by setupIpc so the SW add-in can request TrentCAD's main window come to the front. */
+let getMainWindowRef: (() => BrowserWindow | null) | null = null
 
 interface PendingCreate {
   id: string
@@ -138,7 +141,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           json(res, 404, { error: 'File not found' })
           return
         }
-        json(res, 200, entry)
+        // Augment with "newer-on-remote" freshness flag so the SW
+        // add-in can show a "Newer version available — Download?"
+        // banner when the user opens a stale local copy
+        const newerOnRemote = await gitOps.isFileNewerOnRemote(filePath).catch(() => false)
+        json(res, 200, { ...entry, newerOnRemote })
         return
       }
 
@@ -220,6 +227,132 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           // Lazy import so rest.ts doesn't pull in meta on load
           const meta = await import('./meta')
           await serialWrite(() => meta.setPartMass(body.path!, body.mass!))
+          json(res, 200, { success: true })
+        } catch (err) {
+          json(res, 500, { success: false, error: (err as Error).message })
+        }
+        return
+      }
+
+      case 'POST /api/focus': {
+        // Bring TrentCAD's main window to the foreground. Used by the
+        // SW add-in's "Show in TrentCAD" button so the user doesn't
+        // have to alt-tab to find it.
+        const win = getMainWindowRef?.()
+        if (win && !win.isDestroyed()) {
+          if (win.isMinimized()) win.restore()
+          win.show()
+          win.focus()
+          json(res, 200, { success: true })
+        } else {
+          json(res, 503, { success: false, error: 'TrentCAD window unavailable' })
+        }
+        return
+      }
+
+      case 'GET /api/meta': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const url = new URL(req.url || '', 'http://localhost')
+        const filePath = url.searchParams.get('path')
+        if (!filePath) { json(res, 400, { error: 'Missing path query param' }); return }
+        try {
+          const meta = await import('./meta')
+          const result = await meta.getPartMeta(filePath)
+          json(res, 200, result)
+        } catch (err) {
+          json(res, 500, { error: (err as Error).message })
+        }
+        return
+      }
+
+      case 'POST /api/release-state': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const body = parseJson(await readBody(req)) as { path?: string; state?: string; note?: string } | null
+        if (!body?.path || !body?.state) {
+          json(res, 400, { error: 'Missing path or state' })
+          return
+        }
+        const validStates = ['draft', 'in-review', 'released', 'manufactured']
+        if (!validStates.includes(body.state)) {
+          json(res, 400, { error: `Invalid state. Expected one of: ${validStates.join(', ')}` })
+          return
+        }
+        try {
+          const meta = await import('./meta')
+          await serialWrite(() => meta.setReleaseState(
+            body.path!,
+            body.state as 'draft' | 'in-review' | 'released' | 'manufactured',
+            body.note
+          ))
+          json(res, 200, { success: true })
+        } catch (err) {
+          json(res, 500, { success: false, error: (err as Error).message })
+        }
+        return
+      }
+
+      case 'GET /api/title-block-data': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const filePath = url.searchParams.get('path')
+        if (!filePath) { json(res, 400, { error: 'Missing path' }); return }
+        try {
+          const parts = await import('./parts')
+          const manifest = await parts.loadManifest()
+          const entry = manifest.entries[filePath]
+          // Drawings link to a part via `linkedTo` and share its number.
+          // For mass/material, pull from the LINKED part's metadata if
+          // it exists; fall back to the drawing's own meta otherwise.
+          const linkedPath = entry?.linkedTo || filePath
+          const meta = await import('./meta')
+          const linkedMeta = await meta.getPartMeta(linkedPath).catch(() => ({}))
+          // Designer = the user who's about to publish. git config
+          // user.name is the right field — same one used as commit
+          // author throughout TrentCAD.
+          const identity = await gitOps.getGitIdentity().catch(() => ({ name: '', email: '' }))
+          const today = new Date()
+          const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+          const massLb = typeof linkedMeta.mass === 'number' ? linkedMeta.mass : null
+          json(res, 200, {
+            partNumber: entry?.partNumber ?? '',
+            description: entry?.description ?? '',
+            material: linkedMeta.manufacturingMaterial ?? '',
+            mass: massLb !== null ? `${massLb.toFixed(3)} lb` : '',
+            designer: identity.name || '',
+            date
+          })
+        } catch (err) {
+          json(res, 500, { error: (err as Error).message })
+        }
+        return
+      }
+
+      case 'POST /api/material': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const body = parseJson(await readBody(req)) as { path?: string; material?: string } | null
+        if (!body?.path || typeof body.material !== 'string') {
+          json(res, 400, { error: 'Missing path or material' })
+          return
+        }
+        try {
+          const meta = await import('./meta')
+          await serialWrite(() => meta.setManufacturingMaterial(body.path!, body.material!))
+          json(res, 200, { success: true })
+        } catch (err) {
+          json(res, 500, { success: false, error: (err as Error).message })
+        }
+        return
+      }
+
+      case 'POST /api/comments': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const body = parseJson(await readBody(req)) as { path?: string; text?: string } | null
+        if (!body?.path || !body?.text || !body.text.trim()) {
+          json(res, 400, { error: 'Missing path or text' })
+          return
+        }
+        try {
+          const meta = await import('./meta')
+          await serialWrite(() => meta.addComment(body.path!, body.text!.trim()))
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })
@@ -324,6 +457,10 @@ export function startRestServer(project?: ProjectConfig, port?: number): void {
 
 export function setRestProject(project: ProjectConfig): void {
   currentProject = project
+}
+
+export function setRestMainWindow(getter: () => BrowserWindow | null): void {
+  getMainWindowRef = getter
 }
 
 export function clearRestProject(): void {

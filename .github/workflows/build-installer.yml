@@ -85,6 +85,24 @@ jobs:
         with:
           dotnet-version: '8.x'
 
+      - name: Stamp add-in version from package.json
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          # Strip any prerelease suffix (e.g. "0.7.14-rc.1" -> "0.7.14")
+          # because AssemblyVersion requires strict W.X.Y.Z numeric and
+          # dotnet build errors on "Invalid Version Format" otherwise
+          $numeric = $v -replace '-.*$', ''
+          # AssemblyVersion uses W.X.Y.Z; package.json is W.X.Y so we append .0
+          $stamp = "$numeric.0"
+          $f = 'solidworks-addin/TrentCAD.SolidWorksAddin/Properties/AssemblyInfo.cs'
+          $c = Get-Content $f -Raw
+          $c = $c -replace 'AssemblyVersion\("[^"]+"\)', "AssemblyVersion(`"$stamp`")"
+          $c = $c -replace 'AssemblyFileVersion\("[^"]+"\)', "AssemblyFileVersion(`"$stamp`")"
+          Set-Content -Path $f -Value $c -NoNewline
+          Write-Host "Stamped add-in AssemblyVersion=$stamp (from package.json version $v)"
+
       - name: Build SolidWorks add-in
         if: matrix.platform == 'win'
         run: dotnet publish solidworks-addin/TrentCAD.SolidWorksAddin/TrentCAD.SolidWorksAddin.csproj -c Release -o build/solidworks-addin

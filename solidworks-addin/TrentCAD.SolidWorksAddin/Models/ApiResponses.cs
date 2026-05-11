@@ -1,7 +1,89 @@
+using System.Collections.Generic;
 using Newtonsoft.Json;
 
 namespace TrentCAD.SolidWorksAddin.Models
 {
+    public class PartCommentDto
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("author")]
+        public string Author { get; set; }
+
+        [JsonProperty("text")]
+        public string Text { get; set; }
+
+        [JsonProperty("at")]
+        public string At { get; set; }
+    }
+
+    public class PartReleaseInfoDto
+    {
+        [JsonProperty("state")]
+        public string State { get; set; }
+
+        [JsonProperty("by")]
+        public string By { get; set; }
+
+        [JsonProperty("at")]
+        public string At { get; set; }
+
+        [JsonProperty("note")]
+        public string Note { get; set; }
+    }
+
+    /// <summary>
+    /// Bundle of values the drawing title-block fill button writes to SW
+    /// custom properties. Server-side composition pulls part number from
+    /// the parts manifest, mass/material from the linked part's meta,
+    /// and designer from `git config user.name`.
+    /// </summary>
+    public class TitleBlockDataDto
+    {
+        [JsonProperty("partNumber")]
+        public string PartNumber { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("material")]
+        public string Material { get; set; }
+
+        [JsonProperty("mass")]
+        public string Mass { get; set; }
+
+        [JsonProperty("designer")]
+        public string Designer { get; set; }
+
+        [JsonProperty("date")]
+        public string Date { get; set; }
+    }
+
+    public class PartMetaDto
+    {
+        [JsonProperty("release")]
+        public PartReleaseInfoDto Release { get; set; }
+
+        [JsonProperty("comments")]
+        public List<PartCommentDto> Comments { get; set; }
+
+        [JsonProperty("manufacturingNotes")]
+        public string ManufacturingNotes { get; set; }
+
+        [JsonProperty("mass")]
+        public double? Mass { get; set; }
+
+        [JsonProperty("cost")]
+        public double? Cost { get; set; }
+
+        [JsonProperty("manufacturingMethod")]
+        public string ManufacturingMethod { get; set; }
+
+        [JsonProperty("manufacturingMaterial")]
+        public string ManufacturingMaterial { get; set; }
+    }
+
     public class HealthResponse
     {
         [JsonProperty("running")]

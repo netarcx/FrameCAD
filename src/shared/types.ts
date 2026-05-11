@@ -283,6 +283,7 @@ export interface IpcApi {
   onUpdateDownloadProgress(callback: (progress: { percent: number }) => void): () => void
   onUpdateDownloaded(callback: () => void): () => void
   onPublishProgress(callback: (progress: PublishProgress) => void): () => void
+  onJoinProgress(callback: (progress: PublishProgress) => void): () => void
 }
 
 declare global {
