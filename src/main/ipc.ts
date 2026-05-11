@@ -8,6 +8,7 @@ import * as adminOps from './admin'
 import * as depsOps from './deps'
 import * as authOps from './auth'
 import * as metaOps from './meta'
+import { isPinRequired, verifyPin } from './admin-pin'
 import { addRecentProject, getRecentProjects, setCachedBrowseConfig, getCachedBrowseConfig } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
@@ -268,6 +269,9 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
       await shell.openExternal(url)
     }
   })
+
+  ipcMain.handle('admin-pin-required', () => isPinRequired())
+  ipcMain.handle('admin-pin-verify', (_e, pin: string) => verifyPin(pin))
 
   ipcMain.handle('get-admin-config', async () => {
     try { return await adminOps.loadAdminConfig() } catch { return {} }

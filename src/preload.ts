@@ -107,6 +107,12 @@ const api: IpcApi = {
   getAdminConfig: () =>
     ipcRenderer.invoke('get-admin-config'),
 
+  adminPinRequired: () =>
+    ipcRenderer.invoke('admin-pin-required'),
+
+  adminPinVerify: (pin) =>
+    ipcRenderer.invoke('admin-pin-verify', pin),
+
   getCachedBrowseConfig: () =>
     ipcRenderer.invoke('get-cached-browse-config'),
 

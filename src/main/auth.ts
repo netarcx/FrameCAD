@@ -1,6 +1,7 @@
 import { exec, spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import path from 'path'
+import os from 'os'
 
 export interface GitHubAuthStatus {
   ghCliAvailable: boolean
@@ -82,15 +83,33 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
     }
   }
 
+  // Quoting a path-with-spaces inside `cmd /k "..."` is fragile (cmd's
+  // nested-quote rules drop tokens, which is what produces the
+  // "Windows cannot find 'Github'" error when gh lives under
+  // `C:\Program Files\GitHub CLI\`). Write a tiny .cmd script instead and
+  // start that — no nested quoting around the gh path required. We still
+  // need to quote the script path itself because tmpdir on Windows
+  // usually lives under the user profile, which may contain spaces.
   try {
-    // Use the resolved full path so the new cmd window can find gh even if
-    // PATH wasn't refreshed in the current TrentCAD process
-    const ghPath = quoteForCmd(gh)
+    // Fixed filename — overwritten each invocation so temp files don't pile up
+    const scriptPath = path.join(os.tmpdir(), 'trentcad-gh-login.cmd')
+    const script =
+      '@echo off\r\n' +
+      'title TrentCAD GitHub Login\r\n' +
+      'echo Signing in to GitHub...\r\n' +
+      'echo.\r\n' +
+      `${quoteForCmd(gh)} auth login --web --git-protocol https --hostname github.com\r\n` +
+      'echo.\r\n' +
+      'echo Press any key to close.\r\n' +
+      'pause >NUL\r\n'
+    await fs.writeFile(scriptPath, script, 'utf-8')
+
+    // shell:true uses `cmd.exe /d /s /c "<command>"`, which has predictable
+    // quote handling — the inner `start "" "<path>"` form parses correctly
+    // even when scriptPath contains spaces.
     const proc = spawn(
-      'cmd.exe',
-      ['/c', 'start', '"TrentCAD GitHub Login"', 'cmd.exe', '/k',
-        `${ghPath} auth login --web --git-protocol https --hostname github.com && echo. && echo Press any key to close && pause >NUL`],
-      { detached: true, stdio: 'ignore', windowsHide: false }
+      `start "" ${quoteForCmd(scriptPath)}`,
+      { shell: true, detached: true, stdio: 'ignore', windowsHide: false }
     )
     proc.unref()
     return { launched: true }

@@ -37,6 +37,10 @@ jobs:
         run: npx electron-vite build && npx electron-builder --config electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # SHA-256 hex hash of the team admin PIN. When unset, the admin
+          # page opens without a PIN prompt (dev fallback). To enable:
+          # set this repo secret to the lowercase hex SHA-256 of your PIN.
+          TRENTCAD_ADMIN_PIN_HASH: ${{ secrets.TRENTCAD_ADMIN_PIN_HASH }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

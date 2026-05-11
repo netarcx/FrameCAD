@@ -7,6 +7,7 @@ import Toolbar from './components/Toolbar'
 import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
+import AdminPinPrompt from './components/AdminPinPrompt'
 import ManufacturingQueue from './components/ManufacturingQueue'
 import OnboardingTour from './components/OnboardingTour'
 import logoUrl from './assets/logo.png'
@@ -59,6 +60,7 @@ export default function App() {
   const [appVersion, setAppVersion] = useState<string>('')
   const [adminConfig, setAdminConfig] = useState<AdminConfig>({})
   const [showAdmin, setShowAdmin] = useState(false)
+  const [adminPinPromptOpen, setAdminPinPromptOpen] = useState(false)
   const [showMfgQueue, setShowMfgQueue] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine)
@@ -154,12 +156,26 @@ export default function App() {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         if (!project) return
         e.preventDefault()
-        setShowAdmin(s => !s)
+        if (showAdmin) {
+          setShowAdmin(false)
+          return
+        }
+        if (adminPinPromptOpen) return
+        window.api.adminPinRequired().then(required => {
+          if (required) {
+            setAdminPinPromptOpen(true)
+          } else {
+            setShowAdmin(true)
+          }
+        }).catch(() => {
+          // If we can't determine, fail closed and require the PIN
+          setAdminPinPromptOpen(true)
+        })
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [project])
+  }, [project, showAdmin, adminPinPromptOpen])
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('trentcad-theme')
     return stored === 'light' ? 'light' : 'dark'
@@ -427,6 +443,16 @@ export default function App() {
           onCheckIn={checkIn}
         />
       </div>
+
+      {adminPinPromptOpen && (
+        <AdminPinPrompt
+          onClose={() => setAdminPinPromptOpen(false)}
+          onSuccess={() => {
+            setAdminPinPromptOpen(false)
+            setShowAdmin(true)
+          }}
+        />
+      )}
 
       {showAdmin && (
         <AdminPage onClose={() => {
