@@ -330,11 +330,13 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
               <button
                 className="toolbar-btn"
                 onClick={() => {
-                  window.api.openFileExplorer(createdInfo.filePath)
+                  const i = createdInfo.filePath.lastIndexOf('/')
+                  const folder = i >= 0 ? createdInfo.filePath.slice(0, i) : ''
+                  window.api.openFileExplorer(folder)
                   setCreatedInfo(null)
                 }}
               >
-                Show in Explorer
+                Open Folder
               </button>
               <button className="toolbar-btn primary" onClick={() => setCreatedInfo(null)}>
                 Done

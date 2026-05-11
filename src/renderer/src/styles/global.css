@@ -10,9 +10,11 @@
   --text-muted: #6b7080;
   --accent: #a78bfa;
   --accent-hover: #c4b5fd;
+  --accent-tint: rgba(167, 139, 250, 0.15);
   --green: #86efac;
   --yellow: #fcd34d;
   --red: #fb7185;
+  --red-tint: rgba(251, 113, 133, 0.15);
   --blue: #a78bfa;
   --border: #353a45;
   --radius: 6px;
@@ -29,9 +31,11 @@
   --text-muted: #7a8090;
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
+  --accent-tint: rgba(124, 58, 237, 0.12);
   --green: #16a34a;
   --yellow: #ca8a04;
   --red: #dc2626;
+  --red-tint: rgba(220, 38, 38, 0.1);
   --blue: #7c3aed;
   --border: #d4d7dd;
   --radius: 6px;
@@ -830,7 +834,7 @@ input {
 
 .update-banner {
   padding: 8px 16px;
-  background: rgba(137, 180, 250, 0.15);
+  background: var(--accent-tint);
   border-bottom: 1px solid var(--accent);
   color: var(--accent);
   font-size: 13px;
@@ -871,7 +875,7 @@ input {
 
 .error-banner {
   padding: 8px 16px;
-  background: rgba(243, 139, 168, 0.15);
+  background: var(--red-tint);
   border-bottom: 1px solid var(--red);
   color: var(--red);
   font-size: 13px;
