@@ -155,15 +155,31 @@ export interface GitHubAuthStatus {
 }
 
 export interface AdminConfig {
-  teamName?: string
-  welcomeMessage?: string
+  /** Per-project default part-number prefix (e.g. "26-2129") */
   defaultPartPrefix?: string
   mainRepoUrl?: string
   cotsRepoUrl?: string
   cotsBranch?: string
   isCotsProject?: boolean
+}
+
+/**
+ * Settings that apply to the TrentCAD install as a whole, not to any
+ * single project. Defaults are baked in at build time from GH Actions
+ * secrets; users override locally via the welcome-screen admin page
+ * and their overrides persist across app updates.
+ */
+export interface GlobalAdminConfig {
+  teamName?: string
+  welcomeMessage?: string
   gitHubOrg?: string
   projectPrefix?: string
+}
+
+export interface GlobalAdminState {
+  effective: GlobalAdminConfig
+  defaults: GlobalAdminConfig
+  hasLocalOverride: boolean
 }
 
 export interface GitHubRepoSummary {
@@ -221,7 +237,9 @@ export interface IpcApi {
   getAdminConfig(): Promise<AdminConfig>
   adminPinRequired(): Promise<boolean>
   adminPinVerify(pin: string): Promise<boolean>
-  getCachedBrowseConfig(): Promise<{ gitHubOrg?: string; projectPrefix?: string }>
+  getGlobalAdmin(): Promise<GlobalAdminState>
+  saveGlobalAdmin(config: GlobalAdminConfig): Promise<void>
+  resetGlobalAdmin(): Promise<void>
   saveAdminConfig(config: AdminConfig): Promise<void>
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>
   createProgressTag(name: string, message?: string): Promise<{ success: boolean; error?: string }>

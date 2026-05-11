@@ -11,7 +11,7 @@ import AdminPinPrompt from './components/AdminPinPrompt'
 import ManufacturingQueue from './components/ManufacturingQueue'
 import OnboardingTour from './components/OnboardingTour'
 import logoUrl from './assets/logo.png'
-import type { AdminConfig, DependencyStatus, FileEntry, ProjectTotals, PublishProgress, UpdateInfo } from '@shared/types'
+import type { AdminConfig, DependencyStatus, FileEntry, GlobalAdminConfig, ProjectTotals, PublishProgress, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
   let count = 0
@@ -59,6 +59,13 @@ export default function App() {
   const [updateReady, setUpdateReady] = useState(false)
   const [appVersion, setAppVersion] = useState<string>('')
   const [adminConfig, setAdminConfig] = useState<AdminConfig>({})
+  const [globalAdmin, setGlobalAdmin] = useState<GlobalAdminConfig>({})
+
+  const refreshGlobalAdmin = useCallback(() => {
+    window.api.getGlobalAdmin()
+      .then(state => setGlobalAdmin(state.effective))
+      .catch(() => {})
+  }, [])
   const [showAdmin, setShowAdmin] = useState(false)
   const [adminPinPromptOpen, setAdminPinPromptOpen] = useState(false)
   const [showMfgQueue, setShowMfgQueue] = useState(false)
@@ -118,23 +125,19 @@ export default function App() {
   }, [recheckDeps])
 
   useEffect(() => {
-    if (!project) return
+    if (!project) {
+      setAdminConfig({})
+      return
+    }
     window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
   }, [project])
 
   useEffect(() => {
-    // On app start (no project yet), seed adminConfig with cached browse
-    // fields so the welcome screen can show the Browse Projects button.
-    // The full per-project admin.json takes over once a project opens.
-    if (project) return
-    window.api.getCachedBrowseConfig().then(cached => {
-      setAdminConfig(prev => ({
-        ...prev,
-        gitHubOrg: prev.gitHubOrg || cached.gitHubOrg,
-        projectPrefix: prev.projectPrefix || cached.projectPrefix
-      }))
-    }).catch(() => {})
-  }, [project])
+    // Global admin (Team + Browse) is loaded at startup and refreshed
+    // whenever the admin page closes. It applies to both the welcome
+    // screen and the in-project view.
+    refreshGlobalAdmin()
+  }, [refreshGlobalAdmin])
 
   useEffect(() => {
     if (!project) {
@@ -154,7 +157,6 @@ export default function App() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
-        if (!project) return
         e.preventDefault()
         if (showAdmin) {
           setShowAdmin(false)
@@ -175,7 +177,7 @@ export default function App() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [project, showAdmin, adminPinPromptOpen])
+  }, [showAdmin, adminPinPromptOpen])
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('trentcad-theme')
     return stored === 'light' ? 'light' : 'dark'
@@ -340,7 +342,7 @@ export default function App() {
           onJoinProject={joinProject}
           onOpenProject={openProject}
           isLoading={isLoading}
-          fallbackAdminConfig={adminConfig}
+          globalAdmin={globalAdmin}
         />
         {depsModal}
         {offlineBanner}
@@ -409,7 +411,7 @@ export default function App() {
         >
           {gitName}
         </button>
-        <span className="team-badge">{adminConfig.teamName || 'FRC 2129'}</span>
+        <span className="team-badge">{globalAdmin.teamName || 'FRC 2129'}</span>
       </div>
 
       <Toolbar
@@ -455,10 +457,16 @@ export default function App() {
       )}
 
       {showAdmin && (
-        <AdminPage onClose={() => {
-          setShowAdmin(false)
-          window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
-        }} />
+        <AdminPage
+          hasProject={!!project}
+          onClose={() => {
+            setShowAdmin(false)
+            refreshGlobalAdmin()
+            if (project) {
+              window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
+            }
+          }}
+        />
       )}
 
       {showMfgQueue && (

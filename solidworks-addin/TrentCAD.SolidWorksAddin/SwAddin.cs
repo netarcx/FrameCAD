@@ -78,7 +78,18 @@ namespace TrentCAD.SolidWorksAddin
             _taskPaneControl.OnCreateSolidWorksFile = CreateSolidWorksFile;
             _taskPaneControl.OnStageFile = StageFileViaApi;
             _taskPaneControl.OnGetAssemblyChildren = GetAssemblyChildren;
-            _taskPaneView = _swApp.CreateTaskpaneView2("", "TrentCAD");
+
+            // Task-pane chrome icon (the small bitmap SolidWorks shows next to
+            // "TrentCAD" in the right-side panel tabs). CreateTaskpaneView2
+            // expects a 16x18 .bmp; we ship one rendered from the app logo
+            // next to the DLL. Falls back to "" so SW shows its default
+            // generic icon if the file is missing.
+            var dllDir = System.IO.Path.GetDirectoryName(
+                System.Reflection.Assembly.GetExecutingAssembly().Location);
+            var iconPath = System.IO.Path.Combine(dllDir ?? "", "taskpane-icon.bmp");
+            if (!System.IO.File.Exists(iconPath)) iconPath = "";
+
+            _taskPaneView = _swApp.CreateTaskpaneView2(iconPath, "TrentCAD");
 
             if (_taskPaneView != null)
             {

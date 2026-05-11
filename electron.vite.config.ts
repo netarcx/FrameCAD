@@ -8,6 +8,15 @@ import react from '@vitejs/plugin-react'
 // prompt (so devs aren't locked out).
 const adminPinHash = JSON.stringify(process.env.TRENTCAD_ADMIN_PIN_HASH || '')
 
+// Build-time defaults for the global admin settings (Team + Browse).
+// Sourced from GH Actions secrets; local clients override these via the
+// welcome-screen admin page, and their overrides survive app updates
+// unless they explicitly Reset to team defaults.
+const defGhOrg = JSON.stringify(process.env.TRENTCAD_DEFAULT_GITHUB_ORG || '')
+const defPrefix = JSON.stringify(process.env.TRENTCAD_DEFAULT_PROJECT_PREFIX || '')
+const defTeam = JSON.stringify(process.env.TRENTCAD_DEFAULT_TEAM_NAME || '')
+const defWelcome = JSON.stringify(process.env.TRENTCAD_DEFAULT_WELCOME_MESSAGE || '')
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
@@ -17,7 +26,11 @@ export default defineConfig({
       }
     },
     define: {
-      __TRENTCAD_ADMIN_PIN_HASH__: adminPinHash
+      __TRENTCAD_ADMIN_PIN_HASH__: adminPinHash,
+      __TRENTCAD_DEFAULT_GITHUB_ORG__: defGhOrg,
+      __TRENTCAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
+      __TRENTCAD_DEFAULT_TEAM_NAME__: defTeam,
+      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome
     }
   },
   preload: {
@@ -46,7 +59,11 @@ export default defineConfig({
       }
     },
     define: {
-      __TRENTCAD_ADMIN_PIN_HASH__: adminPinHash
+      __TRENTCAD_ADMIN_PIN_HASH__: adminPinHash,
+      __TRENTCAD_DEFAULT_GITHUB_ORG__: defGhOrg,
+      __TRENTCAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
+      __TRENTCAD_DEFAULT_TEAM_NAME__: defTeam,
+      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome
     }
   }
 })

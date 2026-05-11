@@ -9,7 +9,13 @@ import * as depsOps from './deps'
 import * as authOps from './auth'
 import * as metaOps from './meta'
 import { isPinRequired, verifyPin } from './admin-pin'
-import { addRecentProject, getRecentProjects, setCachedBrowseConfig, getCachedBrowseConfig } from './config'
+import {
+  getGlobalAdminState,
+  saveGlobalAdmin,
+  resetGlobalAdmin,
+  migrateFromCachedBrowseConfig
+} from './global-admin'
+import { addRecentProject, getRecentProjects, getCachedBrowseConfig } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
@@ -91,9 +97,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
       if (cfg.cotsRepoUrl) {
         await gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch)
       }
-      // Cache the team's browse settings so future welcome-screen visits
-      // can show the Browse Projects button without re-opening the project
-      await setCachedBrowseConfig(cfg.gitHubOrg, cfg.projectPrefix).catch(() => {})
     } catch { /* best effort */ }
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
@@ -115,8 +118,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     // Apply admin config: pull the shared COTS library in the background
     adminOps.loadAdminConfig().then(cfg => {
       if (cfg.cotsRepoUrl) gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch).catch(() => {})
-      // Mirror browse settings to userData for the next welcome screen visit
-      setCachedBrowseConfig(cfg.gitHubOrg, cfg.projectPrefix).catch(() => {})
     }).catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
@@ -282,13 +283,26 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     if (config?.mainRepoUrl) {
       try { await gitOps.setMainRemoteUrl(config.mainRepoUrl) } catch { /* leave to admin */ }
     }
-    // Mirror the browse-related fields to userData so the welcome screen
-    // can see them before any project is opened next session
-    await setCachedBrowseConfig(config?.gitHubOrg, config?.projectPrefix).catch(() => {})
   })
 
-  ipcMain.handle('get-cached-browse-config', async () => {
-    return getCachedBrowseConfig()
+  ipcMain.handle('get-global-admin', async () => {
+    // One-time migration: seed the new local override file from the v0.7
+    // cachedBrowseConfig if no override exists yet
+    try {
+      const cached = await getCachedBrowseConfig()
+      if (cached.gitHubOrg || cached.projectPrefix) {
+        await migrateFromCachedBrowseConfig(cached).catch(() => {})
+      }
+    } catch { /* ignore */ }
+    return getGlobalAdminState()
+  })
+
+  ipcMain.handle('save-global-admin', async (_e, config) => {
+    await saveGlobalAdmin(config || {})
+  })
+
+  ipcMain.handle('reset-global-admin', async () => {
+    await resetGlobalAdmin()
   })
 
   ipcMain.handle('sync-cots', async () => {

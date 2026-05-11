@@ -3,8 +3,6 @@ import { promises as fs } from 'fs'
 import { getProjectPath, getGit } from './git'
 
 export interface AdminConfig {
-  teamName?: string
-  welcomeMessage?: string
   defaultPartPrefix?: string
   /**
    * Canonical Git remote URL for the main project. Stored so newly cloned
@@ -26,19 +24,12 @@ export interface AdminConfig {
    * buttons) since COTS files have their own external numbering authority.
    */
   isCotsProject?: boolean
-  /**
-   * GitHub organization scoped for the Browse / Create-on-GitHub flows.
-   * When set, the welcome-screen Browse Projects button lists repos in
-   * this org, and new projects are pushed to org/<projectPrefix><name>.
-   */
-  gitHubOrg?: string
-  /**
-   * Filename prefix automatically prepended to new project repos so the
-   * Browse view can pick TrentCAD projects out of the org's full repo
-   * list. Default suggestion in the UI is "trentcad-".
-   */
-  projectPrefix?: string
 }
+
+// `teamName`, `welcomeMessage`, `gitHubOrg`, `projectPrefix` moved to the
+// install-wide global admin config (src/main/global-admin.ts) in v0.7.1.
+// Legacy admin.json files may still have those keys — we ignore them on
+// load and they get dropped on the next admin save.
 
 /**
  * Write admin.json to disk without committing or pushing. Used during

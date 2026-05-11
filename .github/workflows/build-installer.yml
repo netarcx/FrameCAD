@@ -41,6 +41,13 @@ jobs:
           # page opens without a PIN prompt (dev fallback). To enable:
           # set this repo secret to the lowercase hex SHA-256 of your PIN.
           TRENTCAD_ADMIN_PIN_HASH: ${{ secrets.TRENTCAD_ADMIN_PIN_HASH }}
+          # Defaults for the install-wide admin settings (Team + Browse).
+          # Local clients override these via the welcome-screen admin page;
+          # their overrides survive future updates unless they Reset.
+          TRENTCAD_DEFAULT_GITHUB_ORG: ${{ secrets.TRENTCAD_DEFAULT_GITHUB_ORG }}
+          TRENTCAD_DEFAULT_PROJECT_PREFIX: ${{ secrets.TRENTCAD_DEFAULT_PROJECT_PREFIX }}
+          TRENTCAD_DEFAULT_TEAM_NAME: ${{ secrets.TRENTCAD_DEFAULT_TEAM_NAME }}
+          TRENTCAD_DEFAULT_WELCOME_MESSAGE: ${{ secrets.TRENTCAD_DEFAULT_WELCOME_MESSAGE }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

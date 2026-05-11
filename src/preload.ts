@@ -113,8 +113,14 @@ const api: IpcApi = {
   adminPinVerify: (pin) =>
     ipcRenderer.invoke('admin-pin-verify', pin),
 
-  getCachedBrowseConfig: () =>
-    ipcRenderer.invoke('get-cached-browse-config'),
+  getGlobalAdmin: () =>
+    ipcRenderer.invoke('get-global-admin'),
+
+  saveGlobalAdmin: (config) =>
+    ipcRenderer.invoke('save-global-admin', config),
+
+  resetGlobalAdmin: () =>
+    ipcRenderer.invoke('reset-global-admin'),
 
   saveAdminConfig: (config) =>
     ipcRenderer.invoke('save-admin-config', config),

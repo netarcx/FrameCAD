@@ -1874,3 +1874,16 @@ input {
   border-color: var(--accent);
   color: #fff;
 }
+
+.admin-section-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}

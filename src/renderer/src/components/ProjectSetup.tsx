@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import logoUrl from '../assets/logo.png'
 import BrowseProjects from './BrowseProjects'
-import type { AdminConfig, GitHubAuthStatus, ProjectConfig } from '@shared/types'
+import type { GitHubAuthStatus, GlobalAdminConfig, ProjectConfig } from '@shared/types'
 
 interface Props {
   onCreateProject: (name: string, path: string, remote: string, isCotsProject?: boolean) => Promise<void>
@@ -9,16 +9,15 @@ interface Props {
   onOpenProject: (path: string) => Promise<void>
   isLoading: boolean
   /**
-   * Most recently joined project's admin config. We fetch it from the user's
-   * latest project so the welcome screen can show Browse / org-aware Create
-   * before they've opened anything.
+   * Install-wide admin settings (Team + Browse). Used to enable the
+   * welcome-screen Browse button and the org-aware Create flow.
    */
-  fallbackAdminConfig?: AdminConfig
+  globalAdmin?: GlobalAdminConfig
 }
 
 type Mode = 'select' | 'create' | 'join' | 'open'
 
-export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, isLoading, fallbackAdminConfig }: Props) {
+export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, isLoading, globalAdmin }: Props) {
   const [mode, setMode] = useState<Mode>('select')
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
@@ -34,8 +33,8 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   const [creatingOnGitHub, setCreatingOnGitHub] = useState(false)
   const [createMsg, setCreateMsg] = useState<string | null>(null)
 
-  const orgConfigured = (fallbackAdminConfig?.gitHubOrg || '').trim()
-  const projectPrefix = (fallbackAdminConfig?.projectPrefix || '').trim()
+  const orgConfigured = (globalAdmin?.gitHubOrg || '').trim()
+  const projectPrefix = (globalAdmin?.projectPrefix || '').trim()
   const canBrowse = !!orgConfigured && !!authStatus?.loggedIn
 
   const refreshAuth = useCallback(() => {
