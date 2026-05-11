@@ -381,11 +381,16 @@ namespace TrentCAD.SolidWorksAddin
                     try { await _api.MarkPendingDoneAsync(p.Id); } catch { }
                     if (error == null)
                     {
-                        ShowMessage("Created " + (p.PartNumber ?? System.IO.Path.GetFileName(p.AbsolutePath)));
                         if (OnStageFile != null && !string.IsNullOrEmpty(p.RelativePath))
                         {
                             try { await OnStageFile(p.RelativePath); } catch { }
                         }
+                        // Refresh the task pane for the new active doc — SolidWorks
+                        // doesn't always fire ActiveDocChangeNotify for a doc that
+                        // becomes active via NewPart/SaveAs, so the file would
+                        // otherwise appear "Not tracked" until the user edits it
+                        UpdateForDocument(p.AbsolutePath);
+                        ShowMessage("Created " + (p.PartNumber ?? System.IO.Path.GetFileName(p.AbsolutePath)));
                     }
                     else
                     {
@@ -625,11 +630,12 @@ namespace TrentCAD.SolidWorksAddin
                             var error = OnCreateSolidWorksFile?.Invoke(abs, true);
                             if (error == null)
                             {
-                                ShowMessage($"Created {result.PartNumber}");
                                 if (OnStageFile != null)
                                 {
                                     try { await OnStageFile(result.FilePath); } catch { }
                                 }
+                                UpdateForDocument(abs);
+                                ShowMessage($"Created {result.PartNumber}");
                             }
                             else
                             {
@@ -650,11 +656,12 @@ namespace TrentCAD.SolidWorksAddin
                             var error = OnCreateSolidWorksFile?.Invoke(abs, false);
                             if (error == null)
                             {
-                                ShowMessage($"Created {result.PartNumber}");
                                 if (OnStageFile != null)
                                 {
                                     try { await OnStageFile(result.FilePath); } catch { }
                                 }
+                                UpdateForDocument(abs);
+                                ShowMessage($"Created {result.PartNumber}");
                             }
                             else
                             {

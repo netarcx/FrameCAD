@@ -282,6 +282,16 @@ input {
 .file-table-header .col-status { width: 100px; }
 .file-table-header .col-lock { width: 160px; }
 
+.file-table-header .sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.file-table-header .sortable:hover {
+  color: var(--text-secondary);
+}
+
 .file-table {
   flex: 1;
   overflow-y: auto;

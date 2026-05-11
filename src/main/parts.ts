@@ -1,7 +1,7 @@
 import path from 'path'
 import fs from 'fs/promises'
 import type { FileEntry, PartsManifest, PartEntry, PartType } from '@shared/types'
-import { getProjectPath } from './git'
+import { getProjectPath, pullPartsJson, pushPartsJson } from './git'
 
 const MANIFEST_FILE = 'parts.json'
 const SOLIDWORKS_EXTS = new Set(['.sldprt', '.sldasm', '.slddrw'])
@@ -22,11 +22,19 @@ function emptyManifest(): PartsManifest {
   }
 }
 
+function ensureYearPrefix(manifest: PartsManifest): PartsManifest {
+  const yy = new Date().getFullYear().toString().slice(-2)
+  if (manifest.prefix && !/^\d{2}-/.test(manifest.prefix)) {
+    manifest.prefix = `${yy}-${manifest.prefix}`
+  }
+  return manifest
+}
+
 export async function loadManifest(): Promise<PartsManifest> {
   try {
     const filePath = path.join(getProjectPath(), MANIFEST_FILE)
     const data = await fs.readFile(filePath, 'utf-8')
-    return JSON.parse(data)
+    return ensureYearPrefix(JSON.parse(data))
   } catch {
     return emptyManifest()
   }
@@ -257,7 +265,12 @@ export async function createNewPart(
   folder: string,
   description?: string
 ): Promise<{ partNumber: string; filePath: string }> {
+  // Pull the latest parts.json from the team so we don't reserve a number
+  // someone else already took
+  await pullPartsJson()
+
   const projectDir = getProjectPath()
+  const snapshot = await fs.readFile(path.join(projectDir, MANIFEST_FILE), 'utf-8').catch(() => null)
   const manifest = await loadManifest()
 
   let partNumber: string
@@ -289,6 +302,16 @@ export async function createNewPart(
   }
 
   await saveManifest(manifest)
+  try {
+    await pushPartsJson(partNumber)
+  } catch (err) {
+    // Push failed — restore the previous manifest so we don't leave a
+    // ghost reservation that other team members don't know about
+    if (snapshot !== null) {
+      await fs.writeFile(path.join(projectDir, MANIFEST_FILE), snapshot)
+    }
+    throw err
+  }
   return { partNumber, filePath: relPath }
 }
 
@@ -297,7 +320,10 @@ export async function createNewAssembly(
   name: string,
   description?: string
 ): Promise<{ partNumber: string; filePath: string }> {
+  await pullPartsJson()
+
   const projectDir = getProjectPath()
+  const snapshot = await fs.readFile(path.join(projectDir, MANIFEST_FILE), 'utf-8').catch(() => null)
   const manifest = await loadManifest()
 
   const folderPath = parentFolder ? `${parentFolder}/${name}` : name
@@ -322,6 +348,14 @@ export async function createNewAssembly(
   }
 
   await saveManifest(manifest)
+  try {
+    await pushPartsJson(partNumber)
+  } catch (err) {
+    if (snapshot !== null) {
+      await fs.writeFile(path.join(projectDir, MANIFEST_FILE), snapshot)
+    }
+    throw err
+  }
   return { partNumber, filePath: relPath }
 }
 

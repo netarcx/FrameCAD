@@ -140,6 +140,48 @@ export async function publish(message: string): Promise<PublishResult> {
   }
 }
 
+export async function pullPartsJson(): Promise<void> {
+  const g = getGit()
+  try {
+    const remotes = await g.getRemotes(false)
+    if (remotes.length === 0) return
+    await g.fetch('origin')
+    // Skip if local has uncommitted parts.json — we'd overwrite the user's
+    // pending reservation
+    const status = await g.status()
+    if (status.files.some(f => f.path === 'parts.json')) return
+    try {
+      await g.raw(['checkout', 'origin/main', '--', 'parts.json'])
+    } catch {
+      // parts.json may not exist on remote yet — ignore
+    }
+  } catch {
+    // network failure, no remote — proceed with local state
+  }
+}
+
+export async function pushPartsJson(reservationLabel: string): Promise<void> {
+  const g = getGit()
+  const remotes = await g.getRemotes(false)
+  if (remotes.length === 0) return
+
+  await g.raw(['add', 'parts.json'])
+  const status = await g.status()
+  if (!status.files.some(f => f.path === 'parts.json')) return
+
+  await g.commit(`Reserve ${reservationLabel}`)
+  try {
+    await g.push()
+  } catch (err) {
+    // Push failed — most likely another teammate reserved at the same time.
+    // Undo the commit but keep parts.json on disk untouched so caller can
+    // decide what to do.
+    await g.raw(['reset', '--soft', 'HEAD~1'])
+    await g.raw(['reset', '--', 'parts.json'])
+    throw new Error('Could not sync part number to team — someone else may have reserved at the same time. Sync and try again.')
+  }
+}
+
 export async function getStatus(): Promise<FileEntry[]> {
   const g = getGit()
   const dirPath = getProjectPath()

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { FileEntry, FileState } from '@shared/types'
 
 interface Props {
@@ -15,6 +15,9 @@ interface ContextMenuState {
   file: FileEntry
 }
 
+type SortKey = 'name' | 'partnum' | 'status' | 'lockedby'
+type SortDir = 'asc' | 'desc'
+
 function stateLabel(state: FileState): string {
   switch (state) {
     case 'synced': return 'Synced'
@@ -23,6 +26,14 @@ function stateLabel(state: FileState): string {
     case 'locked-by-you': return 'Checked out'
     case 'locked-by-other': return 'Locked'
   }
+}
+
+const STATE_ORDER: Record<FileState, number> = {
+  'locked-by-other': 0,
+  'locked-by-you': 1,
+  'modified': 2,
+  'untracked': 3,
+  'synced': 4
 }
 
 function fileIcon(entry: FileEntry): string {
@@ -53,6 +64,37 @@ function fileIconTitle(entry: FileEntry): string {
   }
 }
 
+function compareEntries(a: FileEntry, b: FileEntry, key: SortKey, dir: SortDir): number {
+  // Directories always come first regardless of sort
+  if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+
+  let cmp = 0
+  switch (key) {
+    case 'name':
+      cmp = a.name.localeCompare(b.name)
+      break
+    case 'partnum':
+      cmp = (a.partNumber || '').localeCompare(b.partNumber || '')
+      break
+    case 'status':
+      cmp = STATE_ORDER[a.state] - STATE_ORDER[b.state]
+      if (cmp === 0) cmp = a.name.localeCompare(b.name)
+      break
+    case 'lockedby':
+      cmp = (a.lockedBy || '').localeCompare(b.lockedBy || '')
+      if (cmp === 0) cmp = a.name.localeCompare(b.name)
+      break
+  }
+  return dir === 'asc' ? cmp : -cmp
+}
+
+function sortTree(entries: FileEntry[], key: SortKey, dir: SortDir): FileEntry[] {
+  const sorted = [...entries].sort((a, b) => compareEntries(a, b, key, dir))
+  return sorted.map(e => e.children
+    ? { ...e, children: sortTree(e.children, key, dir) }
+    : e)
+}
+
 function flattenTree(entries: FileEntry[], depth: number, collapsed: Set<string>): { entry: FileEntry; depth: number }[] {
   const result: { entry: FileEntry; depth: number }[] = []
   for (const entry of entries) {
@@ -67,6 +109,8 @@ function flattenTree(entries: FileEntry[], depth: number, collapsed: Set<string>
 export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckOut, onCheckIn }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null)
@@ -83,25 +127,41 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
     })
   }
 
+  const setSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
   const handleContext = (e: React.MouseEvent, file: FileEntry) => {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, file })
   }
 
-  const rows = flattenTree(files, 0, collapsed)
+  const sortedFiles = useMemo(
+    () => sortTree(files, sortKey, sortDir),
+    [files, sortKey, sortDir]
+  )
+  const rows = flattenTree(sortedFiles, 0, collapsed)
 
   const canCheckOut = contextMenu?.file && !contextMenu.file.isDirectory &&
     contextMenu.file.state !== 'locked-by-you' && contextMenu.file.state !== 'locked-by-other'
 
   const canCheckIn = contextMenu?.file && contextMenu.file.state === 'locked-by-you'
 
+  const sortArrow = (key: SortKey) =>
+    sortKey === key ? (sortDir === 'asc' ? ' ▴' : ' ▾') : ''
+
   return (
     <>
       <div className="file-table-header">
-        <span className="col-name">Name</span>
-        <span className="col-partnum">Part #</span>
-        <span className="col-status">Status</span>
-        <span className="col-lock">Checked Out By</span>
+        <span className="col-name sortable" onClick={() => setSort('name')}>Name{sortArrow('name')}</span>
+        <span className="col-partnum sortable" onClick={() => setSort('partnum')}>Part #{sortArrow('partnum')}</span>
+        <span className="col-status sortable" onClick={() => setSort('status')}>Status{sortArrow('status')}</span>
+        <span className="col-lock sortable" onClick={() => setSort('lockedby')}>Checked Out By{sortArrow('lockedby')}</span>
       </div>
       <div className="file-table">
         {rows.length === 0 ? (
