@@ -115,7 +115,10 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('publish', async (_e, message: string) => {
-    const result = await gitOps.publish(message)
+    const win = getMainWindow()
+    const result = await gitOps.publish(message, (progress) => {
+      if (win && !win.isDestroyed()) win.webContents.send('publish-progress', progress)
+    })
     if (result.success && driveOps.isDriveConnected()) {
       driveOps.syncToDrive().catch(() => {})
     }

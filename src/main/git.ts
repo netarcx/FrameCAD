@@ -1,7 +1,7 @@
 import simpleGit, { SimpleGit } from 'simple-git'
 import path from 'path'
 import fs from 'fs/promises'
-import type { FileEntry, FileState, HistoryEntry, PartsManifest, PublishResult, SyncResult } from '@shared/types'
+import type { FileEntry, FileState, HistoryEntry, PartsManifest, PublishProgress, PublishResult, SyncResult } from '@shared/types'
 import { getLocks } from './locking'
 import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
 
@@ -173,7 +173,10 @@ function randomCommitMessage(): string {
   return `${pick()} ${pick()} ${pick()}`
 }
 
-export async function publish(message: string): Promise<PublishResult> {
+export async function publish(
+  message: string,
+  onProgress?: (p: PublishProgress) => void
+): Promise<PublishResult> {
   const g = getGit()
   try {
     await syncManifest()
@@ -183,14 +186,56 @@ export async function publish(message: string): Promise<PublishResult> {
       return { success: false, error: 'No changes to upload' }
     }
 
+    const files = status.files.map(f => f.path)
+    onProgress?.({ phase: 'preparing', files, detail: 'Preparing upload' })
+
     const finalMessage = (message ?? '').trim() || randomCommitMessage()
     await g.raw(['add', '-A'])
     const result = await g.commit(finalMessage)
-    await g.push()
 
+    onProgress?.({ phase: 'uploading', files, percent: 0, detail: 'Uploading to GitHub' })
+
+    // Fresh SimpleGit instance with a progress callback so simple-git
+    // surfaces git's own --progress lines as structured events. Falls back
+    // to a simple "uploading" status if the underlying git doesn't stream
+    // progress.
+    const pushGit = simpleGit(getProjectPath(), {
+      progress: ({ method, stage, progress }) => {
+        if (method === 'push' && onProgress) {
+          onProgress({
+            phase: 'uploading',
+            files,
+            percent: typeof progress === 'number' ? progress : undefined,
+            detail: stage
+          })
+        }
+      }
+    })
+
+    // Also parse stderr for git-lfs lines like "Uploading LFS objects: 50% (1/2)..."
+    pushGit.outputHandler((_bin, _stdout, stderr) => {
+      stderr.on('data', (chunk: Buffer) => {
+        const text = chunk.toString()
+        const lfs = text.match(/Uploading LFS objects:\s+(\d+)%\s+\((\d+)\/(\d+)\)/)
+        if (lfs && onProgress) {
+          onProgress({
+            phase: 'uploading',
+            files,
+            percent: parseInt(lfs[1], 10),
+            detail: `LFS ${lfs[2]} of ${lfs[3]} uploaded`
+          })
+        }
+      })
+    })
+
+    await pushGit.push()
+
+    onProgress?.({ phase: 'done', files, percent: 100, detail: 'Upload complete' })
     return { success: true, hash: result.commit }
   } catch (err: unknown) {
-    return { success: false, error: (err as Error).message }
+    const errMsg = (err as Error).message
+    onProgress?.({ phase: 'error', error: errMsg })
+    return { success: false, error: errMsg }
   }
 }
 

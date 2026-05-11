@@ -85,6 +85,14 @@ export interface UpdateInfo {
   version: string
 }
 
+export interface PublishProgress {
+  phase: 'preparing' | 'uploading' | 'done' | 'error'
+  files?: string[]
+  percent?: number
+  detail?: string
+  error?: string
+}
+
 export interface DependencyStatus {
   git: { installed: boolean; version?: string }
   lfs: { installed: boolean; version?: string }
@@ -147,6 +155,7 @@ export interface IpcApi {
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void
   onUpdateDownloadProgress(callback: (progress: { percent: number }) => void): () => void
   onUpdateDownloaded(callback: () => void): () => void
+  onPublishProgress(callback: (progress: PublishProgress) => void): () => void
 }
 
 declare global {

@@ -130,6 +130,13 @@ const api: IpcApi = {
     const handler = () => callback()
     ipcRenderer.on('update-downloaded', handler)
     return () => ipcRenderer.removeListener('update-downloaded', handler)
+  },
+
+  onPublishProgress: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: unknown) =>
+      callback(progress as Parameters<typeof callback>[0])
+    ipcRenderer.on('publish-progress', handler)
+    return () => ipcRenderer.removeListener('publish-progress', handler)
   }
 }
 

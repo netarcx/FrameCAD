@@ -8,7 +8,7 @@ import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
 import logoUrl from './assets/logo.png'
-import type { AdminConfig, DependencyStatus, FileEntry, UpdateInfo } from '@shared/types'
+import type { AdminConfig, DependencyStatus, FileEntry, PublishProgress, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
   let count = 0
@@ -59,6 +59,20 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [missingDeps, setMissingDeps] = useState<DependencyStatus | null>(null)
   const [checkingDeps, setCheckingDeps] = useState(false)
+  const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null)
+
+  useEffect(() => {
+    const cleanup = window.api.onPublishProgress((p) => {
+      setPublishProgress(p)
+      if (p.phase === 'done' || p.phase === 'error') {
+        // Auto-dismiss "done" after a short delay; keep "error" until user closes
+        if (p.phase === 'done') {
+          setTimeout(() => setPublishProgress(null), 2000)
+        }
+      }
+    })
+    return cleanup
+  }, [])
 
   const recheckDeps = useCallback(() => {
     setCheckingDeps(true)
@@ -339,6 +353,49 @@ export default function App() {
           setShowAdmin(false)
           window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
         }} />
+      )}
+
+      {publishProgress && (
+        <div className="modal-overlay">
+          <div className="modal publish-progress-modal">
+            <h2>
+              {publishProgress.phase === 'preparing' && 'Preparing upload...'}
+              {publishProgress.phase === 'uploading' && 'Uploading to GitHub'}
+              {publishProgress.phase === 'done' && 'Upload complete'}
+              {publishProgress.phase === 'error' && 'Upload failed'}
+            </h2>
+            {publishProgress.detail && <p className="publish-detail">{publishProgress.detail}</p>}
+            {typeof publishProgress.percent === 'number' && (
+              <div className="publish-progress-bar">
+                <div className="publish-progress-fill" style={{ width: `${publishProgress.percent}%` }} />
+                <span className="publish-progress-pct">{publishProgress.percent}%</span>
+              </div>
+            )}
+            {publishProgress.files && publishProgress.files.length > 0 && (
+              <div className="publish-file-list">
+                <div className="publish-file-list-header">
+                  {publishProgress.files.length} file{publishProgress.files.length === 1 ? '' : 's'} in this upload
+                </div>
+                <ul>
+                  {publishProgress.files.slice(0, 30).map(f => (
+                    <li key={f}>{f}</li>
+                  ))}
+                  {publishProgress.files.length > 30 && (
+                    <li className="publish-file-more">+ {publishProgress.files.length - 30} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {publishProgress.phase === 'error' && (
+              <>
+                <div className="admin-error">{publishProgress.error || 'Unknown error'}</div>
+                <div className="actions">
+                  <button className="toolbar-btn primary" onClick={() => setPublishProgress(null)}>Close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {depsModal}
