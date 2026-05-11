@@ -276,8 +276,10 @@ export async function createNewPart(
   const relPath = folder ? `${folder}/${fileName}` : fileName
   const fullPath = path.join(projectDir, relPath)
 
+  // Ensure parent folder exists so the user can save there from SolidWorks.
+  // Do NOT create the .sldprt file — an empty file is not a valid SolidWorks
+  // document and the program reports it as corrupt.
   await fs.mkdir(path.dirname(fullPath), { recursive: true })
-  await fs.writeFile(fullPath, '')
 
   manifest.entries[relPath] = {
     partNumber,
@@ -306,8 +308,11 @@ export async function createNewAssembly(
   const relPath = `${folderPath}/${fileName}`
   const fullPath = path.join(projectDir, relPath)
 
+  // Create the assembly folder but not the .sldasm itself (an empty .sldasm
+  // is invalid and SolidWorks reports it as corrupt). Drop a .gitkeep so the
+  // empty folder is tracked until the user saves the assembly there.
   await fs.mkdir(path.dirname(fullPath), { recursive: true })
-  await fs.writeFile(fullPath, '')
+  await fs.writeFile(path.join(path.dirname(fullPath), '.gitkeep'), '').catch(() => {})
 
   manifest.entries[relPath] = {
     partNumber,

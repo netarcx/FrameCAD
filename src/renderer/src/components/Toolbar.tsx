@@ -316,12 +316,14 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
       {createdInfo && (
         <div className="modal-overlay" onClick={() => setCreatedInfo(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Part Created</h2>
+            <h2>Part Number Reserved</h2>
             <div className="created-details">
               <div className="created-number">{createdInfo.partNumber}</div>
               <div className="created-path">{createdInfo.filePath}</div>
               <p className="created-hint">
-                Open SolidWorks and save your work to this file.
+                Open SolidWorks, create a new part or assembly, and save it
+                with the filename above into the project folder. The file
+                will then appear here with this part number attached.
               </p>
             </div>
             <div className="actions">
