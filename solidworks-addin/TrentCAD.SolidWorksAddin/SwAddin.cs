@@ -47,11 +47,6 @@ namespace TrentCAD.SolidWorksAddin
             _addinCookie = Cookie;
 
             _swEvents.ActiveDocChangeNotify += OnActiveDocChange;
-            // FileSaveNotify fires pre-save at the SldWorks-application level for
-            // ALL document types. (FileSavePostNotify only exists per-ModelDoc.)
-            // Reading mass before the save commits is fine — SW computes mass
-            // from the in-memory model, not the on-disk file.
-            _swEvents.FileSaveNotify += OnFileSave;
 
             CreateTaskPane();
             _taskPaneControl?.StartHealthPolling();
@@ -64,7 +59,6 @@ namespace TrentCAD.SolidWorksAddin
         public bool DisconnectFromSW()
         {
             _swEvents.ActiveDocChangeNotify -= OnActiveDocChange;
-            _swEvents.FileSaveNotify -= OnFileSave;
 
             _taskPaneControl?.StopHealthPolling();
             _taskPaneHost?.ReleaseHandle();
@@ -214,66 +208,6 @@ namespace TrentCAD.SolidWorksAddin
             {
                 // Best-effort - file will still show up as untracked
             }
-        }
-
-        private int OnFileSave(string fileName)
-        {
-            // Pre-save hook: push the doc's current mass (from SW's mass-
-            // properties engine) to TrentCAD so the project totals update
-            // without manual entry. Done best-effort — any failure is silent.
-            if (string.IsNullOrEmpty(fileName) || _swApp == null) return 0;
-            try
-            {
-                var doc = _swApp.ActiveDoc as ModelDoc2;
-                if (doc == null) return 0;
-                // Only push for the file that was actually saved
-                if (!string.Equals(doc.GetPathName(), fileName, StringComparison.OrdinalIgnoreCase))
-                    return 0;
-                // GetMassProperties2's third arg (UseSystemUnits=true) forces
-                // SI units (kg) regardless of the document's MMGS / IPS / CGS
-                // configuration, so the kg→lb conversion below is correct for
-                // every user's SolidWorks setup. Available in SW 2010+, stable
-                // through SW 2025.
-                int errors = 0;
-                var props = doc.Extension.GetMassProperties2(1, out errors, true) as double[];
-                if (props == null || props.Length < 6) return 0;
-                var massKg = props[5];
-                if (massKg <= 0) return 0;
-                var massLb = massKg * 2.20462262;
-                // POST to local TrentCAD API. Best effort, fire and forget.
-                System.Threading.Tasks.Task.Run(async () =>
-                {
-                    try
-                    {
-                        using (var client = new System.Net.Http.HttpClient(
-                            new System.Net.Http.HttpClientHandler { UseProxy = false, Proxy = null }))
-                        {
-                            client.Timeout = TimeSpan.FromSeconds(5);
-                            // Convert SW's absolute path to TrentCAD's relative path
-                            // via /api/health (which reports the project root)
-                            var healthResp = await client.GetAsync("http://127.0.0.1:42129/api/health");
-                            if (!healthResp.IsSuccessStatusCode) return;
-                            var healthJson = await healthResp.Content.ReadAsStringAsync();
-                            // Crude string parse to avoid bringing Json into this file
-                            var rootMatch = System.Text.RegularExpressions.Regex.Match(
-                                healthJson, "\"path\"\\s*:\\s*\"([^\"]+)\"");
-                            if (!rootMatch.Success) return;
-                            var projectRoot = rootMatch.Groups[1].Value.Replace("\\\\", "\\");
-                            var norm = fileName.Replace("\\", "/");
-                            var root = projectRoot.Replace("\\", "/").TrimEnd('/') + "/";
-                            if (!norm.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return;
-                            var rel = norm.Substring(root.Length);
-                            var body = $"{{\"path\":\"{rel.Replace("\\", "\\\\").Replace("\"", "\\\"")}\",\"mass\":{massLb:F4}}}";
-                            var content = new System.Net.Http.StringContent(
-                                body, System.Text.Encoding.UTF8, "application/json");
-                            await client.PostAsync("http://127.0.0.1:42129/api/part-mass-auto", content);
-                        }
-                    }
-                    catch { /* best effort */ }
-                });
-            }
-            catch { /* SW API rejected — skip */ }
-            return 0;
         }
 
         private int OnActiveDocChange()
