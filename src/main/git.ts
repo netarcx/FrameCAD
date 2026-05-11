@@ -91,12 +91,18 @@ export function getProjectPath(): string {
 export async function createProject(name: string, dirPath: string, remote: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true })
   await addSafeDirectory(dirPath)
+  // Pre-trust the parent too: a stale .git from a prior failed attempt
+  // there will otherwise trip git's worktree-discovery ownership check
+  // before init has a chance to take over.
+  await addSafeDirectory(path.dirname(dirPath))
   git = simpleGit(dirPath)
   projectPath = dirPath
 
-  await git.raw(['config', '--global', 'init.defaultBranch', 'main'])
-  await git.init()
-  await git.raw(['lfs', 'install', '--local'])
+  await withDubiousOwnershipRecovery(async () => {
+    await git.raw(['config', '--global', 'init.defaultBranch', 'main'])
+    await git.init()
+    await git.raw(['lfs', 'install', '--local'])
+  })
 
   await fs.writeFile(path.join(dirPath, '.gitattributes'), buildGitAttributes())
 
@@ -125,35 +131,40 @@ export async function createProject(name: string, dirPath: string, remote: strin
     await fs.writeFile(partsPath, JSON.stringify(emptyManifest, null, 2) + '\n')
   }
 
-  await git.add(['.gitattributes', '.gitignore', 'parts.json'])
-  // Commit may throw "nothing to commit" if create-project is re-run on an
-  // already-initialised repo — treat that as success
-  try {
-    await git.commit('Initialize TrentCAD project')
-  } catch { /* nothing to commit */ }
+  await withDubiousOwnershipRecovery(async () => {
+    await git.add(['.gitattributes', '.gitignore', 'parts.json'])
+    // Commit may throw "nothing to commit" if create-project is re-run on an
+    // already-initialised repo — treat that as success
+    try {
+      await git.commit('Initialize TrentCAD project')
+    } catch { /* nothing to commit */ }
 
-  if (remote) {
-    // Idempotent: add origin if missing, update its URL if it already
-    // exists with a different value. Without this, retrying create-project
-    // fails with "remote origin already exists".
-    const remotes = await git.getRemotes(true)
-    const origin = remotes.find(r => r.name === 'origin')
-    if (!origin) {
-      await git.addRemote('origin', remote)
-    } else if (origin.refs.push !== remote && origin.refs.fetch !== remote) {
-      await git.remote(['set-url', 'origin', remote])
+    if (remote) {
+      // Idempotent: add origin if missing, update its URL if it already
+      // exists with a different value. Without this, retrying create-project
+      // fails with "remote origin already exists".
+      const remotes = await git.getRemotes(true)
+      const origin = remotes.find(r => r.name === 'origin')
+      if (!origin) {
+        await git.addRemote('origin', remote)
+      } else if (origin.refs.push !== remote && origin.refs.fetch !== remote) {
+        await git.remote(['set-url', 'origin', remote])
+      }
+      await git.push(['--set-upstream', 'origin', 'main'])
     }
-    await git.push(['--set-upstream', 'origin', 'main'])
-  }
+  })
 }
 
 export async function joinProject(url: string, dirPath: string): Promise<void> {
   await addSafeDirectory(dirPath)
-  git = simpleGit()
-  git.env('GIT_CLONE_PROTECTION_ACTIVE', 'false')
-  await git.clone(url, dirPath)
-  git = simpleGit(dirPath)
-  projectPath = dirPath
+  await addSafeDirectory(path.dirname(dirPath))
+  await withDubiousOwnershipRecovery(async () => {
+    git = simpleGit()
+    git.env('GIT_CLONE_PROTECTION_ACTIVE', 'false')
+    await git.clone(url, dirPath)
+    git = simpleGit(dirPath)
+    projectPath = dirPath
+  })
 }
 
 async function addSafeDirectory(dirPath: string): Promise<void> {
@@ -171,17 +182,44 @@ async function addSafeDirectory(dirPath: string): Promise<void> {
   }
 }
 
+/**
+ * Run a git operation; if it fails with "dubious ownership in repository
+ * at 'PATH'", auto-add that exact PATH to safe.directory and retry once.
+ * Network drives (FRC team shared volumes like G:\) don't record POSIX
+ * ownership, so git refuses operations whenever it walks up and finds a
+ * .git the current user doesn't appear to own. Pre-registering only the
+ * target dir doesn't help when git's worktree-discovery hits a parent
+ * with a stale .git from a prior attempt — so we recover by parsing the
+ * actual path out of git's complaint.
+ */
+async function withDubiousOwnershipRecovery<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    const msg = (err as Error).message || ''
+    const m = msg.match(/detected dubious ownership in repository at ['"]?([^'"\n]+?)['"]?\s*(?:$|\n)/)
+    if (!m) throw err
+    const dubious = m[1].replace(/\\/g, '/')
+    const g = simpleGit()
+    await g.raw(['config', '--global', '--add', 'safe.directory', dubious])
+    return fn()
+  }
+}
+
 export async function openProject(dirPath: string): Promise<void> {
   await addSafeDirectory(dirPath)
-  git = simpleGit(dirPath)
-  projectPath = dirPath
+  await addSafeDirectory(path.dirname(dirPath))
+  await withDubiousOwnershipRecovery(async () => {
+    git = simpleGit(dirPath)
+    projectPath = dirPath
 
-  const isRepo = await git.checkIsRepo()
-  if (!isRepo) throw new Error('Not a Git repository')
+    const isRepo = await git.checkIsRepo()
+    if (!isRepo) throw new Error('Not a Git repository')
 
-  // Auto-add any new CAD patterns introduced by a newer TrentCAD version
-  // so files added today never get the default text-merge treatment
-  await ensureGitAttributes().catch(() => { /* best-effort */ })
+    // Auto-add any new CAD patterns introduced by a newer TrentCAD version
+    // so files added today never get the default text-merge treatment
+    await ensureGitAttributes().catch(() => { /* best-effort */ })
+  })
 }
 
 export async function createProgressTag(
