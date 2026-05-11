@@ -231,6 +231,7 @@ export interface IpcApi {
   openExternal(url: string): Promise<void>
   githubAuthStatus(): Promise<GitHubAuthStatus>
   githubLogin(): Promise<{ launched: boolean; error?: string }>
+  reportIssue(errorMessage: string): Promise<{ success: boolean; url?: string; number?: number; error?: string }>
   gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }>
   listGitHubRepos(org: string, prefix?: string): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }>
   createGitHubRepo(org: string, name: string, isPrivate: boolean, description?: string): Promise<{ success: boolean; url?: string; error?: string }>

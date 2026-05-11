@@ -69,6 +69,41 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [adminPinPromptOpen, setAdminPinPromptOpen] = useState(false)
   const [showMfgQueue, setShowMfgQueue] = useState(false)
+  const [ghLoggedIn, setGhLoggedIn] = useState(false)
+  // Error-banner report state: 'idle' → 'confirm' → 'sending' → 'sent' | 'failed'
+  const [reportState, setReportState] = useState<'idle' | 'confirm' | 'sending' | 'sent' | 'failed'>('idle')
+  const [reportResult, setReportResult] = useState<{ url?: string; number?: number; error?: string }>({})
+
+  // Refresh on every error so a stale logged-out state doesn't hide the
+  // button. Always reset report state on error change (including
+  // non-null -> non-null transitions) so a previous "sent" status from a
+  // different error never leaks into the new banner.
+  useEffect(() => {
+    setReportState('idle')
+    setReportResult({})
+    if (!error) return
+    window.api.githubAuthStatus()
+      .then(s => setGhLoggedIn(!!s.loggedIn))
+      .catch(() => setGhLoggedIn(false))
+  }, [error])
+
+  const submitReport = useCallback(async () => {
+    if (!error) return
+    setReportState('sending')
+    try {
+      const r = await window.api.reportIssue(error)
+      if (r.success) {
+        setReportResult({ url: r.url, number: r.number })
+        setReportState('sent')
+      } else {
+        setReportResult({ error: r.error || 'Unknown error' })
+        setReportState('failed')
+      }
+    } catch (err) {
+      setReportResult({ error: (err as Error).message })
+      setReportState('failed')
+    }
+  }, [error])
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine)
 
@@ -233,6 +268,52 @@ export default function App() {
     if (error) navigator.clipboard.writeText(error)
   }
 
+  const errorBanner = error && (
+    <div className="error-banner">
+      <span>{error}</span>
+      <div className="error-banner-actions">
+        {reportState === 'idle' && ghLoggedIn && (
+          <button
+            onClick={() => setReportState('confirm')}
+            title="Open a GitHub issue with this error"
+          >
+            Report
+          </button>
+        )}
+        {reportState === 'confirm' && (
+          <>
+            <span className="error-banner-prompt">Report to GitHub?</span>
+            <button onClick={submitReport} className="primary">Yes</button>
+            <button onClick={() => setReportState('idle')}>No</button>
+          </>
+        )}
+        {reportState === 'sending' && (
+          <span className="error-banner-prompt">Reporting…</span>
+        )}
+        {reportState === 'sent' && (
+          reportResult.url
+            ? <button
+                onClick={() => reportResult.url && window.api.openExternal(reportResult.url)}
+                title={reportResult.url}
+              >
+                ✓ Issue #{reportResult.number ?? '?'} →
+              </button>
+            : <span className="error-banner-prompt">✓ Reported</span>
+        )}
+        {reportState === 'failed' && (
+          <span
+            className="error-banner-prompt"
+            title={reportResult.error}
+          >
+            ✗ Report failed
+          </span>
+        )}
+        <button onClick={copyError} title="Copy error">Copy</button>
+        <button onClick={dismissError}>{'×'}</button>
+      </div>
+    </div>
+  )
+
   const updateBanner = updateInfo && (
     <div className="update-banner">
       {updateReady ? (
@@ -328,15 +409,7 @@ export default function App() {
     return (
       <div className="app">
         {updateBanner}
-        {error && (
-          <div className="error-banner">
-            <span>{error}</span>
-            <div className="error-banner-actions">
-              <button onClick={copyError} title="Copy error">Copy</button>
-              <button onClick={dismissError}>{'×'}</button>
-            </div>
-          </div>
-        )}
+        {errorBanner}
         <ProjectSetup
           onCreateProject={createProject}
           onJoinProject={joinProject}
@@ -373,16 +446,7 @@ export default function App() {
   return (
     <div className="app">
       {updateBanner}
-
-      {error && (
-        <div className="error-banner">
-          <span>{error}</span>
-          <div className="error-banner-actions">
-            <button onClick={copyError} title="Copy error">Copy</button>
-            <button onClick={dismissError}>{'×'}</button>
-          </div>
-        </div>
-      )}
+      {errorBanner}
 
       <div className="app-header">
         <img className="logo-img" src={logoUrl} alt="TrentCAD" />

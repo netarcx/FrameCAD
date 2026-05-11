@@ -7,6 +7,7 @@ import * as partsOps from './parts'
 import * as adminOps from './admin'
 import * as depsOps from './deps'
 import * as authOps from './auth'
+import { reportIssue } from './issue'
 import * as metaOps from './meta'
 import { isPinRequired, verifyPin } from './admin-pin'
 import {
@@ -255,6 +256,10 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('check-dependencies', async () => depsOps.checkDependencies())
   ipcMain.handle('github-auth-status', async () => authOps.githubAuthStatus())
   ipcMain.handle('github-login', async () => authOps.githubLogin())
+
+  ipcMain.handle('report-issue', async (_e, errorMessage: string) => {
+    return reportIssue(errorMessage || '')
+  })
   ipcMain.handle('git-resetup', async () => authOps.gitResetup())
 
   ipcMain.handle('list-github-repos', async (_e, org: string, prefix?: string) => {

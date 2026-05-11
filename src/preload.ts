@@ -95,6 +95,9 @@ const api: IpcApi = {
   githubLogin: () =>
     ipcRenderer.invoke('github-login'),
 
+  reportIssue: (errorMessage) =>
+    ipcRenderer.invoke('report-issue', errorMessage),
+
   gitResetup: () =>
     ipcRenderer.invoke('git-resetup'),
 
