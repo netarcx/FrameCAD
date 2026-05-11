@@ -4,6 +4,7 @@ import fs from 'fs/promises'
 import type { FileEntry, FileState, HistoryEntry, PartsManifest, PublishProgress, PublishResult, SyncResult } from '@shared/types'
 import { getLocks } from './locking'
 import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
+import { loadAllMeta, annotateMeta } from './meta'
 
 // Large binary or text-based CAD files that go through Git LFS. `-text` keeps
 // git from running line-ending conversion on the file; `merge=lfs` uses the
@@ -409,6 +410,50 @@ async function getCurrentBranch(g: SimpleGit): Promise<string> {
   }
 }
 
+/**
+ * Best-effort pull of a single file from the upstream tracking branch so we
+ * have the latest team state before modifying it locally. Skipped if local
+ * has uncommitted changes to the same path (avoids overwriting in-flight
+ * work) or if there's no remote configured.
+ */
+export async function pullRemoteFile(relPath: string): Promise<void> {
+  const g = getGit()
+  try {
+    const remotes = await g.getRemotes(false)
+    if (remotes.length === 0) return
+    await g.fetch('origin')
+    const status = await g.status()
+    if (status.files.some(f => f.path === relPath)) return
+    const branch = await getCurrentBranch(g)
+    try {
+      await g.raw(['checkout', `origin/${branch}`, '--', relPath])
+    } catch { /* file may not exist on remote yet */ }
+  } catch { /* network failure, no remote — proceed with local */ }
+}
+
+/**
+ * Stage a single file, commit it with the given message, and push. If the
+ * push fails the commit is unwound so the working tree is clean and the
+ * caller can retry. Throws on push failure so the caller can surface the
+ * error.
+ */
+export async function commitAndPushFile(relPath: string, message: string): Promise<void> {
+  const g = getGit()
+  const remotes = await g.getRemotes(false)
+  await g.raw(['add', relPath])
+  const status = await g.status()
+  if (!status.files.some(f => f.path === relPath)) return
+  await g.commit(message)
+  if (remotes.length === 0) return
+  try {
+    await g.push()
+  } catch (err) {
+    await g.raw(['reset', '--soft', 'HEAD~1'])
+    await g.raw(['reset', '--', relPath])
+    throw new Error('Could not sync to team — ' + (err as Error).message)
+  }
+}
+
 export async function pullPartsJson(): Promise<void> {
   const g = getGit()
   try {
@@ -529,6 +574,12 @@ export async function getStatus(): Promise<FileEntry[]> {
     annotatePartNumbers(result, manifest)
   } catch {
     // parts.json may not exist yet for joined/legacy projects
+  }
+  try {
+    const meta = await loadAllMeta()
+    annotateMeta(result, meta)
+  } catch {
+    // parts-meta.json may not exist
   }
   return result
 }

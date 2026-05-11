@@ -227,6 +227,17 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
                   <>
                     <span className={`status-dot ${entry.state}`} />
                     <span className={`status-label ${entry.state}`}>{stateLabel(entry.state)}</span>
+                    {entry.releaseState && entry.releaseState !== 'draft' && (
+                      <span
+                        className={`release-dot release-${entry.releaseState}`}
+                        title={`Release: ${entry.releaseState}`}
+                      />
+                    )}
+                    {entry.commentCount && entry.commentCount > 0 && (
+                      <span className="comment-count" title={`${entry.commentCount} comment(s)`}>
+                        {entry.commentCount}
+                      </span>
+                    )}
                   </>
                 )}
               </div>

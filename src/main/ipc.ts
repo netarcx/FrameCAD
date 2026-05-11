@@ -7,6 +7,7 @@ import * as partsOps from './parts'
 import * as adminOps from './admin'
 import * as depsOps from './deps'
 import * as authOps from './auth'
+import * as metaOps from './meta'
 import { addRecentProject, getRecentProjects } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
@@ -264,6 +265,22 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('create-progress-tag', async (_e, name: string, message?: string) => {
     return gitOps.createProgressTag(name, message)
+  })
+
+  ipcMain.handle('get-part-meta', async (_e, filePath: string) => {
+    return metaOps.getPartMeta(filePath)
+  })
+
+  ipcMain.handle('set-release-state', async (_e, filePath: string, state: string, note?: string) => {
+    await metaOps.setReleaseState(filePath, state as Parameters<typeof metaOps.setReleaseState>[1], note)
+  })
+
+  ipcMain.handle('add-comment', async (_e, filePath: string, text: string) => {
+    await metaOps.addComment(filePath, text)
+  })
+
+  ipcMain.handle('set-manufacturing-notes', async (_e, filePath: string, notes: string) => {
+    await metaOps.setManufacturingNotes(filePath, notes)
   })
 
   ipcMain.handle('get-main-remote-url', async () => {

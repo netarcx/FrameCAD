@@ -1,4 +1,5 @@
-import type { FileEntry, FileState } from '@shared/types'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import type { FileEntry, FileState, PartMeta, ReleaseState } from '@shared/types'
 
 interface Props {
   file: FileEntry | null
@@ -30,7 +31,55 @@ function fileType(name: string): string {
   }
 }
 
+const RELEASE_STATES: ReleaseState[] = ['draft', 'in-review', 'released', 'manufactured']
+
+function releaseLabel(s: ReleaseState | undefined): string {
+  if (!s) return 'Draft'
+  switch (s) {
+    case 'draft': return 'Draft'
+    case 'in-review': return 'In Review'
+    case 'released': return 'Released'
+    case 'manufactured': return 'Manufactured'
+  }
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000) return 'just now'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  return d.toLocaleDateString()
+}
+
 export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
+  const [meta, setMeta] = useState<PartMeta>({})
+  const [loading, setLoading] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [posting, setPosting] = useState(false)
+  const [mfgNotes, setMfgNotes] = useState('')
+  const [savingState, setSavingState] = useState<ReleaseState | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const mfgTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const refreshMeta = useCallback(async (path: string) => {
+    setLoading(true)
+    try {
+      const m = await window.api.getPartMeta(path)
+      setMeta(m || {})
+      setMfgNotes(m?.manufacturingNotes || '')
+    } catch {
+      setMeta({})
+      setMfgNotes('')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (file && !file.isDirectory) refreshMeta(file.path)
+  }, [file, refreshMeta])
+
   if (!file) {
     return (
       <div className="details-panel">
@@ -47,6 +96,50 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
   const canCheckIn = file.state === 'locked-by-you'
 
   const dir = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : '/'
+
+  const currentState: ReleaseState = meta.release?.state || 'draft'
+
+  const handleSetState = async (state: ReleaseState) => {
+    if (state === currentState) return
+    setSavingState(state)
+    setError(null)
+    try {
+      await window.api.setReleaseState(file.path, state)
+      await refreshMeta(file.path)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSavingState(null)
+    }
+  }
+
+  const handlePostComment = async () => {
+    const text = commentText.trim()
+    if (!text) return
+    setPosting(true)
+    setError(null)
+    try {
+      await window.api.addComment(file.path, text)
+      setCommentText('')
+      await refreshMeta(file.path)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  const handleMfgChange = (value: string) => {
+    setMfgNotes(value)
+    if (mfgTimeout.current) clearTimeout(mfgTimeout.current)
+    mfgTimeout.current = setTimeout(async () => {
+      try {
+        await window.api.setManufacturingNotes(file.path, value)
+      } catch (err) {
+        setError((err as Error).message)
+      }
+    }, 1500)
+  }
 
   return (
     <div className="details-panel">
@@ -84,6 +177,83 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
           </div>
         )}
       </div>
+
+      {!file.isDirectory && (
+        <>
+          <div className="details-section">
+            <div className="section-title">Release</div>
+            <div className="release-row">
+              <span className={`release-badge release-${currentState}`}>{releaseLabel(currentState)}</span>
+              {meta.release?.at && (
+                <span className="release-meta">
+                  {meta.release.by ? `by ${meta.release.by} · ` : ''}{formatTime(meta.release.at)}
+                </span>
+              )}
+            </div>
+            <div className="release-buttons">
+              {RELEASE_STATES.map(s => (
+                <button
+                  key={s}
+                  className={`release-pill release-${s}${currentState === s ? ' active' : ''}`}
+                  onClick={() => handleSetState(s)}
+                  disabled={loading || savingState !== null}
+                >
+                  {savingState === s ? '...' : releaseLabel(s)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="details-section">
+            <div className="section-title">
+              Comments {meta.comments && meta.comments.length > 0 ? `(${meta.comments.length})` : ''}
+            </div>
+            <div className="comments-list">
+              {(meta.comments || []).map(c => (
+                <div className="comment" key={c.id}>
+                  <div className="comment-head">
+                    <span className="comment-author">{c.author}</span>
+                    <span className="comment-time">{formatTime(c.at)}</span>
+                  </div>
+                  <div className="comment-body">{c.text}</div>
+                </div>
+              ))}
+              {(!meta.comments || meta.comments.length === 0) && (
+                <div className="comments-empty">No comments yet</div>
+              )}
+            </div>
+            <div className="comment-form">
+              <textarea
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder="Add a comment..."
+                rows={2}
+              />
+              <button
+                className="toolbar-btn primary"
+                onClick={handlePostComment}
+                disabled={!commentText.trim() || posting}
+              >
+                {posting ? 'Posting...' : 'Post'}
+              </button>
+            </div>
+          </div>
+
+          <div className="details-section">
+            <div className="section-title">Manufacturing Notes</div>
+            <textarea
+              className="mfg-notes-input"
+              value={mfgNotes}
+              onChange={e => handleMfgChange(e.target.value)}
+              placeholder="e.g., 1/4&quot; 6061, deburr edges"
+              rows={3}
+            />
+            <div className="mfg-hint">Saves automatically</div>
+          </div>
+        </>
+      )}
+
+      {error && <div className="details-error">{error}</div>}
 
       {!file.isDirectory && (
         <div className="details-actions">

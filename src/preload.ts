@@ -113,6 +113,18 @@ const api: IpcApi = {
   getMainRemoteUrl: () =>
     ipcRenderer.invoke('get-main-remote-url'),
 
+  getPartMeta: (filePath) =>
+    ipcRenderer.invoke('get-part-meta', filePath),
+
+  setReleaseState: (filePath, state, note) =>
+    ipcRenderer.invoke('set-release-state', filePath, state, note),
+
+  addComment: (filePath, text) =>
+    ipcRenderer.invoke('add-comment', filePath, text),
+
+  setManufacturingNotes: (filePath, notes) =>
+    ipcRenderer.invoke('set-manufacturing-notes', filePath, notes),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

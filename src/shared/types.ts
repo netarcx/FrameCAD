@@ -7,6 +7,28 @@ export interface ProjectConfig {
 
 export type FileState = 'synced' | 'modified' | 'untracked' | 'locked-by-you' | 'locked-by-other'
 
+export type ReleaseState = 'draft' | 'in-review' | 'released' | 'manufactured'
+
+export interface PartComment {
+  id: string
+  author: string
+  text: string
+  at: string
+}
+
+export interface PartReleaseInfo {
+  state: ReleaseState
+  by?: string
+  at?: string
+  note?: string
+}
+
+export interface PartMeta {
+  release?: PartReleaseInfo
+  comments?: PartComment[]
+  manufacturingNotes?: string
+}
+
 export interface FileEntry {
   path: string
   name: string
@@ -15,6 +37,8 @@ export interface FileEntry {
   lockedBy?: string
   partNumber?: string
   partDescription?: string
+  releaseState?: ReleaseState
+  commentCount?: number
   children?: FileEntry[]
 }
 
@@ -161,6 +185,10 @@ export interface IpcApi {
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>
   createProgressTag(name: string, message?: string): Promise<{ success: boolean; error?: string }>
   getMainRemoteUrl(): Promise<string>
+  getPartMeta(filePath: string): Promise<PartMeta>
+  setReleaseState(filePath: string, state: ReleaseState, note?: string): Promise<void>
+  addComment(filePath: string, text: string): Promise<void>
+  setManufacturingNotes(filePath: string, notes: string): Promise<void>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void
