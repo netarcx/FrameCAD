@@ -209,6 +209,24 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         return
       }
 
+      case 'POST /api/part-mass-auto': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const body = parseJson(await readBody(req)) as { path?: string; mass?: number } | null
+        if (!body?.path || typeof body.mass !== 'number') {
+          json(res, 400, { error: 'Missing path or mass' })
+          return
+        }
+        try {
+          // Lazy import so rest.ts doesn't pull in meta on load
+          const meta = await import('./meta')
+          await serialWrite(() => meta.setPartMass(body.path!, body.mass!))
+          json(res, 200, { success: true })
+        } catch (err) {
+          json(res, 500, { success: false, error: (err as Error).message })
+        }
+        return
+      }
+
       case 'POST /api/stage': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string } | null

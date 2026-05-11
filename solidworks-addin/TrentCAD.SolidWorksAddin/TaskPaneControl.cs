@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using TrentCAD.SolidWorksAddin.Models;
@@ -300,11 +301,28 @@ namespace TrentCAD.SolidWorksAddin
         public Action<string> OnProjectPathChanged { get; set; }
         public Func<string, bool, string> OnCreateSolidWorksFile { get; set; }
         public Func<string, System.Threading.Tasks.Task> OnStageFile { get; set; }
+        public Func<string, System.Collections.Generic.List<string>> OnGetAssemblyChildren { get; set; }
+
+        // Cached last-known file-state-derived button availability. We
+        // remember these so the 5-second health tick can refresh the
+        // connection-dependent buttons (Sync / Upload / + Part) without
+        // clobbering Check Out / Check In, which is driven by the active
+        // doc's lock state — UpdateFileDisplay is the only place that
+        // should change those.
+        private bool _lastCanCheckOut;
+        private bool _lastCanCheckIn;
 
         private void SetButtonStates(bool canCheckOut, bool canCheckIn)
         {
-            _btnCheckOut.Enabled = _connected && canCheckOut && !_busy;
-            _btnCheckIn.Enabled = _connected && canCheckIn && !_busy;
+            _lastCanCheckOut = canCheckOut;
+            _lastCanCheckIn = canCheckIn;
+            ApplyButtonStates();
+        }
+
+        private void ApplyButtonStates()
+        {
+            _btnCheckOut.Enabled = _connected && _lastCanCheckOut && !_busy;
+            _btnCheckIn.Enabled = _connected && _lastCanCheckIn && !_busy;
             _btnSync.Enabled = _connected && !_busy;
             _btnPublish.Enabled = _connected && !_busy;
             _btnNewPart.Enabled = _connected && !_busy;
@@ -389,7 +407,9 @@ namespace TrentCAD.SolidWorksAddin
                 {
                     _dot.DotColor = CGreen;
                     _lblConnection.Text = health.Project.Name;
-                    SetButtonStates(false, false);
+                    // Re-apply (don't reset) — keeps the file-state buttons
+                    // alive across 5-second health ticks
+                    ApplyButtonStates();
                     if (!string.IsNullOrEmpty(health.Project.Path) && _currentProjectPath != health.Project.Path)
                     {
                         _currentProjectPath = health.Project.Path;
@@ -558,6 +578,32 @@ namespace TrentCAD.SolidWorksAddin
             _lblMessage.ForeColor = isError ? CRed : CGreen;
         }
 
+        private System.Collections.Generic.List<string> AssemblyTargets()
+        {
+            // When the active doc is an assembly, also operate on every child
+            // component file. Returns the parent first, then any children.
+            var targets = new System.Collections.Generic.List<string> { _currentFilePath };
+            var ext = System.IO.Path.GetExtension(_currentFilePath).ToLowerInvariant();
+            if (ext == ".sldasm" && OnGetAssemblyChildren != null)
+            {
+                try
+                {
+                    var children = OnGetAssemblyChildren(_currentFilePath);
+                    if (children != null)
+                    {
+                        foreach (var c in children)
+                        {
+                            if (!string.IsNullOrEmpty(c) &&
+                                !targets.Contains(c, StringComparer.OrdinalIgnoreCase))
+                                targets.Add(c);
+                        }
+                    }
+                }
+                catch { /* fall back to single-file action */ }
+            }
+            return targets;
+        }
+
         private async System.Threading.Tasks.Task DoCheckOut()
         {
             if (string.IsNullOrEmpty(_currentFilePath) || _busy) return;
@@ -565,11 +611,31 @@ namespace TrentCAD.SolidWorksAddin
             SetButtonStates(false, false);
             try
             {
-                var result = await _api.CheckOutAsync(_currentFilePath);
+                var targets = AssemblyTargets();
+                int ok = 0, fail = 0;
+                string lastError = null;
+                foreach (var p in targets)
+                {
+                    try
+                    {
+                        var result = await _api.CheckOutAsync(p);
+                        if (result != null && result.Success) ok++;
+                        else { fail++; if (result?.Error != null) lastError = result.Error; }
+                    }
+                    catch (Exception ex) { fail++; lastError = ex.Message; }
+                }
                 SafeInvoke(() =>
                 {
-                    if (result.Success) ShowMessage("Checked out");
-                    else ShowMessage(result.Error ?? "Check out failed", true);
+                    if (targets.Count == 1)
+                    {
+                        if (ok == 1) ShowMessage("Checked out");
+                        else ShowMessage(lastError ?? "Check out failed", true);
+                    }
+                    else
+                    {
+                        ShowMessage($"Checked out {ok} of {targets.Count} (assembly + children)",
+                            fail > 0);
+                    }
                 });
                 UpdateForDocument(_currentFilePath);
             }
@@ -584,11 +650,31 @@ namespace TrentCAD.SolidWorksAddin
             SetButtonStates(false, false);
             try
             {
-                var result = await _api.CheckInAsync(_currentFilePath);
+                var targets = AssemblyTargets();
+                int ok = 0, fail = 0;
+                string lastError = null;
+                foreach (var p in targets)
+                {
+                    try
+                    {
+                        var result = await _api.CheckInAsync(p);
+                        if (result != null && result.Success) ok++;
+                        else { fail++; if (result?.Error != null) lastError = result.Error; }
+                    }
+                    catch (Exception ex) { fail++; lastError = ex.Message; }
+                }
                 SafeInvoke(() =>
                 {
-                    if (result.Success) ShowMessage("Checked in");
-                    else ShowMessage(result.Error ?? "Check in failed", true);
+                    if (targets.Count == 1)
+                    {
+                        if (ok == 1) ShowMessage("Checked in");
+                        else ShowMessage(lastError ?? "Check in failed", true);
+                    }
+                    else
+                    {
+                        ShowMessage($"Checked in {ok} of {targets.Count} (assembly + children)",
+                            fail > 0);
+                    }
                 });
                 UpdateForDocument(_currentFilePath);
             }

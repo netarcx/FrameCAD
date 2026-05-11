@@ -7,8 +7,10 @@ import Toolbar from './components/Toolbar'
 import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
+import ManufacturingQueue from './components/ManufacturingQueue'
+import OnboardingTour from './components/OnboardingTour'
 import logoUrl from './assets/logo.png'
-import type { AdminConfig, DependencyStatus, FileEntry, PublishProgress, UpdateInfo } from '@shared/types'
+import type { AdminConfig, DependencyStatus, FileEntry, ProjectTotals, PublishProgress, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
   let count = 0
@@ -57,9 +59,36 @@ export default function App() {
   const [appVersion, setAppVersion] = useState<string>('')
   const [adminConfig, setAdminConfig] = useState<AdminConfig>({})
   const [showAdmin, setShowAdmin] = useState(false)
+  const [showMfgQueue, setShowMfgQueue] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine)
+
+  useEffect(() => {
+    const goOnline = () => setOffline(false)
+    const goOffline = () => setOffline(true)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  useEffect(() => {
+    // Show the tour once per user (gate via localStorage)
+    if (!localStorage.getItem('trentcad-onboarding-seen')) {
+      setShowOnboarding(true)
+    }
+  }, [])
+
+  const dismissOnboarding = useCallback(() => {
+    localStorage.setItem('trentcad-onboarding-seen', '1')
+    setShowOnboarding(false)
+  }, [])
   const [missingDeps, setMissingDeps] = useState<DependencyStatus | null>(null)
   const [checkingDeps, setCheckingDeps] = useState(false)
   const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null)
+  const [projectTotals, setProjectTotals] = useState<ProjectTotals | null>(null)
 
   useEffect(() => {
     const cleanup = window.api.onPublishProgress((p) => {
@@ -90,6 +119,35 @@ export default function App() {
     if (!project) return
     window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
   }, [project])
+
+  useEffect(() => {
+    // On app start (no project yet), seed adminConfig with cached browse
+    // fields so the welcome screen can show the Browse Projects button.
+    // The full per-project admin.json takes over once a project opens.
+    if (project) return
+    window.api.getCachedBrowseConfig().then(cached => {
+      setAdminConfig(prev => ({
+        ...prev,
+        gitHubOrg: prev.gitHubOrg || cached.gitHubOrg,
+        projectPrefix: prev.projectPrefix || cached.projectPrefix
+      }))
+    }).catch(() => {})
+  }, [project])
+
+  useEffect(() => {
+    if (!project) {
+      setProjectTotals(null)
+      return
+    }
+    const refresh = () =>
+      window.api.getProjectTotals().then(setProjectTotals).catch(() => setProjectTotals(null))
+    refresh()
+    // Files state changes whenever the watcher fires, but mass/cost lives in
+    // the meta file the watcher doesn't follow; re-fetch every 5s while a
+    // project is open so totals stay current after team uploads
+    const id = setInterval(refresh, 5000)
+    return () => clearInterval(id)
+  }, [project, files])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -181,6 +239,16 @@ export default function App() {
 
   const versionCorner = appVersion && <div className="app-version-corner">v{appVersion}</div>
 
+  const offlineBanner = offline && (
+    <div className="offline-banner">
+      You're offline — Download / Upload will fail until your connection is back. Local edits are safe.
+    </div>
+  )
+
+  const onboardingModal = showOnboarding && (
+    <OnboardingTour onClose={dismissOnboarding} />
+  )
+
   const depsModal = missingDeps && (
     <div className="modal-overlay">
       <div className="modal deps-modal">
@@ -231,6 +299,8 @@ export default function App() {
           initialEmail={gitEmail}
         />
         {depsModal}
+        {offlineBanner}
+        {onboardingModal}
         {versionCorner}
       </div>
     )
@@ -254,8 +324,11 @@ export default function App() {
           onJoinProject={joinProject}
           onOpenProject={openProject}
           isLoading={isLoading}
+          fallbackAdminConfig={adminConfig}
         />
         {depsModal}
+        {offlineBanner}
+        {onboardingModal}
         {versionCorner}
       </div>
     )
@@ -299,6 +372,13 @@ export default function App() {
             {driveStatus.connected ? 'Drive Connected' : 'Connect Drive'}
           </button>
         )}
+        <button
+          className="header-mfg-btn"
+          onClick={() => setShowMfgQueue(true)}
+          title="Manufacturing queue: see released parts ready for the shop"
+        >
+          Shop
+        </button>
         <button
           className="theme-toggle"
           onClick={toggleTheme}
@@ -355,6 +435,13 @@ export default function App() {
         }} />
       )}
 
+      {showMfgQueue && (
+        <ManufacturingQueue onClose={() => setShowMfgQueue(false)} />
+      )}
+
+      {offlineBanner}
+      {onboardingModal}
+
       {publishProgress && (
         <div className="modal-overlay">
           <div className="modal publish-progress-modal">
@@ -401,6 +488,17 @@ export default function App() {
       {depsModal}
 
       <div className="status-bar">
+        {projectTotals && projectTotals.totalParts > 0 && (
+          <>
+            <span className="status-item robot-totals" title={`From ${projectTotals.partsWithMass} of ${projectTotals.totalParts} parts`}>
+              <strong>Robot:</strong> {projectTotals.mass.toFixed(1)} lb
+            </span>
+            <span className="status-item robot-totals" title={`From ${projectTotals.partsWithCost} of ${projectTotals.totalParts} parts`}>
+              <strong>$</strong>{projectTotals.cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </span>
+            <span className="status-sep" />
+          </>
+        )}
         {stats.modified > 0 && (
           <span className="status-item">
             <span className="status-dot modified" />

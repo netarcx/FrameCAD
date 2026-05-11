@@ -98,8 +98,17 @@ const api: IpcApi = {
   gitResetup: () =>
     ipcRenderer.invoke('git-resetup'),
 
+  listGitHubRepos: (org, prefix) =>
+    ipcRenderer.invoke('list-github-repos', org, prefix),
+
+  createGitHubRepo: (org, name, isPrivate, description) =>
+    ipcRenderer.invoke('create-github-repo', org, name, isPrivate, description),
+
   getAdminConfig: () =>
     ipcRenderer.invoke('get-admin-config'),
+
+  getCachedBrowseConfig: () =>
+    ipcRenderer.invoke('get-cached-browse-config'),
 
   saveAdminConfig: (config) =>
     ipcRenderer.invoke('save-admin-config', config),
@@ -112,6 +121,36 @@ const api: IpcApi = {
 
   getMainRemoteUrl: () =>
     ipcRenderer.invoke('get-main-remote-url'),
+
+  getPartMeta: (filePath) =>
+    ipcRenderer.invoke('get-part-meta', filePath),
+
+  setReleaseState: (filePath, state, note) =>
+    ipcRenderer.invoke('set-release-state', filePath, state, note),
+
+  addComment: (filePath, text) =>
+    ipcRenderer.invoke('add-comment', filePath, text),
+
+  setManufacturingNotes: (filePath, notes) =>
+    ipcRenderer.invoke('set-manufacturing-notes', filePath, notes),
+
+  setPartMass: (filePath, mass) =>
+    ipcRenderer.invoke('set-part-mass', filePath, mass),
+
+  setPartCost: (filePath, cost) =>
+    ipcRenderer.invoke('set-part-cost', filePath, cost),
+
+  getProjectTotals: () =>
+    ipcRenderer.invoke('get-project-totals'),
+
+  setManufacturingMethod: (filePath, method) =>
+    ipcRenderer.invoke('set-mfg-method', filePath, method),
+
+  setManufacturingMaterial: (filePath, material) =>
+    ipcRenderer.invoke('set-mfg-material', filePath, material),
+
+  getManufacturingQueue: () =>
+    ipcRenderer.invoke('get-manufacturing-queue'),
 
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>

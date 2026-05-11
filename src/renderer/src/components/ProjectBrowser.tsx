@@ -106,11 +106,38 @@ function flattenTree(entries: FileEntry[], depth: number, collapsed: Set<string>
   return result
 }
 
+function matchesSearch(entry: FileEntry, query: string): boolean {
+  if (!query) return true
+  const q = query.toLowerCase()
+  if (entry.name.toLowerCase().includes(q)) return true
+  if (entry.partNumber && entry.partNumber.toLowerCase().includes(q)) return true
+  if (entry.partDescription && entry.partDescription.toLowerCase().includes(q)) return true
+  if (entry.path.toLowerCase().includes(q)) return true
+  return false
+}
+
+function filterTree(entries: FileEntry[], query: string): FileEntry[] {
+  if (!query) return entries
+  const out: FileEntry[] = []
+  for (const e of entries) {
+    if (e.isDirectory && e.children) {
+      const kids = filterTree(e.children, query)
+      if (kids.length > 0 || matchesSearch(e, query)) {
+        out.push({ ...e, children: kids })
+      }
+    } else if (matchesSearch(e, query)) {
+      out.push(e)
+    }
+  }
+  return out
+}
+
 export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckOut, onCheckIn }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null)
@@ -141,11 +168,17 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
     setContextMenu({ x: e.clientX, y: e.clientY, file })
   }
 
-  const sortedFiles = useMemo(
-    () => sortTree(files, sortKey, sortDir),
-    [files, sortKey, sortDir]
+  const filteredFiles = useMemo(
+    () => filterTree(files, search.trim()),
+    [files, search]
   )
-  const rows = flattenTree(sortedFiles, 0, collapsed)
+  const sortedFiles = useMemo(
+    () => sortTree(filteredFiles, sortKey, sortDir),
+    [filteredFiles, sortKey, sortDir]
+  )
+  // Expand all when there's a search query so matches are visible
+  const effectiveCollapsed = search.trim() ? new Set<string>() : collapsed
+  const rows = flattenTree(sortedFiles, 0, effectiveCollapsed)
 
   const allFolderPaths = useMemo(() => {
     const out: string[] = []
@@ -175,10 +208,20 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
   return (
     <>
       <div className="file-tree-controls">
-        <button className="tree-control" onClick={collapseAll} disabled={allFolderPaths.length === 0}>
+        <input
+          className="tree-search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search files, part numbers..."
+        />
+        {search && (
+          <button className="tree-control" onClick={() => setSearch('')}>Clear</button>
+        )}
+        <span className="file-tree-spacer" />
+        <button className="tree-control" onClick={collapseAll} disabled={allFolderPaths.length === 0 || !!search}>
           Collapse all
         </button>
-        <button className="tree-control" onClick={expandAll} disabled={collapsed.size === 0}>
+        <button className="tree-control" onClick={expandAll} disabled={collapsed.size === 0 || !!search}>
           Expand all
         </button>
       </div>
@@ -227,6 +270,17 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
                   <>
                     <span className={`status-dot ${entry.state}`} />
                     <span className={`status-label ${entry.state}`}>{stateLabel(entry.state)}</span>
+                    {entry.releaseState && entry.releaseState !== 'draft' && (
+                      <span
+                        className={`release-dot release-${entry.releaseState}`}
+                        title={`Release: ${entry.releaseState}`}
+                      />
+                    )}
+                    {entry.commentCount && entry.commentCount > 0 && (
+                      <span className="comment-count" title={`${entry.commentCount} comment(s)`}>
+                        {entry.commentCount}
+                      </span>
+                    )}
                   </>
                 )}
               </div>

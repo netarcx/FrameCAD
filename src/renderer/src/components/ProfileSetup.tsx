@@ -41,7 +41,7 @@ export default function ProfileSetup({ onComplete, onCancel, initialName = '', i
           <input
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="jane@team2129.org"
+            placeholder="jane@swrobotics.com"
             type="email"
           />
         </div>

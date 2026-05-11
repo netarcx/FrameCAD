@@ -26,6 +26,18 @@ export interface AdminConfig {
    * buttons) since COTS files have their own external numbering authority.
    */
   isCotsProject?: boolean
+  /**
+   * GitHub organization scoped for the Browse / Create-on-GitHub flows.
+   * When set, the welcome-screen Browse Projects button lists repos in
+   * this org, and new projects are pushed to org/<projectPrefix><name>.
+   */
+  gitHubOrg?: string
+  /**
+   * Filename prefix automatically prepended to new project repos so the
+   * Browse view can pick TrentCAD projects out of the org's full repo
+   * list. Default suggestion in the UI is "trentcad-".
+   */
+  projectPrefix?: string
 }
 
 /**

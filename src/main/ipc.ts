@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell, app, BrowserWindow } from 'electron'
+import { ipcMain, dialog, shell, app, BrowserWindow, Notification } from 'electron'
 import path from 'path'
 import { watch } from 'chokidar'
 import * as gitOps from './git'
@@ -7,7 +7,8 @@ import * as partsOps from './parts'
 import * as adminOps from './admin'
 import * as depsOps from './deps'
 import * as authOps from './auth'
-import { addRecentProject, getRecentProjects } from './config'
+import * as metaOps from './meta'
+import { addRecentProject, getRecentProjects, setCachedBrowseConfig, getCachedBrowseConfig } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
@@ -89,6 +90,9 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
       if (cfg.cotsRepoUrl) {
         await gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch)
       }
+      // Cache the team's browse settings so future welcome-screen visits
+      // can show the Browse Projects button without re-opening the project
+      await setCachedBrowseConfig(cfg.gitHubOrg, cfg.projectPrefix).catch(() => {})
     } catch { /* best effort */ }
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
@@ -110,6 +114,8 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     // Apply admin config: pull the shared COTS library in the background
     adminOps.loadAdminConfig().then(cfg => {
       if (cfg.cotsRepoUrl) gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch).catch(() => {})
+      // Mirror browse settings to userData for the next welcome screen visit
+      setCachedBrowseConfig(cfg.gitHubOrg, cfg.projectPrefix).catch(() => {})
     }).catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
@@ -117,7 +123,17 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('sync', async () => {
-    return gitOps.sync()
+    const result = await gitOps.sync()
+    if (result.success && result.filesUpdated > 0 && Notification.isSupported()) {
+      try {
+        new Notification({
+          title: 'TrentCAD — Downloaded',
+          body: `${result.filesUpdated} file${result.filesUpdated === 1 ? '' : 's'} updated from the team`,
+          silent: false
+        }).show()
+      } catch { /* not all platforms support */ }
+    }
+    return result
   })
 
   ipcMain.handle('publish', async (_e, message: string) => {
@@ -239,6 +255,14 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('github-login', async () => authOps.githubLogin())
   ipcMain.handle('git-resetup', async () => authOps.gitResetup())
 
+  ipcMain.handle('list-github-repos', async (_e, org: string, prefix?: string) => {
+    return authOps.listGitHubRepos(org, prefix)
+  })
+
+  ipcMain.handle('create-github-repo', async (_e, org: string, name: string, isPrivate: boolean, description?: string) => {
+    return authOps.createGitHubRepo(org, name, isPrivate, description)
+  })
+
   ipcMain.handle('open-external', async (_e, url: string) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
       await shell.openExternal(url)
@@ -254,6 +278,13 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     if (config?.mainRepoUrl) {
       try { await gitOps.setMainRemoteUrl(config.mainRepoUrl) } catch { /* leave to admin */ }
     }
+    // Mirror the browse-related fields to userData so the welcome screen
+    // can see them before any project is opened next session
+    await setCachedBrowseConfig(config?.gitHubOrg, config?.projectPrefix).catch(() => {})
+  })
+
+  ipcMain.handle('get-cached-browse-config', async () => {
+    return getCachedBrowseConfig()
   })
 
   ipcMain.handle('sync-cots', async () => {
@@ -264,6 +295,46 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('create-progress-tag', async (_e, name: string, message?: string) => {
     return gitOps.createProgressTag(name, message)
+  })
+
+  ipcMain.handle('get-part-meta', async (_e, filePath: string) => {
+    return metaOps.getPartMeta(filePath)
+  })
+
+  ipcMain.handle('set-release-state', async (_e, filePath: string, state: string, note?: string) => {
+    await metaOps.setReleaseState(filePath, state as Parameters<typeof metaOps.setReleaseState>[1], note)
+  })
+
+  ipcMain.handle('add-comment', async (_e, filePath: string, text: string) => {
+    await metaOps.addComment(filePath, text)
+  })
+
+  ipcMain.handle('set-manufacturing-notes', async (_e, filePath: string, notes: string) => {
+    await metaOps.setManufacturingNotes(filePath, notes)
+  })
+
+  ipcMain.handle('set-part-mass', async (_e, filePath: string, mass: number | null) => {
+    await metaOps.setPartMass(filePath, mass)
+  })
+
+  ipcMain.handle('set-part-cost', async (_e, filePath: string, cost: number | null) => {
+    await metaOps.setPartCost(filePath, cost)
+  })
+
+  ipcMain.handle('get-project-totals', async () => {
+    return metaOps.getProjectTotals()
+  })
+
+  ipcMain.handle('set-mfg-method', async (_e, filePath: string, method: string | null) => {
+    await metaOps.setManufacturingMethod(filePath, method as Parameters<typeof metaOps.setManufacturingMethod>[1])
+  })
+
+  ipcMain.handle('set-mfg-material', async (_e, filePath: string, material: string) => {
+    await metaOps.setManufacturingMaterial(filePath, material)
+  })
+
+  ipcMain.handle('get-manufacturing-queue', async () => {
+    return metaOps.getManufacturingQueue()
   })
 
   ipcMain.handle('get-main-remote-url', async () => {

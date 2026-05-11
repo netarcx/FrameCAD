@@ -1,0 +1,131 @@
+import { useEffect, useState, useCallback } from 'react'
+import type { ManufacturingMethod, ManufacturingQueueItem } from '@shared/types'
+
+interface Props {
+  onClose: () => void
+}
+
+const METHODS: ManufacturingMethod[] = ['print', 'cnc', 'manual', 'other']
+
+function methodLabel(m: ManufacturingMethod): string {
+  switch (m) {
+    case 'print': return '3D Print'
+    case 'cnc': return 'CNC'
+    case 'manual': return 'Hand'
+    case 'other': return 'Other'
+  }
+}
+
+function relativeTime(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000) return 'just now'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  return d.toLocaleDateString()
+}
+
+export default function ManufacturingQueue({ onClose }: Props) {
+  const [items, setItems] = useState<ManufacturingQueueItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<ManufacturingMethod>('print')
+  const [markingDone, setMarkingDone] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const list = await window.api.getManufacturingQueue()
+      setItems(list)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const counts = METHODS.reduce<Record<string, number>>((acc, m) => {
+    acc[m] = items.filter(i => i.method === m).length
+    return acc
+  }, {})
+
+  const visible = items.filter(i => i.method === tab)
+
+  const handleMarkManufactured = async (path: string) => {
+    setMarkingDone(path)
+    setError(null)
+    try {
+      await window.api.setReleaseState(path, 'manufactured')
+      await refresh()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMarkingDone(null)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal mfg-queue-modal" onClick={e => e.stopPropagation()}>
+        <h2>Manufacturing Queue</h2>
+        <p className="admin-hint">
+          Every part with release state <strong>Released</strong> appears here, grouped by manufacturing method. Click <em>Done</em> when the part has been made and state will move to <strong>Manufactured</strong>.
+        </p>
+
+        <div className="mfg-queue-tabs">
+          {METHODS.map(m => (
+            <button
+              key={m}
+              className={`mfg-queue-tab${tab === m ? ' active' : ''}`}
+              onClick={() => setTab(m)}
+            >
+              {methodLabel(m)}
+              <span className="mfg-queue-count">{counts[m] || 0}</span>
+            </button>
+          ))}
+        </div>
+
+        {loading && <div className="mfg-queue-empty">Loading...</div>}
+        {!loading && visible.length === 0 && (
+          <div className="mfg-queue-empty">No parts queued for {methodLabel(tab)}.</div>
+        )}
+
+        {visible.length > 0 && (
+          <div className="mfg-queue-list">
+            {visible.map(item => (
+              <div className="mfg-queue-item" key={item.path}>
+                <div className="mfg-queue-main">
+                  <div className="mfg-queue-path">{item.path}</div>
+                  <div className="mfg-queue-meta">
+                    {item.material && <span><strong>Material:</strong> {item.material}</span>}
+                    {typeof item.mass === 'number' && <span><strong>Mass:</strong> {item.mass.toFixed(2)} lb</span>}
+                    {item.releasedBy && <span><strong>Released by:</strong> {item.releasedBy}</span>}
+                    {item.releasedAt && <span>{relativeTime(item.releasedAt)}</span>}
+                  </div>
+                  {item.notes && <div className="mfg-queue-notes">{item.notes}</div>}
+                </div>
+                <button
+                  className="toolbar-btn primary"
+                  onClick={() => handleMarkManufactured(item.path)}
+                  disabled={markingDone === item.path}
+                >
+                  {markingDone === item.path ? '...' : 'Done'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {error && <div className="admin-error">{error}</div>}
+
+        <div className="actions">
+          <button className="toolbar-btn" onClick={refresh}>Refresh</button>
+          <button className="toolbar-btn primary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}

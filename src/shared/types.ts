@@ -7,6 +7,54 @@ export interface ProjectConfig {
 
 export type FileState = 'synced' | 'modified' | 'untracked' | 'locked-by-you' | 'locked-by-other'
 
+export type ReleaseState = 'draft' | 'in-review' | 'released' | 'manufactured'
+
+export interface PartComment {
+  id: string
+  author: string
+  text: string
+  at: string
+}
+
+export interface PartReleaseInfo {
+  state: ReleaseState
+  by?: string
+  at?: string
+  note?: string
+}
+
+export type ManufacturingMethod = 'print' | 'cnc' | 'manual' | 'other'
+
+export interface PartMeta {
+  release?: PartReleaseInfo
+  comments?: PartComment[]
+  manufacturingNotes?: string
+  /** Mass in pounds */
+  mass?: number
+  /** Cost in USD */
+  cost?: number
+  manufacturingMethod?: ManufacturingMethod
+  manufacturingMaterial?: string
+}
+
+export interface ManufacturingQueueItem {
+  path: string
+  method: ManufacturingMethod
+  material?: string
+  mass?: number
+  notes?: string
+  releasedBy?: string
+  releasedAt?: string
+}
+
+export interface ProjectTotals {
+  mass: number
+  cost: number
+  partsWithMass: number
+  partsWithCost: number
+  totalParts: number
+}
+
 export interface FileEntry {
   path: string
   name: string
@@ -15,6 +63,8 @@ export interface FileEntry {
   lockedBy?: string
   partNumber?: string
   partDescription?: string
+  releaseState?: ReleaseState
+  commentCount?: number
   children?: FileEntry[]
 }
 
@@ -112,6 +162,16 @@ export interface AdminConfig {
   cotsRepoUrl?: string
   cotsBranch?: string
   isCotsProject?: boolean
+  gitHubOrg?: string
+  projectPrefix?: string
+}
+
+export interface GitHubRepoSummary {
+  name: string
+  description?: string
+  url: string
+  updatedAt?: string
+  isPrivate?: boolean
 }
 
 export interface AppState {
@@ -156,11 +216,24 @@ export interface IpcApi {
   githubAuthStatus(): Promise<GitHubAuthStatus>
   githubLogin(): Promise<{ launched: boolean; error?: string }>
   gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }>
+  listGitHubRepos(org: string, prefix?: string): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }>
+  createGitHubRepo(org: string, name: string, isPrivate: boolean, description?: string): Promise<{ success: boolean; url?: string; error?: string }>
   getAdminConfig(): Promise<AdminConfig>
+  getCachedBrowseConfig(): Promise<{ gitHubOrg?: string; projectPrefix?: string }>
   saveAdminConfig(config: AdminConfig): Promise<void>
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>
   createProgressTag(name: string, message?: string): Promise<{ success: boolean; error?: string }>
   getMainRemoteUrl(): Promise<string>
+  getPartMeta(filePath: string): Promise<PartMeta>
+  setReleaseState(filePath: string, state: ReleaseState, note?: string): Promise<void>
+  addComment(filePath: string, text: string): Promise<void>
+  setManufacturingNotes(filePath: string, notes: string): Promise<void>
+  setPartMass(filePath: string, mass: number | null): Promise<void>
+  setPartCost(filePath: string, cost: number | null): Promise<void>
+  getProjectTotals(): Promise<ProjectTotals>
+  setManufacturingMethod(filePath: string, method: ManufacturingMethod | null): Promise<void>
+  setManufacturingMaterial(filePath: string, material: string): Promise<void>
+  getManufacturingQueue(): Promise<ManufacturingQueueItem[]>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void

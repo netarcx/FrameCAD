@@ -1,4 +1,6 @@
 import { exec, spawn } from 'child_process'
+import { promises as fs } from 'fs'
+import path from 'path'
 
 export interface GitHubAuthStatus {
   ghCliAvailable: boolean
@@ -15,13 +17,52 @@ function run(cmd: string): Promise<string | null> {
   })
 }
 
-export async function githubAuthStatus(): Promise<GitHubAuthStatus> {
-  const cliVersion = await run('gh --version')
-  if (!cliVersion) return { ghCliAvailable: false, loggedIn: false }
+/**
+ * Find the gh executable. Prefers `gh` if it's in PATH (works for most users
+ * who installed GitHub CLI normally), but falls back to common install
+ * locations because TrentCAD inherits the PATH it was launched with — if the
+ * user installed gh AFTER opening TrentCAD, PATH won't have it yet.
+ */
+async function locateGh(): Promise<string | null> {
+  // 1. PATH lookup
+  if (await run('gh --version')) return 'gh'
 
-  // `gh auth status` writes to stderr on success in some versions. run()
-  // collects both. We look for "Logged in to github.com as <name>".
-  const status = await run('gh auth status')
+  // 2. Common Windows install locations
+  const candidates: string[] = []
+  if (process.env.LOCALAPPDATA) {
+    candidates.push(path.join(process.env.LOCALAPPDATA, 'Programs', 'GitHub CLI', 'gh.exe'))
+  }
+  if (process.env.ProgramFiles) {
+    candidates.push(path.join(process.env.ProgramFiles, 'GitHub CLI', 'gh.exe'))
+  }
+  if (process.env['ProgramFiles(x86)']) {
+    candidates.push(path.join(process.env['ProgramFiles(x86)'] as string, 'GitHub CLI', 'gh.exe'))
+  }
+  // winget installs to packages dir on some systems
+  if (process.env.LOCALAPPDATA) {
+    candidates.push(path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links', 'gh.exe'))
+  }
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate)
+      // Quote the path for use in shell commands
+      return candidate
+    } catch { /* keep searching */ }
+  }
+  return null
+}
+
+function quoteForCmd(p: string): string {
+  // Wrap in double quotes if it contains a space (Windows convention)
+  return p.includes(' ') ? `"${p}"` : p
+}
+
+export async function githubAuthStatus(): Promise<GitHubAuthStatus> {
+  const gh = await locateGh()
+  if (!gh) return { ghCliAvailable: false, loggedIn: false }
+
+  const status = await run(`${quoteForCmd(gh)} auth status`)
   const match = status?.match(/(?:Logged in to|account)\s+github\.com\s+(?:as\s+)?(\S+)/i)
   if (match) return { ghCliAvailable: true, loggedIn: true, username: match[1] }
   return { ghCliAvailable: true, loggedIn: false }
@@ -33,17 +74,22 @@ export async function githubAuthStatus(): Promise<GitHubAuthStatus> {
  * re-check status afterwards.
  */
 export async function githubLogin(): Promise<{ launched: boolean; error?: string }> {
-  const cliVersion = await run('gh --version')
-  if (!cliVersion) {
-    return { launched: false, error: 'GitHub CLI not installed' }
+  const gh = await locateGh()
+  if (!gh) {
+    return {
+      launched: false,
+      error: 'GitHub CLI not found. Install from https://cli.github.com and restart TrentCAD.'
+    }
   }
+
   try {
-    // start opens a new cmd window; /k keeps it open with `pause` so user
-    // can see the result before closing
+    // Use the resolved full path so the new cmd window can find gh even if
+    // PATH wasn't refreshed in the current TrentCAD process
+    const ghPath = quoteForCmd(gh)
     const proc = spawn(
       'cmd.exe',
       ['/c', 'start', '"TrentCAD GitHub Login"', 'cmd.exe', '/k',
-        'gh auth login --web --git-protocol https --hostname github.com && echo. && echo Press any key to close && pause >NUL'],
+        `${ghPath} auth login --web --git-protocol https --hostname github.com && echo. && echo Press any key to close && pause >NUL`],
       { detached: true, stdio: 'ignore', windowsHide: false }
     )
     proc.unref()
@@ -51,6 +97,67 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
   } catch (err) {
     return { launched: false, error: (err as Error).message }
   }
+}
+
+export interface GitHubRepoSummary {
+  name: string
+  description?: string
+  url: string
+  updatedAt?: string
+  isPrivate?: boolean
+}
+
+export async function listGitHubRepos(
+  org: string,
+  prefix?: string
+): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }> {
+  const gh = await locateGh()
+  if (!gh) return { success: false, repos: [], error: 'GitHub CLI not found' }
+  if (!org) return { success: false, repos: [], error: 'No GitHub organization configured' }
+  const json = await run(`${quoteForCmd(gh)} repo list ${org} --json name,description,updatedAt,url,isPrivate --limit 200`)
+  if (!json) return { success: false, repos: [], error: 'gh repo list returned nothing — check permissions and that the org exists' }
+  try {
+    interface RawRepo { name: string; description?: string; updatedAt?: string; url: string; isPrivate?: boolean }
+    const raw = JSON.parse(json) as RawRepo[]
+    let repos: GitHubRepoSummary[] = raw.map(r => ({
+      name: r.name,
+      description: r.description || undefined,
+      url: r.url,
+      updatedAt: r.updatedAt,
+      isPrivate: r.isPrivate
+    }))
+    if (prefix && prefix.trim()) {
+      const p = prefix.trim().toLowerCase()
+      repos = repos.filter(r => r.name.toLowerCase().startsWith(p))
+    }
+    // Newest first
+    repos.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+    return { success: true, repos }
+  } catch (err) {
+    return { success: false, repos: [], error: 'Could not parse gh output: ' + (err as Error).message }
+  }
+}
+
+export async function createGitHubRepo(
+  org: string,
+  name: string,
+  isPrivate: boolean,
+  description?: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  const gh = await locateGh()
+  if (!gh) return { success: false, error: 'GitHub CLI not found' }
+  if (!org || !name) return { success: false, error: 'Missing org or repo name' }
+
+  const visibility = isPrivate ? '--private' : '--public'
+  // Quote description for shell — escape any embedded quotes
+  const desc = (description || 'TrentCAD project').replace(/"/g, '\\"')
+  const cmd = `${quoteForCmd(gh)} repo create ${org}/${name} ${visibility} --description "${desc}"`
+  const output = await run(cmd)
+  if (!output) {
+    return { success: false, error: 'gh repo create failed — check org permissions and that the repo name isn\'t already taken' }
+  }
+  // gh prints the canonical https URL. Build a .git form for cloning.
+  return { success: true, url: `https://github.com/${org}/${name}.git` }
 }
 
 export async function gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }> {

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -76,6 +77,7 @@ namespace TrentCAD.SolidWorksAddin
             _taskPaneControl.OnProjectPathChanged = SetSolidWorksWorkingDirectory;
             _taskPaneControl.OnCreateSolidWorksFile = CreateSolidWorksFile;
             _taskPaneControl.OnStageFile = StageFileViaApi;
+            _taskPaneControl.OnGetAssemblyChildren = GetAssemblyChildren;
             _taskPaneView = _swApp.CreateTaskpaneView2("", "TrentCAD");
 
             if (_taskPaneView != null)
@@ -97,6 +99,33 @@ namespace TrentCAD.SolidWorksAddin
             {
                 // SolidWorks may reject the call if the path is invalid; ignore silently
             }
+        }
+
+        private System.Collections.Generic.List<string> GetAssemblyChildren(string assemblyPath)
+        {
+            var result = new System.Collections.Generic.List<string>();
+            if (_swApp == null || string.IsNullOrEmpty(assemblyPath)) return result;
+            try
+            {
+                var doc = _swApp.ActiveDoc as ModelDoc2;
+                if (doc == null) return result;
+                if (!string.Equals(doc.GetPathName(), assemblyPath, StringComparison.OrdinalIgnoreCase))
+                    return result;
+                var asm = doc as AssemblyDoc;
+                if (asm == null) return result;
+                var components = asm.GetComponents(false) as object[];
+                if (components == null) return result;
+                foreach (var c in components)
+                {
+                    var comp = c as Component2;
+                    if (comp == null) continue;
+                    var path = comp.GetPathName();
+                    if (!string.IsNullOrEmpty(path) && !result.Contains(path, StringComparer.OrdinalIgnoreCase))
+                        result.Add(path);
+                }
+            }
+            catch { /* SW API rejected — return what we have */ }
+            return result;
         }
 
         private string CreateSolidWorksFile(string absolutePath, bool isAssembly)
@@ -125,6 +154,19 @@ namespace TrentCAD.SolidWorksAddin
 
                 var doc = created as ModelDoc2;
                 if (doc == null) return "Unexpected document type from SolidWorks";
+
+                // Force IPS (inch / pound / second) on every part TrentCAD
+                // creates. FRC teams build in pounds and inches; the team
+                // template might be MMGS or MKS, so we override here.
+                // SetUserPreferenceIntegerValue on the model affects only
+                // this document, not the user's global settings.
+                try
+                {
+                    doc.SetUserPreferenceIntegerValue(
+                        (int)swUserPreferenceIntegerValue_e.swUnitSystem,
+                        (int)swUnitSystem_e.swUnitSystem_IPS);
+                }
+                catch { /* template's units win if SW rejects the call */ }
 
                 var dir = Path.GetDirectoryName(absolutePath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))

@@ -161,6 +161,28 @@ export default function AdminPage({ onClose }: Props) {
         </div>
 
         <div className="admin-section">
+          <h3>GitHub Browse</h3>
+          <p className="admin-hint">
+            When set, students will see a "Browse Projects" button on the
+            welcome screen that lists repos in this organisation matching
+            the prefix. New projects created through TrentCAD use the
+            prefix automatically, so the filter stays accurate.
+          </p>
+          <label>GitHub organisation</label>
+          <input
+            value={config.gitHubOrg ?? ''}
+            onChange={e => set('gitHubOrg', e.target.value)}
+            placeholder="netarcx"
+          />
+          <label>Project name prefix</label>
+          <input
+            value={config.projectPrefix ?? ''}
+            onChange={e => set('projectPrefix', e.target.value)}
+            placeholder="trentcad-"
+          />
+        </div>
+
+        <div className="admin-section">
           <h3>Weekly Progress Tag</h3>
           <p className="admin-hint">
             Creates an annotated Git tag at the current commit and pushes
