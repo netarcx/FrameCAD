@@ -1,5 +1,4 @@
-import { google, drive_v3 } from 'googleapis'
-import { OAuth2Client } from 'google-auth-library'
+import { auth as gAuth, drive as gDrive, drive_v3 } from '@googleapis/drive'
 import http from 'http'
 import fs from 'fs/promises'
 import fsSync from 'fs'
@@ -28,6 +27,8 @@ function getClientCredentials(): { clientId: string; clientSecret: string } {
     return { clientId: '', clientSecret: '' }
   }
 }
+
+type OAuth2Client = InstanceType<typeof gAuth.OAuth2>
 
 let oauth2Client: OAuth2Client | null = null
 let driveApi: drive_v3.Drive | null = null
@@ -63,7 +64,7 @@ async function loadTokens(): Promise<object | null> {
 function createOAuth2Client(): OAuth2Client | null {
   const { clientId, clientSecret } = getClientCredentials()
   if (!clientId || !clientSecret) return null
-  return new google.auth.OAuth2(clientId, clientSecret, 'http://127.0.0.1:0')
+  return new gAuth.OAuth2(clientId, clientSecret, 'http://127.0.0.1:0')
 }
 
 export async function initDrive(): Promise<boolean> {
@@ -79,7 +80,7 @@ export async function initDrive(): Promise<boolean> {
     await saveTokens({ ...existing, ...newTokens })
   })
 
-  driveApi = google.drive({ version: 'v3', auth: oauth2Client })
+  driveApi = gDrive({ version: 'v3', auth: oauth2Client })
   return true
 }
 
@@ -122,7 +123,7 @@ export async function connectDrive(): Promise<{ success: boolean; error?: string
           await saveTokens({ ...existing, ...newTokens })
         })
 
-        driveApi = google.drive({ version: 'v3', auth: oauth2Client! })
+        driveApi = gDrive({ version: 'v3', auth: oauth2Client! })
 
         res.writeHead(200, { 'Content-Type': 'text/html' })
         res.end('<html><body><h2>Connected to Google Drive!</h2><p>You can close this window.</p></body></html>')

@@ -25,7 +25,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo 'matrix={"include":[{"os":"windows-2022","platform":"win"},{"os":"macos-latest","platform":"mac"},{"os":"ubuntu-latest","platform":"linux"}]}' >> "$GITHUB_OUTPUT"
           else
-            echo 'matrix={"include":[{"os":"windows-2022","platform":"win"}]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"os":"windows-2022","platform":"win"},{"os":"ubuntu-latest","platform":"linux"}]}' >> "$GITHUB_OUTPUT"
           fi
 
   # Pre-create the GitHub Release (idempotent) BEFORE the matrix runs.

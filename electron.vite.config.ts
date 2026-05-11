@@ -19,7 +19,7 @@ const defWelcome = JSON.stringify(process.env.TRENTCAD_DEFAULT_WELCOME_MESSAGE |
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@googleapis/drive'] })],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')

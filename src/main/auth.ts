@@ -28,20 +28,31 @@ async function locateGh(): Promise<string | null> {
   // 1. PATH lookup
   if (await run('gh --version')) return 'gh'
 
-  // 2. Common Windows install locations
+  // 2. Common install locations by platform
   const candidates: string[] = []
-  if (process.env.LOCALAPPDATA) {
-    candidates.push(path.join(process.env.LOCALAPPDATA, 'Programs', 'GitHub CLI', 'gh.exe'))
-  }
-  if (process.env.ProgramFiles) {
-    candidates.push(path.join(process.env.ProgramFiles, 'GitHub CLI', 'gh.exe'))
-  }
-  if (process.env['ProgramFiles(x86)']) {
-    candidates.push(path.join(process.env['ProgramFiles(x86)'] as string, 'GitHub CLI', 'gh.exe'))
-  }
-  // winget installs to packages dir on some systems
-  if (process.env.LOCALAPPDATA) {
-    candidates.push(path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links', 'gh.exe'))
+  if (process.platform === 'win32') {
+    if (process.env.LOCALAPPDATA) {
+      candidates.push(path.join(process.env.LOCALAPPDATA, 'Programs', 'GitHub CLI', 'gh.exe'))
+    }
+    if (process.env.ProgramFiles) {
+      candidates.push(path.join(process.env.ProgramFiles, 'GitHub CLI', 'gh.exe'))
+    }
+    if (process.env['ProgramFiles(x86)']) {
+      candidates.push(path.join(process.env['ProgramFiles(x86)'] as string, 'GitHub CLI', 'gh.exe'))
+    }
+    if (process.env.LOCALAPPDATA) {
+      candidates.push(path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links', 'gh.exe'))
+    }
+  } else {
+    candidates.push('/usr/bin/gh', '/usr/local/bin/gh', '/snap/bin/gh')
+    if (process.env.HOME) {
+      candidates.push(path.join(process.env.HOME, '.local', 'bin', 'gh'))
+    }
+    if (process.platform === 'darwin') {
+      candidates.push('/opt/homebrew/bin/gh', '/usr/local/bin/gh')
+    } else {
+      candidates.push('/home/linuxbrew/.linuxbrew/bin/gh')
+    }
   }
 
   for (const candidate of candidates) {
@@ -64,7 +75,7 @@ export async function githubAuthStatus(): Promise<GitHubAuthStatus> {
   if (!gh) return { ghCliAvailable: false, loggedIn: false }
 
   const status = await run(`${quoteForCmd(gh)} auth status`)
-  const match = status?.match(/(?:Logged in to|account)\s+github\.com\s+(?:as\s+)?(\S+)/i)
+  const match = status?.match(/Logged in to github\.com\s+(?:as|account)\s+(\S+)/i)
   if (match) return { ghCliAvailable: true, loggedIn: true, username: match[1] }
   return { ghCliAvailable: true, loggedIn: false }
 }
