@@ -11,6 +11,9 @@ const api: IpcApi = {
   openProject: (path) =>
     ipcRenderer.invoke('open-project', path),
 
+  closeProject: () =>
+    ipcRenderer.invoke('close-project'),
+
   sync: () =>
     ipcRenderer.invoke('sync'),
 

@@ -308,6 +308,10 @@ export function setRestProject(project: ProjectConfig): void {
   currentProject = project
 }
 
+export function clearRestProject(): void {
+  currentProject = null
+}
+
 export function stopRestServer(): void {
   if (server) {
     server.close()

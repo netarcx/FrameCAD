@@ -107,6 +107,7 @@ export interface IpcApi {
   createProject(name: string, path: string, remote: string): Promise<void>
   joinProject(url: string, path: string): Promise<void>
   openProject(path: string): Promise<ProjectConfig>
+  closeProject(): Promise<void>
   sync(): Promise<SyncResult>
   publish(message: string): Promise<PublishResult>
   getStatus(): Promise<FileEntry[]>

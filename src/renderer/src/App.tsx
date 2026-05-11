@@ -31,6 +31,7 @@ export default function App() {
     createProject,
     joinProject,
     openProject,
+    closeProject,
     sync,
     publish,
     checkOut,
@@ -212,7 +213,13 @@ export default function App() {
         <span className="logo">TrentCAD</span>
         {appVersion && <span className="version">v{appVersion}</span>}
         <span className="divider" />
-        <span className="project-name">{project.name}</span>
+        <button
+          className="project-name-btn"
+          onClick={closeProject}
+          title="Close this project and go back to the project picker"
+        >
+          {'←'} {project.name}
+        </button>
         <span className="spacer" />
         {driveStatus.configured && (
           <button

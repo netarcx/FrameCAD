@@ -6,7 +6,7 @@ import * as lockOps from './locking'
 import * as partsOps from './parts'
 import * as adminOps from './admin'
 import { addRecentProject, getRecentProjects } from './config'
-import { setRestProject, stopRestServer, queuePendingCreate } from './rest'
+import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
 
@@ -201,6 +201,12 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('set-git-identity', async (_e, name: string, email: string) => {
     await gitOps.setGitIdentity(name, email)
+  })
+
+  ipcMain.handle('close-project', () => {
+    currentProject = null
+    clearRestProject()
+    stopWatching()
   })
 
   ipcMain.handle('get-app-version', () => app.getVersion())

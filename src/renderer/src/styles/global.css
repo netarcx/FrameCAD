@@ -226,6 +226,24 @@ input {
   color: var(--text-primary);
 }
 
+.app-header .project-name-btn {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s, color 0.15s;
+}
+
+.app-header .project-name-btn:hover {
+  background: var(--bg-surface);
+  color: var(--accent);
+}
+
 .app-header .spacer { flex: 1; }
 
 .app-header .drive-badge {

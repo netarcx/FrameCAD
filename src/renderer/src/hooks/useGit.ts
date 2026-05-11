@@ -77,6 +77,16 @@ export function useGit() {
     }
   }, [])
 
+  const closeProject = useCallback(async () => {
+    try { await window.api.closeProject() } catch { /* best effort */ }
+    setProject(null)
+    setFiles([])
+    setHistory([])
+    setLocks([])
+    setSelectedFile(null)
+    setError(null)
+  }, [])
+
   const openProject = useCallback(async (path: string) => {
     setIsLoading(true)
     setError(null)
@@ -232,6 +242,7 @@ export function useGit() {
     createProject,
     joinProject,
     openProject,
+    closeProject,
     sync,
     publish,
     checkOut,
