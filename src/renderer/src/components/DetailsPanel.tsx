@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { FileEntry, FileState, PartMeta, ReleaseState } from '@shared/types'
+import type { FileEntry, FileState, ManufacturingMethod, PartMeta, ReleaseState } from '@shared/types'
 
 interface Props {
   file: FileEntry | null
@@ -312,6 +312,38 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
               </label>
             </div>
             <div className="mfg-hint">Press Enter or click away to save</div>
+          </div>
+
+          <div className="details-section">
+            <div className="section-title">Manufacturing Method</div>
+            <div className="mfg-method-row">
+              {(['print', 'cnc', 'manual', 'other'] as ManufacturingMethod[]).map(m => (
+                <button
+                  key={m}
+                  className={`mfg-method-pill${meta.manufacturingMethod === m ? ' active' : ''}`}
+                  onClick={async () => {
+                    try {
+                      await window.api.setManufacturingMethod(file.path, meta.manufacturingMethod === m ? null : m)
+                      await refreshMeta(file.path)
+                    } catch (err) { setError((err as Error).message) }
+                  }}
+                >
+                  {m === 'print' ? '3D Print' : m === 'cnc' ? 'CNC' : m === 'manual' ? 'Hand' : 'Other'}
+                </button>
+              ))}
+            </div>
+            <input
+              className="mfg-material-input"
+              placeholder="Material (e.g. 6061, PLA, polycarb)"
+              defaultValue={meta.manufacturingMaterial || ''}
+              onBlur={async e => {
+                if (e.target.value === (meta.manufacturingMaterial || '')) return
+                try {
+                  await window.api.setManufacturingMaterial(file.path, e.target.value)
+                  await refreshMeta(file.path)
+                } catch (err) { setError((err as Error).message) }
+              }}
+            />
           </div>
 
           <div className="details-section">

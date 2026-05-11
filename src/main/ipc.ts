@@ -305,6 +305,18 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     return metaOps.getProjectTotals()
   })
 
+  ipcMain.handle('set-mfg-method', async (_e, filePath: string, method: string | null) => {
+    await metaOps.setManufacturingMethod(filePath, method as Parameters<typeof metaOps.setManufacturingMethod>[1])
+  })
+
+  ipcMain.handle('set-mfg-material', async (_e, filePath: string, material: string) => {
+    await metaOps.setManufacturingMaterial(filePath, material)
+  })
+
+  ipcMain.handle('get-manufacturing-queue', async () => {
+    return metaOps.getManufacturingQueue()
+  })
+
   ipcMain.handle('get-main-remote-url', async () => {
     try {
       const remotes = await gitOps.getGit().getRemotes(true)

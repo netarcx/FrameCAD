@@ -134,6 +134,15 @@ const api: IpcApi = {
   getProjectTotals: () =>
     ipcRenderer.invoke('get-project-totals'),
 
+  setManufacturingMethod: (filePath, method) =>
+    ipcRenderer.invoke('set-mfg-method', filePath, method),
+
+  setManufacturingMaterial: (filePath, material) =>
+    ipcRenderer.invoke('set-mfg-material', filePath, material),
+
+  getManufacturingQueue: () =>
+    ipcRenderer.invoke('get-manufacturing-queue'),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

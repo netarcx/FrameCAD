@@ -23,6 +23,8 @@ export interface PartReleaseInfo {
   note?: string
 }
 
+export type ManufacturingMethod = 'print' | 'cnc' | 'manual' | 'other'
+
 export interface PartMeta {
   release?: PartReleaseInfo
   comments?: PartComment[]
@@ -31,6 +33,18 @@ export interface PartMeta {
   mass?: number
   /** Cost in USD */
   cost?: number
+  manufacturingMethod?: ManufacturingMethod
+  manufacturingMaterial?: string
+}
+
+export interface ManufacturingQueueItem {
+  path: string
+  method: ManufacturingMethod
+  material?: string
+  mass?: number
+  notes?: string
+  releasedBy?: string
+  releasedAt?: string
 }
 
 export interface ProjectTotals {
@@ -204,6 +218,9 @@ export interface IpcApi {
   setPartMass(filePath: string, mass: number | null): Promise<void>
   setPartCost(filePath: string, cost: number | null): Promise<void>
   getProjectTotals(): Promise<ProjectTotals>
+  setManufacturingMethod(filePath: string, method: ManufacturingMethod | null): Promise<void>
+  setManufacturingMaterial(filePath: string, material: string): Promise<void>
+  getManufacturingQueue(): Promise<ManufacturingQueueItem[]>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void

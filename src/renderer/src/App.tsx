@@ -7,6 +7,8 @@ import Toolbar from './components/Toolbar'
 import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
+import ManufacturingQueue from './components/ManufacturingQueue'
+import OnboardingTour from './components/OnboardingTour'
 import logoUrl from './assets/logo.png'
 import type { AdminConfig, DependencyStatus, FileEntry, ProjectTotals, PublishProgress, UpdateInfo } from '@shared/types'
 
@@ -57,6 +59,32 @@ export default function App() {
   const [appVersion, setAppVersion] = useState<string>('')
   const [adminConfig, setAdminConfig] = useState<AdminConfig>({})
   const [showAdmin, setShowAdmin] = useState(false)
+  const [showMfgQueue, setShowMfgQueue] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine)
+
+  useEffect(() => {
+    const goOnline = () => setOffline(false)
+    const goOffline = () => setOffline(true)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  useEffect(() => {
+    // Show the tour once per user (gate via localStorage)
+    if (!localStorage.getItem('trentcad-onboarding-seen')) {
+      setShowOnboarding(true)
+    }
+  }, [])
+
+  const dismissOnboarding = useCallback(() => {
+    localStorage.setItem('trentcad-onboarding-seen', '1')
+    setShowOnboarding(false)
+  }, [])
   const [missingDeps, setMissingDeps] = useState<DependencyStatus | null>(null)
   const [checkingDeps, setCheckingDeps] = useState(false)
   const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null)
@@ -197,6 +225,16 @@ export default function App() {
 
   const versionCorner = appVersion && <div className="app-version-corner">v{appVersion}</div>
 
+  const offlineBanner = offline && (
+    <div className="offline-banner">
+      You're offline — Download / Upload will fail until your connection is back. Local edits are safe.
+    </div>
+  )
+
+  const onboardingModal = showOnboarding && (
+    <OnboardingTour onClose={dismissOnboarding} />
+  )
+
   const depsModal = missingDeps && (
     <div className="modal-overlay">
       <div className="modal deps-modal">
@@ -247,6 +285,8 @@ export default function App() {
           initialEmail={gitEmail}
         />
         {depsModal}
+        {offlineBanner}
+        {onboardingModal}
         {versionCorner}
       </div>
     )
@@ -272,6 +312,8 @@ export default function App() {
           isLoading={isLoading}
         />
         {depsModal}
+        {offlineBanner}
+        {onboardingModal}
         {versionCorner}
       </div>
     )
@@ -315,6 +357,13 @@ export default function App() {
             {driveStatus.connected ? 'Drive Connected' : 'Connect Drive'}
           </button>
         )}
+        <button
+          className="header-mfg-btn"
+          onClick={() => setShowMfgQueue(true)}
+          title="Manufacturing queue: see released parts ready for the shop"
+        >
+          Shop
+        </button>
         <button
           className="theme-toggle"
           onClick={toggleTheme}
@@ -370,6 +419,13 @@ export default function App() {
           window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
         }} />
       )}
+
+      {showMfgQueue && (
+        <ManufacturingQueue onClose={() => setShowMfgQueue(false)} />
+      )}
+
+      {offlineBanner}
+      {onboardingModal}
 
       {publishProgress && (
         <div className="modal-overlay">

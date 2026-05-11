@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs/promises'
-import type { PartMeta, ProjectTotals, ReleaseState } from '@shared/types'
+import type { ManufacturingMethod, ManufacturingQueueItem, PartMeta, ProjectTotals, ReleaseState } from '@shared/types'
 import { getProjectPath, getGit, pullRemoteFile, commitAndPushFile } from './git'
 
 const META_DIR = '.trentcad'
@@ -138,6 +138,56 @@ export async function setPartCost(filePath: string, cost: number | null): Promis
     },
     `[cost] ${path.basename(filePath)} = ${cost === null ? 'cleared' : `$${cost}`}`
   )
+}
+
+export async function setManufacturingMethod(
+  filePath: string,
+  method: ManufacturingMethod | null
+): Promise<void> {
+  await modifyAndSync(
+    filePath,
+    entry => {
+      if (method === null) delete entry.manufacturingMethod
+      else entry.manufacturingMethod = method
+    },
+    `[mfg-method] ${path.basename(filePath)} = ${method ?? 'cleared'}`
+  )
+}
+
+export async function setManufacturingMaterial(filePath: string, material: string): Promise<void> {
+  await modifyAndSync(
+    filePath,
+    entry => {
+      const trimmed = (material ?? '').trim()
+      if (!trimmed) delete entry.manufacturingMaterial
+      else entry.manufacturingMaterial = trimmed
+    },
+    `[mfg-material] ${path.basename(filePath)}`
+  )
+}
+
+/**
+ * Build the manufacturing queue — every part currently in the "released"
+ * state, ready for the shop to make. Ordered oldest-first so the earliest
+ * approvals get worked first.
+ */
+export async function getManufacturingQueue(): Promise<ManufacturingQueueItem[]> {
+  const all = await loadAllMeta()
+  const items: ManufacturingQueueItem[] = []
+  for (const [filePath, entry] of Object.entries(all)) {
+    if (entry.release?.state !== 'released') continue
+    items.push({
+      path: filePath,
+      method: entry.manufacturingMethod || 'other',
+      material: entry.manufacturingMaterial,
+      mass: entry.mass,
+      notes: entry.manufacturingNotes,
+      releasedBy: entry.release.by,
+      releasedAt: entry.release.at
+    })
+  }
+  items.sort((a, b) => (a.releasedAt || '').localeCompare(b.releasedAt || ''))
+  return items
 }
 
 /**
