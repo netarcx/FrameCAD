@@ -71,6 +71,7 @@ namespace TrentCAD.SolidWorksAddin
         private void CreateTaskPane()
         {
             _taskPaneControl = new TaskPaneControl();
+            _taskPaneControl.OnProjectPathChanged = SetSolidWorksWorkingDirectory;
             _taskPaneView = _swApp.CreateTaskpaneView2("", "TrentCAD");
 
             if (_taskPaneView != null)
@@ -78,6 +79,19 @@ namespace TrentCAD.SolidWorksAddin
                 _taskPaneView.DisplayWindowFromHandlex64(_taskPaneControl.Handle.ToInt64());
                 var parentHwnd = (IntPtr)_taskPaneView.GetTaskpaneViewWndx64();
                 _taskPaneHost = new TaskPaneHost(parentHwnd, _taskPaneControl);
+            }
+        }
+
+        private void SetSolidWorksWorkingDirectory(string path)
+        {
+            if (_swApp == null || string.IsNullOrEmpty(path)) return;
+            try
+            {
+                _swApp.SetCurrentWorkingDirectory(path);
+            }
+            catch
+            {
+                // SolidWorks may reject the call if the path is invalid; ignore silently
             }
         }
 

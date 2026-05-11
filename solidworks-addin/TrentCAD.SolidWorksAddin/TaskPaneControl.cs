@@ -84,7 +84,10 @@ namespace TrentCAD.SolidWorksAddin
                 ForeColor = CSubtext,
                 Font = new Font("Segoe UI", 8.25f),
                 Location = new Point(14, 2),
-                AutoSize = true
+                AutoSize = false,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Size = new Size(180, 16)
             };
             _pnlConnection.Controls.Add(_lblConnection);
             Controls.Add(_pnlConnection);
@@ -154,16 +157,23 @@ namespace TrentCAD.SolidWorksAddin
         {
             var w = ClientSize.Width - Pad * 2;
             if (w < 40) return;
-            var y = 34;
+            var y = 42;
 
             _pnlConnection.Location = new Point(Pad, y);
             _pnlConnection.Width = w;
-            y += 26;
+            _lblConnection.Width = Math.Max(40, w - 18);
+            y += 28;
 
             if (_pnlFileCard.Visible)
             {
                 _pnlFileCard.Location = new Point(Pad, y);
                 _pnlFileCard.Width = w;
+
+                var labelW = Math.Max(40, w - 20);
+                foreach (Control c in _pnlFileCard.Controls)
+                {
+                    if (c is Label lbl) lbl.Width = labelW;
+                }
 
                 var cardH = 10;
                 foreach (Control c in _pnlFileCard.Controls)
@@ -202,15 +212,19 @@ namespace TrentCAD.SolidWorksAddin
 
         private Label MakeLabel(Control parent, ref int y, Font font, Color color)
         {
+            var rowH = (int)(font.GetHeight() + 4);
             var lbl = new Label
             {
                 ForeColor = color,
                 Font = font,
                 Location = new Point(10, y),
-                AutoSize = true
+                AutoSize = false,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Size = new Size(180, rowH)
             };
             parent.Controls.Add(lbl);
-            y += (int)(font.GetHeight() + 6);
+            y += rowH + 4;
             return lbl;
         }
 
@@ -242,6 +256,9 @@ namespace TrentCAD.SolidWorksAddin
         }
 
         private bool _connected;
+        private string _currentProjectPath;
+
+        public Action<string> OnProjectPathChanged { get; set; }
 
         private void SetButtonStates(bool canCheckOut, bool canCheckIn)
         {
@@ -312,11 +329,17 @@ namespace TrentCAD.SolidWorksAddin
                     _dot.DotColor = CGreen;
                     _lblConnection.Text = health.Project.Name;
                     SetButtonStates(false, false);
+                    if (!string.IsNullOrEmpty(health.Project.Path) && _currentProjectPath != health.Project.Path)
+                    {
+                        _currentProjectPath = health.Project.Path;
+                        OnProjectPathChanged?.Invoke(health.Project.Path);
+                    }
                     if (!wasConnected && !string.IsNullOrEmpty(_currentFilePath))
                         UpdateForDocument(_currentFilePath);
                 }
                 else if (isConnected)
                 {
+                    _currentProjectPath = null;
                     _dot.DotColor = CYellow;
                     _lblConnection.Text = "No Project Open";
                     SetButtonStates(false, false);

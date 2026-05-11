@@ -51,6 +51,19 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
   const [updateReady, setUpdateReady] = useState(false)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const stored = localStorage.getItem('trentcad-theme')
+    return stored === 'light' ? 'light' : 'dark'
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('trentcad-theme', theme)
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme(t => (t === 'dark' ? 'light' : 'dark'))
+  }, [])
 
   useEffect(() => {
     window.api.getGitIdentity().then(({ name, email }) => {
@@ -182,6 +195,13 @@ export default function App() {
             {driveStatus.connected ? 'Drive Connected' : 'Connect Drive'}
           </button>
         )}
+        <button
+          className="theme-toggle"
+          onClick={toggleTheme}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? 'Light' : 'Dark'}
+        </button>
         <button
           className="user-badge"
           onClick={() => setShowProfileEdit(true)}
