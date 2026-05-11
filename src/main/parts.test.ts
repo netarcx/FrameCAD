@@ -163,6 +163,54 @@ describe('parts module (with temp project dir)', () => {
       expect(r1.partNumber).toBe(`${yy}-2129-01`)
       expect(r2.partNumber).toBe(`${yy}-2129-02`)
     })
+
+    it('nested sub-assembly inherits the top-level folder number (no extra dash-segment)', async () => {
+      // Top-level Drivetrain gets 01
+      await parts.createNewAssembly('', 'Drivetrain', undefined)
+      // Sub-assembly Wheels inside Drivetrain: previously was 01-01, now 01-001
+      const sub = await parts.createNewAssembly('Drivetrain', 'Wheels', undefined)
+      const yy = new Date().getFullYear().toString().slice(-2)
+      expect(sub.partNumber).toBe(`${yy}-2129-01-001`)
+      expect(sub.filePath).toBe(`Drivetrain/Wheels/${sub.partNumber}.sldasm`)
+    })
+  })
+
+  describe('part numbering scope (top-level folder only)', () => {
+    it('part 3 levels deep uses only the top-level folder number', async () => {
+      await parts.createNewAssembly('', 'Drivetrain', undefined)
+      await parts.createSubsystem('Drivetrain', 'Wheels')
+      await parts.createSubsystem('Drivetrain/Wheels', 'Spokes')
+      // Sub-folders share Drivetrain's counter (01); the part gets a 3-digit
+      // sequence, NOT one segment per folder level
+      const p = await parts.createNewPart('Drivetrain/Wheels/Spokes', undefined)
+      const yy = new Date().getFullYear().toString().slice(-2)
+      expect(p.partNumber).toBe(`${yy}-2129-01-001`)
+    })
+
+    it('counter is shared across all depths within a top-level folder', async () => {
+      await parts.createNewAssembly('', 'Drivetrain', undefined)
+      const a = await parts.createNewPart('Drivetrain', undefined)
+      await parts.createSubsystem('Drivetrain', 'Wheels')
+      const b = await parts.createNewPart('Drivetrain/Wheels', undefined)
+      await parts.createSubsystem('Drivetrain/Wheels', 'Spokes')
+      const c = await parts.createNewPart('Drivetrain/Wheels/Spokes', undefined)
+      const yy = new Date().getFullYear().toString().slice(-2)
+      expect(a.partNumber).toBe(`${yy}-2129-01-001`)
+      expect(b.partNumber).toBe(`${yy}-2129-01-002`)
+      expect(c.partNumber).toBe(`${yy}-2129-01-003`)
+    })
+
+    it('sibling top-level folders keep independent counters', async () => {
+      await parts.createNewAssembly('', 'Drivetrain', undefined)
+      await parts.createNewAssembly('', 'Intake', undefined)
+      const d1 = await parts.createNewPart('Drivetrain', undefined)
+      const i1 = await parts.createNewPart('Intake', undefined)
+      const d2 = await parts.createNewPart('Drivetrain', undefined)
+      const yy = new Date().getFullYear().toString().slice(-2)
+      expect(d1.partNumber).toBe(`${yy}-2129-01-001`)
+      expect(i1.partNumber).toBe(`${yy}-2129-02-001`)
+      expect(d2.partNumber).toBe(`${yy}-2129-01-002`)
+    })
   })
 
   describe('createSubsystem (plain folder)', () => {

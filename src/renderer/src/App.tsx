@@ -590,13 +590,21 @@ export default function App() {
               </div>
             )}
             {publishProgress.phase === 'error' && (
-              <>
-                <div className="admin-error">{publishProgress.error || 'Unknown error'}</div>
-                <div className="actions">
-                  <button className="toolbar-btn primary" onClick={() => setPublishProgress(null)}>Close</button>
-                </div>
-              </>
+              <div className="admin-error">{publishProgress.error || 'Unknown error'}</div>
             )}
+            <div className="actions">
+              {publishProgress.phase === 'error' || publishProgress.phase === 'done' ? (
+                <button className="toolbar-btn primary" onClick={() => setPublishProgress(null)}>Close</button>
+              ) : (
+                <button
+                  className="toolbar-btn"
+                  onClick={() => setPublishProgress(null)}
+                  title="Hide this dialog. The upload keeps running in the background."
+                >
+                  Hide
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

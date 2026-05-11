@@ -73,6 +73,27 @@ function getScope(relPath: string): string {
   return dir
 }
 
+/**
+ * First path segment of any non-empty relative path, treated as a folder
+ * path. Used to scope part numbers to the top-level subsystem folder
+ * regardless of how deeply nested a file or sub-folder is.
+ *
+ * Examples (folder paths):
+ *   ''                       -> ''            (root scope)
+ *   'Drivetrain'             -> 'Drivetrain'
+ *   'Drivetrain/Wheels'      -> 'Drivetrain'
+ *   'Drivetrain/Wheels/Hub'  -> 'Drivetrain'
+ *
+ * For a file path, pass the file's containing folder (getScope) — not
+ * the file path itself, otherwise a root-level file would be treated as
+ * its own top-level folder.
+ */
+function topLevelSegment(folderPath: string): string {
+  if (!folderPath) return ''
+  const idx = folderPath.indexOf('/')
+  return idx === -1 ? folderPath : folderPath.slice(0, idx)
+}
+
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
 }
@@ -81,31 +102,42 @@ function pad3(n: number): string {
   return n.toString().padStart(3, '0')
 }
 
-function ensureAssemblyNumber(manifest: PartsManifest, folderPath: string): string {
-  if (manifest.assemblies[folderPath]) {
-    return manifest.assemblies[folderPath]
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Reserve and return a 2-digit number for a top-level subsystem folder
+ * (Drivetrain, Intake, etc.). The number is shared by everything inside
+ * that folder, no matter how deep — sub-folders do NOT get their own
+ * dash-segment in the part number anymore (which was the v0.7.x bug:
+ * `26-2129-01-02-003` instead of `26-2129-01-003`).
+ */
+function ensureTopLevelFolderNumber(manifest: PartsManifest, topLevel: string): string {
+  if (manifest.assemblies[topLevel]) return manifest.assemblies[topLevel]
+  const counter = manifest.nextAssemblyCounters[''] || 1
+  const num = pad2(counter)
+  manifest.nextAssemblyCounters[''] = counter + 1
+  manifest.assemblies[topLevel] = num
+  return num
+}
+
+/**
+ * Find the next available 3-digit counter for parts under `topLevel`,
+ * scanning existing entries so we never collide with a number that's
+ * already been assigned (covers both fresh assignments and entries
+ * carried over from the old multi-dash scheme on the same install).
+ */
+function nextCounterFor(manifest: PartsManifest, topLevel: string, topNumber: string): number {
+  let max = (manifest.nextCounters[topLevel] || 1) - 1
+  const re = topLevel === ''
+    ? new RegExp(`^${escapeRegex(manifest.prefix)}-(\\d{3})$`)
+    : new RegExp(`^${escapeRegex(manifest.prefix)}-${escapeRegex(topNumber)}-(\\d{3})$`)
+  for (const e of Object.values(manifest.entries)) {
+    const m = e.partNumber.match(re)
+    if (m) max = Math.max(max, parseInt(m[1], 10))
   }
-
-  const segments = folderPath.split('/')
-  let builtPath = ''
-  let assemblyNum = ''
-
-  for (let i = 0; i < segments.length; i++) {
-    builtPath = i === 0 ? segments[i] : builtPath + '/' + segments[i]
-    const parentScope = i === 0 ? '' : segments.slice(0, i).join('/')
-
-    if (manifest.assemblies[builtPath]) {
-      assemblyNum = manifest.assemblies[builtPath]
-    } else {
-      const counter = manifest.nextAssemblyCounters[parentScope] || 1
-      const segment = pad2(counter)
-      assemblyNum = assemblyNum ? assemblyNum + '-' + segment : segment
-      manifest.nextAssemblyCounters[parentScope] = counter + 1
-      manifest.assemblies[builtPath] = assemblyNum
-    }
-  }
-
-  return assemblyNum
+  return max + 1
 }
 
 function findLinkedPart(manifest: PartsManifest, drawingPath: string): PartEntry | null {
@@ -131,6 +163,7 @@ export function assignPartNumber(manifest: PartsManifest, relPath: string): Part
   if (!type) return null
 
   const scope = getScope(relPath)
+  const topLevel = topLevelSegment(getScope(relPath))
 
   if (type === 'drawing') {
     const linked = findLinkedPart(manifest, relPath)
@@ -147,14 +180,20 @@ export function assignPartNumber(manifest: PartsManifest, relPath: string): Part
   }
 
   let partNumber: string
-  if (scope === '') {
-    const counter = manifest.nextCounters[''] || 1
+  if (topLevel === '') {
+    // File sits at the project root
+    const counter = nextCounterFor(manifest, '', '')
     partNumber = `${manifest.prefix}-${pad3(counter)}`
     manifest.nextCounters[''] = counter + 1
   } else {
-    const assemblySegment = ensureAssemblyNumber(manifest, scope)
-    if (type === 'assembly') {
-      const asmNumber = `${manifest.prefix}-${assemblySegment}`
+    const topNumber = ensureTopLevelFolderNumber(manifest, topLevel)
+
+    // The single "main" assembly directly inside a top-level folder gets
+    // the bare `prefix-XX` number (e.g. Drivetrain/drivetrain.sldasm ->
+    // 26-2129-01). Every other file under the top-level — including
+    // sub-folder assemblies — gets a regular counter-based number.
+    if (type === 'assembly' && scope === topLevel) {
+      const asmNumber = `${manifest.prefix}-${topNumber}`
       const alreadyUsed = Object.values(manifest.entries).some(
         e => e.type === 'assembly' && e.partNumber === asmNumber
       )
@@ -168,9 +207,9 @@ export function assignPartNumber(manifest: PartsManifest, relPath: string): Part
         return entry
       }
     }
-    const counter = manifest.nextCounters[scope] || 1
-    partNumber = `${manifest.prefix}-${assemblySegment}-${pad3(counter)}`
-    manifest.nextCounters[scope] = counter + 1
+    const counter = nextCounterFor(manifest, topLevel, topNumber)
+    partNumber = `${manifest.prefix}-${topNumber}-${pad3(counter)}`
+    manifest.nextCounters[topLevel] = counter + 1
   }
 
   const entry: PartEntry = {
@@ -292,15 +331,16 @@ export async function createNewPart(
   const manifest = await loadManifest()
 
   let partNumber: string
-  if (folder === '') {
-    const counter = manifest.nextCounters[''] || 1
+  const topLevel = topLevelSegment(folder)
+  if (topLevel === '') {
+    const counter = nextCounterFor(manifest, '', '')
     partNumber = `${manifest.prefix}-${pad3(counter)}`
     manifest.nextCounters[''] = counter + 1
   } else {
-    const assemblySegment = ensureAssemblyNumber(manifest, folder)
-    const counter = manifest.nextCounters[folder] || 1
-    partNumber = `${manifest.prefix}-${assemblySegment}-${pad3(counter)}`
-    manifest.nextCounters[folder] = counter + 1
+    const topNumber = ensureTopLevelFolderNumber(manifest, topLevel)
+    const counter = nextCounterFor(manifest, topLevel, topNumber)
+    partNumber = `${manifest.prefix}-${topNumber}-${pad3(counter)}`
+    manifest.nextCounters[topLevel] = counter + 1
   }
 
   const fileName = `${partNumber}.sldprt`
@@ -348,8 +388,22 @@ export async function createNewAssembly(
   const manifest = await loadManifest()
 
   const folderPath = parentFolder ? `${parentFolder}/${name}` : name
-  const assemblySegment = ensureAssemblyNumber(manifest, folderPath)
-  const partNumber = `${manifest.prefix}-${assemblySegment}`
+  const topLevel = topLevelSegment(folderPath)
+
+  let partNumber: string
+  if (parentFolder === '') {
+    // Creating a brand-new top-level subsystem folder — gets the bare
+    // `prefix-XX` assembly number
+    const topNumber = ensureTopLevelFolderNumber(manifest, folderPath)
+    partNumber = `${manifest.prefix}-${topNumber}`
+  } else {
+    // Nested assembly: shares its top-level folder's number and gets a
+    // regular 3-digit counter, same as a part would
+    const topNumber = ensureTopLevelFolderNumber(manifest, topLevel)
+    const counter = nextCounterFor(manifest, topLevel, topNumber)
+    partNumber = `${manifest.prefix}-${topNumber}-${pad3(counter)}`
+    manifest.nextCounters[topLevel] = counter + 1
+  }
 
   const fileName = `${partNumber}.sldasm`
   const relPath = `${folderPath}/${fileName}`
