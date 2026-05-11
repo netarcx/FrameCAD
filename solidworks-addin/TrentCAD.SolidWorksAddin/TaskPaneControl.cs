@@ -322,9 +322,24 @@ namespace TrentCAD.SolidWorksAddin
                 {
                     _connected = false;
                     _dot.DotColor = CRed;
-                    var msg = error.InnerException?.Message ?? error.Message;
-                    if (msg.Length > 60) msg = msg.Substring(0, 57) + "...";
-                    _lblConnection.Text = "Conn error: " + msg;
+                    string label;
+                    if (error is System.Net.Http.HttpRequestException)
+                    {
+                        // Connection refused / unreachable — almost always means the
+                        // desktop app isn't running
+                        label = "TrentCAD desktop app is not open";
+                    }
+                    else if (error is System.Threading.Tasks.TaskCanceledException)
+                    {
+                        label = "TrentCAD not responding";
+                    }
+                    else
+                    {
+                        var msg = error.InnerException?.Message ?? error.Message;
+                        if (msg.Length > 60) msg = msg.Substring(0, 57) + "...";
+                        label = "Error: " + msg;
+                    }
+                    _lblConnection.Text = label;
                     SetButtonStates(false, false);
                     return;
                 }
