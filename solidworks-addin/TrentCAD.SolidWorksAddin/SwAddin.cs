@@ -211,8 +211,13 @@ namespace TrentCAD.SolidWorksAddin
                 // Only push for the file that was actually saved
                 if (!string.Equals(doc.GetPathName(), fileName, StringComparison.OrdinalIgnoreCase))
                     return 0;
+                // GetMassProperties2's third arg (UseSystemUnits=true) forces
+                // SI units (kg) regardless of the document's MMGS / IPS / CGS
+                // configuration, so the kg→lb conversion below is correct for
+                // every user's SolidWorks setup. Available in SW 2010+, stable
+                // through SW 2025.
                 int errors = 0;
-                var props = doc.Extension.GetMassProperties2(1, out errors, false) as double[];
+                var props = doc.Extension.GetMassProperties2(1, out errors, true) as double[];
                 if (props == null || props.Length < 6) return 0;
                 var massKg = props[5];
                 if (massKg <= 0) return 0;
