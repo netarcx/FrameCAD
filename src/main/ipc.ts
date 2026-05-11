@@ -250,6 +250,14 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('github-login', async () => authOps.githubLogin())
   ipcMain.handle('git-resetup', async () => authOps.gitResetup())
 
+  ipcMain.handle('list-github-repos', async (_e, org: string, prefix?: string) => {
+    return authOps.listGitHubRepos(org, prefix)
+  })
+
+  ipcMain.handle('create-github-repo', async (_e, org: string, name: string, isPrivate: boolean, description?: string) => {
+    return authOps.createGitHubRepo(org, name, isPrivate, description)
+  })
+
   ipcMain.handle('open-external', async (_e, url: string) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
       await shell.openExternal(url)

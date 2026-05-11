@@ -1,17 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
 import logoUrl from '../assets/logo.png'
-import type { GitHubAuthStatus, ProjectConfig } from '@shared/types'
+import BrowseProjects from './BrowseProjects'
+import type { AdminConfig, GitHubAuthStatus, ProjectConfig } from '@shared/types'
 
 interface Props {
   onCreateProject: (name: string, path: string, remote: string, isCotsProject?: boolean) => Promise<void>
   onJoinProject: (url: string, path: string) => Promise<void>
   onOpenProject: (path: string) => Promise<void>
   isLoading: boolean
+  /**
+   * Most recently joined project's admin config. We fetch it from the user's
+   * latest project so the welcome screen can show Browse / org-aware Create
+   * before they've opened anything.
+   */
+  fallbackAdminConfig?: AdminConfig
 }
 
 type Mode = 'select' | 'create' | 'join' | 'open'
 
-export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, isLoading }: Props) {
+export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, isLoading, fallbackAdminConfig }: Props) {
   const [mode, setMode] = useState<Mode>('select')
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
@@ -23,6 +30,13 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   const [resetupMsg, setResetupMsg] = useState<string | null>(null)
   const [loggingIn, setLoggingIn] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [showBrowse, setShowBrowse] = useState(false)
+  const [creatingOnGitHub, setCreatingOnGitHub] = useState(false)
+  const [createMsg, setCreateMsg] = useState<string | null>(null)
+
+  const orgConfigured = (fallbackAdminConfig?.gitHubOrg || '').trim()
+  const projectPrefix = (fallbackAdminConfig?.projectPrefix || '').trim()
+  const canBrowse = !!orgConfigured && !!authStatus?.loggedIn
 
   const refreshAuth = useCallback(() => {
     window.api.githubAuthStatus().then(setAuthStatus).catch(() => {})
@@ -76,10 +90,21 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <span className="card-title">Create Project</span>
             <span className="card-desc">Start a new CAD project<br />with version control</span>
           </button>
-          <button className="setup-card" onClick={() => setMode('join')}>
-            <span className="card-icon">{'↓'}</span>
-            <span className="card-title">Join Project</span>
-            <span className="card-desc">Download a team project<br />from GitHub</span>
+          <button
+            className="setup-card"
+            onClick={() => canBrowse ? setShowBrowse(true) : setMode('join')}
+            disabled={!canBrowse && !authStatus?.loggedIn}
+            title={canBrowse
+              ? 'Browse team projects from GitHub'
+              : authStatus?.loggedIn
+                ? 'Admin hasn\'t configured a GitHub organisation — paste a URL instead'
+                : 'Sign in to GitHub to browse team projects'}
+          >
+            <span className="card-icon">{'⌕'}</span>
+            <span className="card-title">{canBrowse ? 'Browse Projects' : 'Join Project'}</span>
+            <span className="card-desc">{canBrowse
+              ? <>List repos from<br />the {orgConfigured} org</>
+              : <>Download a team project<br />from GitHub</>}</span>
           </button>
           <button className="setup-card" onClick={() => setMode('open')}>
             <span className="card-icon">{'⊞'}</span>
@@ -87,6 +112,20 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <span className="card-desc">Open an existing<br />project folder</span>
           </button>
         </div>
+
+        {showBrowse && orgConfigured && (
+          <BrowseProjects
+            org={orgConfigured}
+            prefix={projectPrefix || undefined}
+            onPick={(url, suggestedName) => {
+              setShowBrowse(false)
+              setUrl(url)
+              setName(suggestedName)
+              setMode('join')
+            }}
+            onClose={() => setShowBrowse(false)}
+          />
+        )}
         <div className="setup-toolbar">
           <div className="setup-auth">
             {authStatus?.loggedIn ? (
@@ -167,6 +206,13 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
               onChange={e => setRemote(e.target.value)}
               placeholder="https://github.com/frc2129/2026-robot.git"
             />
+            {orgConfigured && projectPrefix && name && authStatus?.loggedIn && (
+              <p className="admin-hint">
+                Or click <strong>Create on GitHub</strong> to auto-create
+                <code> {orgConfigured}/{projectPrefix}{name.replace(/[^a-zA-Z0-9._-]/g, '-')}</code>
+                so other team members can find it via Browse.
+              </p>
+            )}
           </div>
           <label className="checkbox-row">
             <input
@@ -179,8 +225,38 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
               <span className="checkbox-hint">Holds shared off-the-shelf parts. No part numbers will be assigned.</span>
             </span>
           </label>
+          {createMsg && <div className="setup-toolbar-msg">{createMsg}</div>}
           <div className="form-actions">
             <button className="toolbar-btn" onClick={() => setMode('select')}>Back</button>
+            {orgConfigured && projectPrefix && authStatus?.loggedIn && (
+              <button
+                className="toolbar-btn"
+                disabled={!name || !path || isLoading || creatingOnGitHub}
+                onClick={async () => {
+                  setCreatingOnGitHub(true)
+                  setCreateMsg(null)
+                  const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '-')
+                  const repoName = `${projectPrefix}${safeName}`
+                  try {
+                    const result = await window.api.createGitHubRepo(
+                      orgConfigured, repoName, true, `TrentCAD project — ${name}`
+                    )
+                    if (!result.success || !result.url) {
+                      setCreateMsg('✗ ' + (result.error || 'Could not create repo on GitHub'))
+                      return
+                    }
+                    setCreateMsg(`✓ Created ${orgConfigured}/${repoName} — pushing local project...`)
+                    await onCreateProject(name, `${path}/${name}`, result.url, isCotsProject)
+                  } catch (err) {
+                    setCreateMsg('✗ ' + (err as Error).message)
+                  } finally {
+                    setCreatingOnGitHub(false)
+                  }
+                }}
+              >
+                {creatingOnGitHub ? 'Creating on GitHub...' : 'Create on GitHub'}
+              </button>
+            )}
             <button
               className="toolbar-btn primary"
               disabled={!name || !path || isLoading}

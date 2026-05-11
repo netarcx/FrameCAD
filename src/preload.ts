@@ -98,6 +98,12 @@ const api: IpcApi = {
   gitResetup: () =>
     ipcRenderer.invoke('git-resetup'),
 
+  listGitHubRepos: (org, prefix) =>
+    ipcRenderer.invoke('list-github-repos', org, prefix),
+
+  createGitHubRepo: (org, name, isPrivate, description) =>
+    ipcRenderer.invoke('create-github-repo', org, name, isPrivate, description),
+
   getAdminConfig: () =>
     ipcRenderer.invoke('get-admin-config'),
 

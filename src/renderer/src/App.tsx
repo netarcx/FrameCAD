@@ -310,6 +310,7 @@ export default function App() {
           onJoinProject={joinProject}
           onOpenProject={openProject}
           isLoading={isLoading}
+          fallbackAdminConfig={adminConfig}
         />
         {depsModal}
         {offlineBanner}

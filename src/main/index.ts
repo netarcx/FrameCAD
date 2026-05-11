@@ -14,11 +14,16 @@ function createWindow(): void {
     minWidth: 800,
     minHeight: 600,
     title: 'TrentCAD',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
+
+  // Drop the default Electron File/Edit/View menu so students don't see a
+  // distracting menu bar — TrentCAD's own UI exposes everything they need
+  Menu.setApplicationMenu(null)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])

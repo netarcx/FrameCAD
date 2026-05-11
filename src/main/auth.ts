@@ -99,6 +99,67 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
   }
 }
 
+export interface GitHubRepoSummary {
+  name: string
+  description?: string
+  url: string
+  updatedAt?: string
+  isPrivate?: boolean
+}
+
+export async function listGitHubRepos(
+  org: string,
+  prefix?: string
+): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }> {
+  const gh = await locateGh()
+  if (!gh) return { success: false, repos: [], error: 'GitHub CLI not found' }
+  if (!org) return { success: false, repos: [], error: 'No GitHub organization configured' }
+  const json = await run(`${quoteForCmd(gh)} repo list ${org} --json name,description,updatedAt,url,isPrivate --limit 200`)
+  if (!json) return { success: false, repos: [], error: 'gh repo list returned nothing — check permissions and that the org exists' }
+  try {
+    interface RawRepo { name: string; description?: string; updatedAt?: string; url: string; isPrivate?: boolean }
+    const raw = JSON.parse(json) as RawRepo[]
+    let repos: GitHubRepoSummary[] = raw.map(r => ({
+      name: r.name,
+      description: r.description || undefined,
+      url: r.url,
+      updatedAt: r.updatedAt,
+      isPrivate: r.isPrivate
+    }))
+    if (prefix && prefix.trim()) {
+      const p = prefix.trim().toLowerCase()
+      repos = repos.filter(r => r.name.toLowerCase().startsWith(p))
+    }
+    // Newest first
+    repos.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+    return { success: true, repos }
+  } catch (err) {
+    return { success: false, repos: [], error: 'Could not parse gh output: ' + (err as Error).message }
+  }
+}
+
+export async function createGitHubRepo(
+  org: string,
+  name: string,
+  isPrivate: boolean,
+  description?: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  const gh = await locateGh()
+  if (!gh) return { success: false, error: 'GitHub CLI not found' }
+  if (!org || !name) return { success: false, error: 'Missing org or repo name' }
+
+  const visibility = isPrivate ? '--private' : '--public'
+  // Quote description for shell — escape any embedded quotes
+  const desc = (description || 'TrentCAD project').replace(/"/g, '\\"')
+  const cmd = `${quoteForCmd(gh)} repo create ${org}/${name} ${visibility} --description "${desc}"`
+  const output = await run(cmd)
+  if (!output) {
+    return { success: false, error: 'gh repo create failed — check org permissions and that the repo name isn\'t already taken' }
+  }
+  // gh prints the canonical https URL. Build a .git form for cloning.
+  return { success: true, url: `https://github.com/${org}/${name}.git` }
+}
+
 export async function gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }> {
   const messages: string[] = []
   try {

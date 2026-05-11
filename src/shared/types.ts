@@ -162,6 +162,16 @@ export interface AdminConfig {
   cotsRepoUrl?: string
   cotsBranch?: string
   isCotsProject?: boolean
+  gitHubOrg?: string
+  projectPrefix?: string
+}
+
+export interface GitHubRepoSummary {
+  name: string
+  description?: string
+  url: string
+  updatedAt?: string
+  isPrivate?: boolean
 }
 
 export interface AppState {
@@ -206,6 +216,8 @@ export interface IpcApi {
   githubAuthStatus(): Promise<GitHubAuthStatus>
   githubLogin(): Promise<{ launched: boolean; error?: string }>
   gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }>
+  listGitHubRepos(org: string, prefix?: string): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }>
+  createGitHubRepo(org: string, name: string, isPrivate: boolean, description?: string): Promise<{ success: boolean; url?: string; error?: string }>
   getAdminConfig(): Promise<AdminConfig>
   saveAdminConfig(config: AdminConfig): Promise<void>
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>
