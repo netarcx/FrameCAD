@@ -33,6 +33,27 @@
   ${If} $0 != "0"
     MessageBox MB_OK|MB_ICONEXCLAMATION "SolidWorks add-in registration returned code $0.$\nThe add-in may not appear in SolidWorks.$\nTry running the installer as Administrator."
   ${EndIf}
+
+  ; Auto-install GitHub CLI via winget if it's not already on the system.
+  ; gh is what powers the "Sign in with GitHub" button on the welcome screen.
+  ; If winget isn't available (older Windows 10 without the package manager)
+  ; we just point the user at the manual download.
+  DetailPrint "Checking for GitHub CLI..."
+  nsExec::ExecToStack 'cmd /c gh --version'
+  Pop $0
+  Pop $1
+  ${If} $0 != 0
+    DetailPrint "GitHub CLI not found. Installing via winget..."
+    nsExec::ExecToLog 'cmd /c winget install --id GitHub.cli --silent --accept-source-agreements --accept-package-agreements'
+    Pop $0
+    ${If} $0 != 0
+      MessageBox MB_OK|MB_ICONINFORMATION "TrentCAD couldn't auto-install GitHub CLI (winget is missing or the install failed).$\n$\nDownload it manually from https://cli.github.com and re-launch TrentCAD. Sign-in won't work until it's installed."
+    ${Else}
+      DetailPrint "GitHub CLI installed."
+    ${EndIf}
+  ${Else}
+    DetailPrint "GitHub CLI already installed."
+  ${EndIf}
 !macroend
 
 !macro customUnInit
