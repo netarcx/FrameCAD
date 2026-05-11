@@ -196,6 +196,16 @@ input {
   border-left: 3px solid var(--yellow);
 }
 
+.inline-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.inline-input-row input {
+  flex: 1;
+}
+
 .admin-hint {
   font-size: 11px;
   color: var(--text-muted);

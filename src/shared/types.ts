@@ -150,6 +150,8 @@ export interface IpcApi {
   getAdminConfig(): Promise<AdminConfig>
   saveAdminConfig(config: AdminConfig): Promise<void>
   syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>
+  createProgressTag(name: string, message?: string): Promise<{ success: boolean; error?: string }>
+  getMainRemoteUrl(): Promise<string>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void

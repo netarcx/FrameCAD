@@ -257,6 +257,19 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     if (!config.cotsRepoUrl) return { success: false, error: 'No COTS repo configured' }
     return gitOps.syncCotsRepo(config.cotsRepoUrl, config.cotsBranch)
   })
+
+  ipcMain.handle('create-progress-tag', async (_e, name: string, message?: string) => {
+    return gitOps.createProgressTag(name, message)
+  })
+
+  ipcMain.handle('get-main-remote-url', async () => {
+    try {
+      const remotes = await gitOps.getGit().getRemotes(true)
+      return remotes.find(r => r.name === 'origin')?.refs.push || ''
+    } catch {
+      return ''
+    }
+  })
 }
 
 export { stopWatching, stopRestServer }

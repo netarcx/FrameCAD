@@ -98,6 +98,12 @@ const api: IpcApi = {
   syncCots: () =>
     ipcRenderer.invoke('sync-cots'),
 
+  createProgressTag: (name, message) =>
+    ipcRenderer.invoke('create-progress-tag', name, message),
+
+  getMainRemoteUrl: () =>
+    ipcRenderer.invoke('get-main-remote-url'),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

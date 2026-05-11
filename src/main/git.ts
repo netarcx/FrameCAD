@@ -5,16 +5,74 @@ import type { FileEntry, FileState, HistoryEntry, PartsManifest, PublishProgress
 import { getLocks } from './locking'
 import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
 
+// Large binary or text-based CAD files that go through Git LFS. `-text` keeps
+// git from running line-ending conversion on the file; `merge=lfs` uses the
+// LFS merge driver which conflicts on any divergent pointer instead of
+// attempting a content merge.
 const LFS_PATTERNS = [
-  '*.sldprt', '*.sldasm', '*.slddrw',
-  '*.SLDPRT', '*.SLDASM', '*.SLDDRW',
-  '*.step', '*.stp', '*.STEP', '*.STP',
+  // SolidWorks
+  '*.sldprt', '*.SLDPRT',
+  '*.sldasm', '*.SLDASM',
+  '*.slddrw', '*.SLDDRW',
+  '*.sldlfp', '*.SLDLFP',
+  // CAD interchange
+  '*.step', '*.STEP', '*.stp', '*.STP',
+  '*.iges', '*.IGES', '*.igs', '*.IGS',
   '*.stl', '*.STL',
-  '*.iges', '*.igs',
-  '*.3dxml',
+  '*.3dxml', '*.3DXML',
+  '*.dwg', '*.DWG',
+  '*.dxf', '*.DXF',
+  '*.obj', '*.OBJ',
+  '*.x_t', '*.X_T', '*.x_b', '*.X_B',
+  // Documents and images that CAD users tend to commit alongside their parts
   '*.pdf', '*.PDF',
-  '*.png', '*.jpg', '*.jpeg', '*.bmp'
+  '*.png', '*.PNG', '*.jpg', '*.JPG', '*.jpeg', '*.JPEG', '*.bmp', '*.BMP'
 ]
+
+// Smaller text-format CAD/SolidWorks files that should NEVER be merged
+// line-by-line. The `binary` macro expands to `-text -diff -merge` — git
+// disables its text merge and surfaces a conflict instead of mangling the
+// file's structure.
+const NEVER_MERGE_PATTERNS = [
+  '*.swstate', '*.SWSTATE',
+  '*.swsettings', '*.SWSETTINGS',
+  '*.swproj', '*.SWPROJ',
+  '*.slddst', '*.SLDDST',
+  '*.sldset', '*.SLDSET',
+  '*.sldsymb', '*.SLDSYMB',
+  '*.scad', '*.SCAD',
+  '*.gcode', '*.GCODE'
+]
+
+function buildGitAttributes(): string {
+  const lines: string[] = ['# Managed by TrentCAD — adds run by openProject if missing.']
+  for (const p of LFS_PATTERNS) lines.push(`${p} filter=lfs diff=lfs merge=lfs -text`)
+  for (const p of NEVER_MERGE_PATTERNS) lines.push(`${p} binary`)
+  return lines.join('\n') + '\n'
+}
+
+/**
+ * Ensure every CAD-related pattern TrentCAD knows about is present in
+ * .gitattributes. Adds missing lines without rewriting any custom rules
+ * the user added. Returns true if the file was modified.
+ */
+export async function ensureGitAttributes(): Promise<boolean> {
+  const filePath = path.join(getProjectPath(), '.gitattributes')
+  let existing = ''
+  try { existing = await fs.readFile(filePath, 'utf-8') } catch { /* missing */ }
+  const expected = buildGitAttributes()
+  const existingLines = new Set(existing.split('\n').map(s => s.trim()))
+  const missing: string[] = []
+  for (const line of expected.split('\n')) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) continue
+    if (!existingLines.has(t)) missing.push(line)
+  }
+  if (missing.length === 0) return false
+  const updated = (existing === '' || existing.endsWith('\n') ? existing : existing + '\n') + missing.join('\n') + '\n'
+  await fs.writeFile(filePath, updated)
+  return true
+}
 
 let git: SimpleGit | null = null
 let projectPath: string | null = null
@@ -39,8 +97,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
   await git.init()
   await git.raw(['lfs', 'install', '--local'])
 
-  const gitattributes = LFS_PATTERNS.map(p => `${p} filter=lfs diff=lfs merge=lfs -text`).join('\n') + '\n'
-  await fs.writeFile(path.join(dirPath, '.gitattributes'), gitattributes)
+  await fs.writeFile(path.join(dirPath, '.gitattributes'), buildGitAttributes())
 
   const gitignore = [
     '~$*',
@@ -120,6 +177,34 @@ export async function openProject(dirPath: string): Promise<void> {
 
   const isRepo = await git.checkIsRepo()
   if (!isRepo) throw new Error('Not a Git repository')
+
+  // Auto-add any new CAD patterns introduced by a newer TrentCAD version
+  // so files added today never get the default text-merge treatment
+  await ensureGitAttributes().catch(() => { /* best-effort */ })
+}
+
+export async function createProgressTag(
+  name: string,
+  message?: string
+): Promise<{ success: boolean; error?: string }> {
+  const g = getGit()
+  const trimmed = (name || '').trim()
+  if (!trimmed) return { success: false, error: 'Tag name is required' }
+  if (/\s/.test(trimmed) || /[~^:?*\[\]\\]/.test(trimmed)) {
+    return { success: false, error: 'Tag name cannot contain spaces or any of ~^:?*[]\\' }
+  }
+  try {
+    await g.addAnnotatedTag(trimmed, message || `Weekly progress: ${trimmed}`)
+    const remotes = await g.getRemotes(false)
+    if (remotes.length > 0) {
+      try { await g.pushTags() } catch (err) {
+        return { success: false, error: 'Tag created locally but push failed: ' + (err as Error).message }
+      }
+    }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
 }
 
 export async function sync(): Promise<SyncResult> {

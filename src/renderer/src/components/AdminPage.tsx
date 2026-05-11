@@ -10,6 +10,14 @@ export default function AdminPage({ onClose }: Props) {
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [syncingCots, setSyncingCots] = useState(false)
+  const [taggingNow, setTaggingNow] = useState(false)
+  const [tagName, setTagName] = useState(() => {
+    const d = new Date()
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `progress-${yyyy}-${mm}-${dd}`
+  })
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
 
@@ -18,6 +26,11 @@ export default function AdminPage({ onClose }: Props) {
       .then(c => setConfig(c || {}))
       .catch(() => setConfig({}))
       .finally(() => setLoaded(true))
+    // Pre-populate the main repo URL from the live git remote so the admin
+    // can see and copy what's actually configured even before saving
+    window.api.getMainRemoteUrl().then(url => {
+      if (url) setConfig(prev => ({ ...prev, mainRepoUrl: prev.mainRepoUrl || url }))
+    }).catch(() => {})
   }, [])
 
   const set = <K extends keyof AdminConfig>(key: K, value: AdminConfig[K]) => {
@@ -42,6 +55,40 @@ export default function AdminPage({ onClose }: Props) {
       setError((err as Error).message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleCopyRepoUrl = async () => {
+    setError(null)
+    setStatus(null)
+    const url = (config.mainRepoUrl || '').trim()
+    if (!url) {
+      setError('No Git URL to copy')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setStatus('Git URL copied to clipboard')
+    } catch (err) {
+      setError('Could not copy: ' + (err as Error).message)
+    }
+  }
+
+  const handleCreateTag = async () => {
+    setTaggingNow(true)
+    setError(null)
+    setStatus(null)
+    try {
+      const result = await window.api.createProgressTag(tagName)
+      if (result.success) {
+        setStatus(`Tag "${tagName}" created and pushed`)
+      } else {
+        setError(result.error || 'Failed to create tag')
+      }
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setTaggingNow(false)
     }
   }
 
@@ -100,14 +147,41 @@ export default function AdminPage({ onClose }: Props) {
         <div className="admin-section">
           <h3>Main Repository</h3>
           <label>Git remote URL</label>
-          <input
-            value={config.mainRepoUrl ?? ''}
-            onChange={e => set('mainRepoUrl', e.target.value)}
-            placeholder="https://github.com/org/main-project.git"
-          />
+          <div className="inline-input-row">
+            <input
+              value={config.mainRepoUrl ?? ''}
+              onChange={e => set('mainRepoUrl', e.target.value)}
+              placeholder="https://github.com/org/main-project.git"
+            />
+            <button className="toolbar-btn" onClick={handleCopyRepoUrl}>Copy</button>
+          </div>
           <p className="admin-hint">
             Saving rewrites this project's `origin` remote to match.
           </p>
+        </div>
+
+        <div className="admin-section">
+          <h3>Weekly Progress Tag</h3>
+          <p className="admin-hint">
+            Creates an annotated Git tag at the current commit and pushes
+            it. Use to mark weekly snapshots so the team can browse the
+            CAD state at any past milestone.
+          </p>
+          <label>Tag name</label>
+          <div className="inline-input-row">
+            <input
+              value={tagName}
+              onChange={e => setTagName(e.target.value)}
+              placeholder="progress-2026-05-10"
+            />
+            <button
+              className="toolbar-btn primary"
+              onClick={handleCreateTag}
+              disabled={!tagName.trim() || taggingNow}
+            >
+              {taggingNow ? 'Tagging...' : 'Tag now'}
+            </button>
+          </div>
         </div>
 
         <div className="admin-section">

@@ -16,9 +16,11 @@ namespace TrentCAD.SolidWorksAddin
         private bool _disposed;
 
         private const int Pad = 12;
-        private const int BtnHeight = 32;
-        private const int BtnGap = 4;
-        private const int SectionGap = 16;
+        private const int BtnHeight = 44;
+        private const int BtnGap = 6;
+        private const int SectionGap = 20;
+        private const int HeaderHeight = 48;
+        private const int LogoSize = 32;
 
         // Slate Grey + Purple
         static readonly Color CBase = Color.FromArgb(28, 31, 38);
@@ -36,6 +38,8 @@ namespace TrentCAD.SolidWorksAddin
         private StatusDot _dot;
         private Label _lblConnection;
         private Panel _pnlConnection;
+        private PictureBox _logo;
+        private Label _title;
 
         private Panel _pnlFileCard;
         private Label _lblFileName;
@@ -72,28 +76,31 @@ namespace TrentCAD.SolidWorksAddin
                 var logoPath = System.IO.Path.Combine(dllDir ?? "", "logo.png");
                 if (System.IO.File.Exists(logoPath))
                 {
-                    var logo = new PictureBox
+                    _logo = new PictureBox
                     {
                         Image = Image.FromFile(logoPath),
                         SizeMode = PictureBoxSizeMode.Zoom,
-                        Size = new Size(26, 26),
+                        Size = new Size(LogoSize, LogoSize),
                         Location = new Point(Pad, 8),
                         BackColor = Color.Transparent
                     };
-                    Controls.Add(logo);
+                    Controls.Add(_logo);
                 }
             }
             catch { /* missing logo is non-fatal */ }
 
-            var title = new Label
+            _title = new Label
             {
                 Text = $"TrentCAD v{version.Major}.{version.Minor}.{version.Build}",
-                Font = new Font("Segoe UI Semibold", 13f),
+                Font = new Font("Segoe UI Semibold", 11f),
                 ForeColor = CText,
-                Location = new Point(Pad + 32, 13),
-                AutoSize = true
+                Location = new Point(Pad + LogoSize + 8, 16),
+                AutoSize = false,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Size = new Size(160, 22)
             };
-            Controls.Add(title);
+            Controls.Add(_title);
 
             // --- Connection ---
             _pnlConnection = new Panel { Size = new Size(200, 20) };
@@ -154,7 +161,7 @@ namespace TrentCAD.SolidWorksAddin
             _btnOpenApp = MakeButton("Open TrentCAD");
             _btnOpenApp.BackColor = CBlue;
             _btnOpenApp.ForeColor = CMantle;
-            _btnOpenApp.Font = new Font("Segoe UI Semibold", 9f);
+            _btnOpenApp.Font = new Font("Segoe UI Semibold", 11f);
             _btnOpenApp.FlatAppearance.BorderSize = 0;
             _btnOpenApp.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 181, 253);
             _btnOpenApp.Enabled = true;
@@ -179,7 +186,16 @@ namespace TrentCAD.SolidWorksAddin
         {
             var w = ClientSize.Width - Pad * 2;
             if (w < 40) return;
-            var y = 42;
+
+            // Header (logo + title) — reposition every layout pass so a
+            // resized pane keeps things aligned
+            if (_logo != null) _logo.Location = new Point(Pad, 8);
+            if (_title != null)
+            {
+                _title.Location = new Point(Pad + LogoSize + 8, 16);
+                _title.Width = Math.Max(40, w - LogoSize - 8);
+            }
+            var y = HeaderHeight + 8;
 
             _pnlConnection.Location = new Point(Pad, y);
             _pnlConnection.Width = w;
@@ -258,7 +274,7 @@ namespace TrentCAD.SolidWorksAddin
                 FlatStyle = FlatStyle.Flat,
                 BackColor = CSurface0,
                 ForeColor = CText,
-                Font = new Font("Segoe UI", 9f),
+                Font = new Font("Segoe UI", 11f),
                 Size = new Size(200, BtnHeight),
                 Cursor = Cursors.Hand,
                 FlatAppearance =
