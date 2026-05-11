@@ -51,10 +51,14 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     setResetupMsg(null)
     try {
       const result = await window.api.githubLogin()
-      if (!result.launched) {
-        setResetupMsg(result.error || 'Could not launch GitHub login')
-      } else {
+      if (result.launched) {
         setResetupMsg('Sign-in opened in a new window — when done, click "Check sign-in" to refresh')
+      } else if (result.error?.startsWith('MANUAL_SIGNIN_REQUIRED:')) {
+        // Mac/Linux: we can't reliably spawn a terminal, so we tell the
+        // user to run the command themselves. Strip the sentinel prefix.
+        setResetupMsg(result.error.slice('MANUAL_SIGNIN_REQUIRED:'.length))
+      } else {
+        setResetupMsg(result.error || 'Could not launch GitHub login')
       }
     } finally {
       setLoggingIn(false)

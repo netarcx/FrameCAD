@@ -11,7 +11,18 @@ env:
 
 jobs:
   release:
-    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: win
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+
+    runs-on: ${{ matrix.os }}
 
     permissions:
       contents: write
@@ -23,11 +34,17 @@ jobs:
         with:
           node-version: '22'
 
+      # SolidWorks add-in only builds on Windows (the SW interop assemblies
+      # are Windows-specific and the add-in only loads inside SolidWorks).
+      # Mac and Linux are admin-only builds — they get the Electron app
+      # without the SW add-in.
       - uses: actions/setup-dotnet@v4
+        if: matrix.platform == 'win'
         with:
           dotnet-version: '8.x'
 
       - name: Build SolidWorks add-in
+        if: matrix.platform == 'win'
         run: dotnet publish solidworks-addin/TrentCAD.SolidWorksAddin/TrentCAD.SolidWorksAddin.csproj -c Release -o build/solidworks-addin
 
       - name: Install dependencies
@@ -49,16 +66,34 @@ jobs:
           TRENTCAD_DEFAULT_TEAM_NAME: ${{ secrets.TRENTCAD_DEFAULT_TEAM_NAME }}
           TRENTCAD_DEFAULT_WELCOME_MESSAGE: ${{ secrets.TRENTCAD_DEFAULT_WELCOME_MESSAGE }}
 
-      - name: Upload installer artifact
+      - name: Upload Windows installer artifact
+        if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: TrentCAD-Installer
+          name: TrentCAD-Installer-Windows
           path: |
             dist/*.exe
             !dist/*-uninstaller-*.exe
           retention-days: 90
 
+      - name: Upload macOS installer artifact
+        if: matrix.platform == 'mac'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrentCAD-Installer-macOS
+          path: dist/*.dmg
+          retention-days: 90
+
+      - name: Upload Linux installer artifact
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TrentCAD-Installer-Linux
+          path: dist/*.AppImage
+          retention-days: 90
+
       - name: Upload add-in artifact
+        if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
           name: TrentCAD-SolidWorksAddin

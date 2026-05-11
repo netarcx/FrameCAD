@@ -1808,6 +1808,74 @@ input {
   min-width: 0;
 }
 
+.publish-mini-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1900;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.publish-mini-bar:hover {
+  background: var(--bg-surface);
+}
+
+.publish-mini-bar-title {
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.publish-mini-bar-detail {
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publish-mini-bar-track {
+  position: relative;
+  height: 6px;
+  width: 180px;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.publish-mini-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease-out;
+}
+
+.publish-mini-bar-pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+.publish-mini-bar-expand {
+  color: var(--accent);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
 .error-banner-actions {
   display: flex;
   align-items: center;
@@ -1944,6 +2012,80 @@ input {
   display: flex;
   gap: 6px;
   margin-top: 4px;
+}
+
+.large-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.large-file-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto auto;
+  gap: 4px 12px;
+  align-items: center;
+}
+
+.large-file-blocker { border-color: var(--red, #e5484d); background: var(--red-tint, rgba(229, 72, 77, 0.08)); }
+.large-file-lfs-too-large { border-color: var(--red, #e5484d); }
+.large-file-warning { border-color: var(--accent); }
+
+.large-file-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.large-file-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.large-file-badge-blocker { background: var(--red, #e5484d); color: #fff; }
+.large-file-badge-warning { background: var(--accent); color: #fff; }
+.large-file-badge-ok-lfs { background: var(--bg-secondary); color: var(--text-secondary); }
+.large-file-badge-lfs-too-large { background: var(--red, #e5484d); color: #fff; }
+
+.large-file-size {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.large-file-path {
+  grid-row: 1;
+  grid-column: 2;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  word-break: break-all;
+  min-width: 0;
+}
+
+.large-file-hint {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.large-file-actions {
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: end;
 }
 
 .error-banner-prompt {

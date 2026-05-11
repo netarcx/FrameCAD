@@ -132,16 +132,24 @@ export default function App() {
   const [missingDeps, setMissingDeps] = useState<DependencyStatus | null>(null)
   const [checkingDeps, setCheckingDeps] = useState(false)
   const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null)
+  const [progressHidden, setProgressHidden] = useState(false)
   const [projectTotals, setProjectTotals] = useState<ProjectTotals | null>(null)
 
   useEffect(() => {
     const cleanup = window.api.onPublishProgress((p) => {
       setPublishProgress(p)
-      if (p.phase === 'done' || p.phase === 'error') {
-        // Auto-dismiss "done" after a short delay; keep "error" until user closes
-        if (p.phase === 'done') {
-          setTimeout(() => setPublishProgress(null), 2000)
-        }
+      // On error, force the full modal back open even if it was hidden —
+      // the user needs to see what went wrong, not a thin strip at the
+      // bottom. On a fresh upload starting (preparing), reset hidden so
+      // the next publish opens its modal cleanly.
+      if (p.phase === 'error' || p.phase === 'preparing') {
+        setProgressHidden(false)
+      }
+      if (p.phase === 'done') {
+        setTimeout(() => {
+          setPublishProgress(null)
+          setProgressHidden(false)
+        }, 2000)
       }
     })
     return cleanup
@@ -558,7 +566,7 @@ export default function App() {
       {offlineBanner}
       {onboardingModal}
 
-      {publishProgress && (
+      {publishProgress && !progressHidden && (
         <div className="modal-overlay">
           <div className="modal publish-progress-modal">
             <h2>
@@ -594,12 +602,17 @@ export default function App() {
             )}
             <div className="actions">
               {publishProgress.phase === 'error' || publishProgress.phase === 'done' ? (
-                <button className="toolbar-btn primary" onClick={() => setPublishProgress(null)}>Close</button>
+                <button
+                  className="toolbar-btn primary"
+                  onClick={() => { setPublishProgress(null); setProgressHidden(false) }}
+                >
+                  Close
+                </button>
               ) : (
                 <button
                   className="toolbar-btn"
-                  onClick={() => setPublishProgress(null)}
-                  title="Hide this dialog. The upload keeps running in the background."
+                  onClick={() => setProgressHidden(true)}
+                  title="Move this dialog to a strip at the bottom of the window. Upload keeps running."
                 >
                   Hide
                 </button>
@@ -607,6 +620,37 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {publishProgress && progressHidden && (
+        <button
+          type="button"
+          className="publish-mini-bar"
+          onClick={() => setProgressHidden(false)}
+          title="Click to expand the upload details"
+        >
+          <span className="publish-mini-bar-title">
+            {publishProgress.phase === 'preparing' && 'Preparing upload…'}
+            {publishProgress.phase === 'uploading' && 'Uploading to GitHub'}
+            {publishProgress.phase === 'done' && 'Upload complete'}
+            {publishProgress.phase === 'error' && 'Upload failed'}
+          </span>
+          {publishProgress.detail && (
+            <span className="publish-mini-bar-detail">{publishProgress.detail}</span>
+          )}
+          {typeof publishProgress.percent === 'number' && (
+            <span className="publish-mini-bar-track">
+              <span
+                className="publish-mini-bar-fill"
+                style={{ width: `${publishProgress.percent}%` }}
+              />
+            </span>
+          )}
+          {typeof publishProgress.percent === 'number' && (
+            <span className="publish-mini-bar-pct">{publishProgress.percent}%</span>
+          )}
+          <span className="publish-mini-bar-expand">Show</span>
+        </button>
       )}
 
       {depsModal}

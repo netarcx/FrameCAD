@@ -104,6 +104,12 @@ const api: IpcApi = {
   openPath: (absPath) =>
     ipcRenderer.invoke('open-path', absPath),
 
+  revealInFolder: (absPath) =>
+    ipcRenderer.invoke('reveal-in-folder', absPath),
+
+  scanLargeFiles: () =>
+    ipcRenderer.invoke('scan-large-files'),
+
   gitResetup: () =>
     ipcRenderer.invoke('git-resetup'),
 

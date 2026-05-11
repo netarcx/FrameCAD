@@ -23,12 +23,27 @@ nsis:
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: true
   include: build/installer.nsh
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  artifactName: ${name}-${version}-${arch}.${ext}
+  category: public.app-category.developer-tools
+  # Unsigned for now (no Apple Developer cert). First launch will show
+  # the Gatekeeper "can't verify" warning; user can right-click → Open
+  # once to trust. Auto-update via electron-updater requires signing,
+  # so Mac users will need to manually download new versions until a
+  # signing cert is added.
+  identity: null
 linux:
   target:
     - target: AppImage
       arch:
         - x64
   artifactName: ${name}-${version}.${ext}
+  category: Development
 publish:
   provider: github
   owner: netarcx

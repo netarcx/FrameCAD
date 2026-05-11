@@ -240,8 +240,20 @@ export interface IpcApi {
   githubAuthStatus(): Promise<GitHubAuthStatus>
   githubLogin(): Promise<{ launched: boolean; error?: string }>
   reportIssue(errorMessage: string): Promise<{ success: boolean; url?: string; number?: number; error?: string }>
-  generateDocument(type: 'bom' | 'manufacturing' | 'summary'): Promise<{ success: boolean; filePath?: string; relPath?: string; error?: string }>
+  generateDocument(type: 'bom' | 'manufacturing' | 'summary'): Promise<{ success: boolean; filePath?: string; relPath?: string; pdfFilePath?: string; pdfRelPath?: string; pdfError?: string; error?: string }>
   openPath(absPath: string): Promise<{ success: boolean; error?: string }>
+  revealInFolder(absPath: string): Promise<{ success: boolean; error?: string }>
+  scanLargeFiles(): Promise<{
+    success: boolean
+    files: Array<{
+      path: string
+      absolutePath: string
+      size: number
+      isLfsTracked: boolean
+      status: 'blocker' | 'warning' | 'ok-lfs' | 'lfs-too-large'
+    }>
+    error?: string
+  }>
   gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }>
   listGitHubRepos(org: string, prefix?: string): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }>
   createGitHubRepo(org: string, name: string, isPrivate: boolean, description?: string): Promise<{ success: boolean; url?: string; error?: string }>

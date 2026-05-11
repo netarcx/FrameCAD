@@ -292,9 +292,67 @@ export async function sync(): Promise<SyncResult> {
   const g = getGit()
   try {
     const before = await g.log({ maxCount: 1 })
-    await g.pull(['--rebase'])
-    const after = await g.log({ maxCount: 1 })
 
+    // CAD students often have unsaved or just-saved local changes when
+    // they hit Download. Git rebase refuses to run with a dirty tree
+    // ("cannot pull with rebase: You have unstaged changes"). Stash
+    // around the pull and pop afterwards so the workflow Just Works.
+    // The stash includes untracked files (--include-untracked) so a
+    // brand-new .sldprt isn't left out.
+    const status = await g.status()
+    const dirty = status.files.length > 0
+    const stashLabel = `trentcad-sync-${Date.now()}`
+    let stashed = false
+
+    if (dirty) {
+      try {
+        await g.raw(['stash', 'push', '--include-untracked', '-m', stashLabel])
+        stashed = true
+      } catch (stashErr) {
+        // If we can't stash (rare — usually permissions), surface a
+        // clear actionable error instead of git's cryptic rebase message
+        return {
+          success: false,
+          filesUpdated: 0,
+          error: 'Could not stash local changes before sync: ' + (stashErr as Error).message
+        }
+      }
+    }
+
+    let pullErr: Error | null = null
+    try {
+      await g.pull(['--rebase'])
+    } catch (err) {
+      pullErr = err as Error
+    }
+
+    if (stashed) {
+      // Pop regardless of whether the pull succeeded — restore the
+      // user's working tree to its pre-sync state on failure, and on
+      // success let the popped changes ride forward
+      try {
+        await g.raw(['stash', 'pop'])
+      } catch (popErr) {
+        // Pop conflicted (incoming changes touched the same files the
+        // user had edited locally). The stash stays in `git stash list`
+        // for them to resolve. Surface this clearly.
+        return {
+          success: false,
+          filesUpdated: 0,
+          error:
+            'Sync downloaded teammates\' changes, but your local edits ' +
+            'conflicted with theirs. Your work is safe in `git stash` ' +
+            '(label "' + stashLabel + '") — resolve the conflicts and run ' +
+            '`git stash pop` manually, then Publish. (' + (popErr as Error).message + ')'
+        }
+      }
+    }
+
+    if (pullErr) {
+      return { success: false, filesUpdated: 0, error: pullErr.message }
+    }
+
+    const after = await g.log({ maxCount: 1 })
     const filesUpdated = before.latest?.hash !== after.latest?.hash
       ? (await g.diffSummary([before.latest!.hash, after.latest!.hash])).changed
       : 0
@@ -360,10 +418,31 @@ export async function publish(
     // rejected by the pre-receive hook AFTER the LFS portion finishes —
     // wasting potentially gigabytes of upload time. Catch them up front
     // and abort with an actionable error instead.
+    //
+    // Critically, we check BOTH the current working-tree changes (what's
+    // about to be staged) AND any files in commits already pending on
+    // origin (e.g. a previous publish that failed to push left a local
+    // commit; without this we'd happily push that bad commit on top of
+    // new work).
     const projectDir = getProjectPath()
     const WARN_BYTES = 50 * 1024 * 1024
+
+    const candidatePaths = new Set<string>(files)
+    try {
+      const branchSummary = await g.branchLocal()
+      const branch = branchSummary.current || 'main'
+      // Files changed in any local-ahead-of-origin commit (won't error
+      // if origin/<branch> doesn't exist — we just skip this scan)
+      const pendingFiles = await g.raw(['diff', '--name-only', `origin/${branch}..HEAD`])
+        .catch(() => '')
+      for (const line of pendingFiles.split('\n')) {
+        const p = line.trim()
+        if (p) candidatePaths.add(p)
+      }
+    } catch { /* best-effort */ }
+
     const sizes = await Promise.all(
-      files.map(async f => {
+      [...candidatePaths].map(async f => {
         try {
           const stat = await fs.stat(path.join(projectDir, f))
           return { path: f, size: stat.size }

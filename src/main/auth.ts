@@ -83,15 +83,22 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
     }
   }
 
-  // Quoting a path-with-spaces inside `cmd /k "..."` is fragile (cmd's
-  // nested-quote rules drop tokens, which is what produces the
-  // "Windows cannot find 'Github'" error when gh lives under
-  // `C:\Program Files\GitHub CLI\`). Write a tiny .cmd script instead and
-  // start that — no nested quoting around the gh path required. We still
-  // need to quote the script path itself because tmpdir on Windows
-  // usually lives under the user profile, which may contain spaces.
+  if (process.platform === 'win32') {
+    return launchGhLoginWindows(gh)
+  }
+  return launchGhLoginUnix(gh)
+}
+
+/**
+ * Windows path: write a tiny .cmd script that runs `gh auth login --web`
+ * and start it in a new console window. We use a script instead of
+ * passing the gh command directly because nested quoting inside
+ * `cmd /k "..."` is fragile when gh lives under a path with spaces
+ * (`C:\Program Files\GitHub CLI\`) — cmd's parser drops tokens and
+ * produces the bogus "Windows cannot find 'Github'" error.
+ */
+async function launchGhLoginWindows(gh: string): Promise<{ launched: boolean; error?: string }> {
   try {
-    // Fixed filename — overwritten each invocation so temp files don't pile up
     const scriptPath = path.join(os.tmpdir(), 'trentcad-gh-login.cmd')
     const script =
       '@echo off\r\n' +
@@ -104,9 +111,6 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
       'pause >NUL\r\n'
     await fs.writeFile(scriptPath, script, 'utf-8')
 
-    // shell:true uses `cmd.exe /d /s /c "<command>"`, which has predictable
-    // quote handling — the inner `start "" "<path>"` form parses correctly
-    // even when scriptPath contains spaces.
     const proc = spawn(
       `start "" ${quoteForCmd(scriptPath)}`,
       { shell: true, detached: true, stdio: 'ignore', windowsHide: false }
@@ -115,6 +119,21 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
     return { launched: true }
   } catch (err) {
     return { launched: false, error: (err as Error).message }
+  }
+}
+
+/**
+ * macOS / Linux path: spawning a terminal app cross-platform is a mess
+ * (Terminal.app vs gnome-terminal vs konsole vs xterm vs…), so we just
+ * tell the renderer the user needs to run `gh auth login --web` in their
+ * own terminal. The renderer surfaces this as an instructional modal.
+ * Returns launched=false with a special error sentinel the renderer
+ * detects and renders nicely instead of as a red error banner.
+ */
+async function launchGhLoginUnix(_gh: string): Promise<{ launched: boolean; error?: string }> {
+  return {
+    launched: false,
+    error: 'MANUAL_SIGNIN_REQUIRED:Open a terminal and run `gh auth login --web`, then click "Refresh status" in TrentCAD.'
   }
 }
 

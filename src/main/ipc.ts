@@ -10,6 +10,7 @@ import * as authOps from './auth'
 import { reportIssue } from './issue'
 import { generateDocument } from './documents'
 import type { DocType } from './documents'
+import { scanLargeFiles } from './large-files'
 import * as metaOps from './meta'
 import { isPinRequired, verifyPin } from './admin-pin'
 import {
@@ -280,6 +281,24 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
       return { success: result === '', error: result || undefined }
     } catch (err) {
       return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('reveal-in-folder', async (_e, absPath: string) => {
+    try {
+      shell.showItemInFolder(absPath)
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('scan-large-files', async () => {
+    try {
+      const files = await scanLargeFiles()
+      return { success: true, files }
+    } catch (err) {
+      return { success: false, files: [], error: (err as Error).message }
     }
   })
   ipcMain.handle('git-resetup', async () => authOps.gitResetup())
