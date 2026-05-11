@@ -303,10 +303,26 @@ namespace TrentCAD.SolidWorksAddin
         public Func<string, System.Threading.Tasks.Task> OnStageFile { get; set; }
         public Func<string, System.Collections.Generic.List<string>> OnGetAssemblyChildren { get; set; }
 
+        // Cached last-known file-state-derived button availability. We
+        // remember these so the 5-second health tick can refresh the
+        // connection-dependent buttons (Sync / Upload / + Part) without
+        // clobbering Check Out / Check In, which is driven by the active
+        // doc's lock state — UpdateFileDisplay is the only place that
+        // should change those.
+        private bool _lastCanCheckOut;
+        private bool _lastCanCheckIn;
+
         private void SetButtonStates(bool canCheckOut, bool canCheckIn)
         {
-            _btnCheckOut.Enabled = _connected && canCheckOut && !_busy;
-            _btnCheckIn.Enabled = _connected && canCheckIn && !_busy;
+            _lastCanCheckOut = canCheckOut;
+            _lastCanCheckIn = canCheckIn;
+            ApplyButtonStates();
+        }
+
+        private void ApplyButtonStates()
+        {
+            _btnCheckOut.Enabled = _connected && _lastCanCheckOut && !_busy;
+            _btnCheckIn.Enabled = _connected && _lastCanCheckIn && !_busy;
             _btnSync.Enabled = _connected && !_busy;
             _btnPublish.Enabled = _connected && !_busy;
             _btnNewPart.Enabled = _connected && !_busy;
@@ -391,7 +407,9 @@ namespace TrentCAD.SolidWorksAddin
                 {
                     _dot.DotColor = CGreen;
                     _lblConnection.Text = health.Project.Name;
-                    SetButtonStates(false, false);
+                    // Re-apply (don't reset) — keeps the file-state buttons
+                    // alive across 5-second health ticks
+                    ApplyButtonStates();
                     if (!string.IsNullOrEmpty(health.Project.Path) && _currentProjectPath != health.Project.Path)
                     {
                         _currentProjectPath = health.Project.Path;
