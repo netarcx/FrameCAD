@@ -344,6 +344,24 @@ export default function App() {
           isLoading={isLoading}
           globalAdmin={globalAdmin}
         />
+        {adminPinPromptOpen && (
+          <AdminPinPrompt
+            onClose={() => setAdminPinPromptOpen(false)}
+            onSuccess={() => {
+              setAdminPinPromptOpen(false)
+              setShowAdmin(true)
+            }}
+          />
+        )}
+        {showAdmin && (
+          <AdminPage
+            hasProject={false}
+            onClose={() => {
+              setShowAdmin(false)
+              refreshGlobalAdmin()
+            }}
+          />
+        )}
         {depsModal}
         {offlineBanner}
         {onboardingModal}
