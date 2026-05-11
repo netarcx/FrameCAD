@@ -723,12 +723,14 @@ input {
 /* ─── Details Panel ─── */
 
 .details-panel {
-  width: 260px;
+  width: 320px;
+  flex-shrink: 0;
   background: var(--bg-secondary);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .details-header {
@@ -859,8 +861,6 @@ input {
 }
 
 .comments-list {
-  max-height: 220px;
-  overflow-y: auto;
   margin-bottom: 8px;
 }
 
