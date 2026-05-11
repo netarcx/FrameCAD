@@ -20,7 +20,7 @@ type SortDir = 'asc' | 'desc'
 
 function stateLabel(state: FileState): string {
   switch (state) {
-    case 'synced': return 'Synced'
+    case 'synced': return 'Up to date'
     case 'modified': return 'Modified'
     case 'untracked': return 'New'
     case 'locked-by-you': return 'Checked out'

@@ -71,7 +71,7 @@ export default function AdminPage({ onClose }: Props) {
         <h2>Admin Settings</h2>
         <p className="admin-warning">
           Changes are committed and pushed to git on Save. Every team
-          member picks them up on their next Sync.
+          member picks them up on their next Download.
         </p>
 
         <div className="admin-section">
@@ -134,7 +134,7 @@ export default function AdminPage({ onClose }: Props) {
             onClick={handleSyncCots}
             disabled={!config.cotsRepoUrl || syncingCots}
           >
-            {syncingCots ? 'Syncing...' : 'Sync COTS now'}
+            {syncingCots ? 'Downloading...' : 'Download COTS now'}
           </button>
         </div>
 
@@ -144,7 +144,7 @@ export default function AdminPage({ onClose }: Props) {
         <div className="actions">
           <button className="toolbar-btn" onClick={onClose}>Close</button>
           <button className="toolbar-btn primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save & Publish'}
+            {saving ? 'Saving...' : 'Save & Upload'}
           </button>
         </div>
       </div>

@@ -98,7 +98,7 @@ export function useGit() {
     try {
       const result = await window.api.sync()
       if (!result.success) {
-        setError(result.error || 'Sync failed')
+        setError(result.error || 'Download failed')
       }
       await fetchAll()
       return result
@@ -116,7 +116,7 @@ export function useGit() {
     try {
       const result = await window.api.publish(message)
       if (!result.success) {
-        setError(result.error || 'Publish failed')
+        setError(result.error || 'Upload failed')
       }
       await fetchAll()
       return result

@@ -117,11 +117,11 @@ namespace TrentCAD.SolidWorksAddin
             _btnCheckIn.Click += async (s, e) => await DoCheckIn();
             Controls.Add(_btnCheckIn);
 
-            _btnSync = MakeButton("Sync");
+            _btnSync = MakeButton("Download");
             _btnSync.Click += async (s, e) => await DoSync();
             Controls.Add(_btnSync);
 
-            _btnPublish = MakeButton("Publish");
+            _btnPublish = MakeButton("Upload");
             _btnPublish.Click += async (s, e) => await DoPublish();
             Controls.Add(_btnPublish);
 
@@ -466,7 +466,7 @@ namespace TrentCAD.SolidWorksAddin
             switch (file.State)
             {
                 case "synced":
-                    statusText = "Synced";
+                    statusText = "Up to date";
                     statusColor = CGreen;
                     break;
                 case "modified":
@@ -553,8 +553,8 @@ namespace TrentCAD.SolidWorksAddin
                 var result = await _api.SyncAsync();
                 SafeInvoke(() =>
                 {
-                    if (result.Success) ShowMessage($"Synced ({result.FilesUpdated} updated)");
-                    else ShowMessage(result.Error ?? "Sync failed", true);
+                    if (result.Success) ShowMessage($"Downloaded ({result.FilesUpdated} updated)");
+                    else ShowMessage(result.Error ?? "Download failed", true);
                 });
                 if (!string.IsNullOrEmpty(_currentFilePath))
                     UpdateForDocument(_currentFilePath);
@@ -569,8 +569,8 @@ namespace TrentCAD.SolidWorksAddin
             using (var dialog = new PublishMessageDialog())
             {
                 if (dialog.ShowDialog() != DialogResult.OK) return;
-                var message = dialog.CommitMessage;
-                if (string.IsNullOrWhiteSpace(message)) return;
+                // Empty message is OK — TrentCAD generates a random 3-word label
+                var message = dialog.CommitMessage ?? "";
 
                 _busy = true;
                 SetButtonStates(false, false);
@@ -579,8 +579,8 @@ namespace TrentCAD.SolidWorksAddin
                     var result = await _api.PublishAsync(message);
                     SafeInvoke(() =>
                     {
-                        if (result.Success) ShowMessage("Published");
-                        else ShowMessage(result.Error ?? "Publish failed", true);
+                        if (result.Success) ShowMessage("Uploaded");
+                        else ShowMessage(result.Error ?? "Upload failed", true);
                     });
                 }
                 catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }

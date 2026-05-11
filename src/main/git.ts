@@ -120,6 +120,33 @@ export async function sync(): Promise<SyncResult> {
   }
 }
 
+const RANDOM_WORDS = [
+  'amber', 'anchor', 'arrow', 'ash', 'aspen', 'autumn', 'azure',
+  'bay', 'beacon', 'bear', 'birch', 'blue', 'bold', 'branch',
+  'breeze', 'bridge', 'bright', 'calm', 'candle', 'cedar',
+  'cherry', 'cliff', 'cloud', 'comet', 'compass', 'copper', 'coral',
+  'crimson', 'crystal', 'daisy', 'dawn', 'deer', 'deep', 'drum',
+  'dusk', 'eagle', 'ember', 'emerald', 'fern', 'fierce', 'flame',
+  'forest', 'fox', 'fresh', 'garden', 'gentle', 'glade', 'glow',
+  'golden', 'harbor', 'hare', 'heron', 'indigo', 'island', 'ivory',
+  'jade', 'jay', 'kind', 'kite', 'koi', 'lake', 'lantern', 'lark',
+  'leaf', 'lily', 'lively', 'lucky', 'maple', 'marble', 'meadow',
+  'merry', 'mint', 'mist', 'misty', 'moss', 'nest', 'newt', 'oak',
+  'orbit', 'otter', 'owl', 'peak', 'pebble', 'pine', 'pike',
+  'prism', 'quail', 'quartz', 'quill', 'quiet', 'raven', 'ribbon',
+  'ridge', 'river', 'rose', 'ruby', 'sail', 'sapphire', 'scarlet',
+  'silver', 'silent', 'sleek', 'slate', 'snow', 'soft', 'sparkle',
+  'spring', 'starlit', 'stone', 'storm', 'sunny', 'swan', 'swift',
+  'thunder', 'tide', 'toad', 'tower', 'tulip', 'twig', 'valley',
+  'velvet', 'violet', 'vole', 'wheel', 'whisper', 'wild', 'willow',
+  'wolf', 'yak', 'yarrow'
+]
+
+function randomCommitMessage(): string {
+  const pick = () => RANDOM_WORDS[Math.floor(Math.random() * RANDOM_WORDS.length)]
+  return `${pick()} ${pick()} ${pick()}`
+}
+
 export async function publish(message: string): Promise<PublishResult> {
   const g = getGit()
   try {
@@ -127,11 +154,12 @@ export async function publish(message: string): Promise<PublishResult> {
 
     const status = await g.status()
     if (status.files.length === 0) {
-      return { success: false, error: 'No changes to publish' }
+      return { success: false, error: 'No changes to upload' }
     }
 
+    const finalMessage = (message ?? '').trim() || randomCommitMessage()
     await g.raw(['add', '-A'])
-    const result = await g.commit(message)
+    const result = await g.commit(finalMessage)
     await g.push()
 
     return { success: true, hash: result.commit }

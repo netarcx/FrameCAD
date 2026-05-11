@@ -34,7 +34,7 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
   const [createdFolder, setCreatedFolder] = useState<string | null>(null)
 
   const handlePublish = () => {
-    if (!message.trim()) return
+    // Empty message is OK — the backend will generate a random 3-word label
     onPublish(message.trim())
     setMessage('')
     setShowPublish(false)
@@ -95,15 +95,15 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
             disabled={!hasProject || isLoading}
             title="Get the latest files from your team"
           >
-            {isLoading ? <span className="loading-spinner" /> : '↻'} Sync
+            {isLoading ? <span className="loading-spinner" /> : '↓'} Download
           </button>
           <button
             className="toolbar-btn primary"
             onClick={() => setShowPublish(true)}
             disabled={!hasProject || isLoading}
-            title="Save and share your changes with the team"
+            title="Send your changes to the team"
           >
-            {'↑'} Publish
+            {'↑'} Upload
           </button>
         </div>
 
@@ -163,12 +163,12 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
       {showPublish && (
         <div className="modal-overlay" onClick={() => setShowPublish(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Publish Changes</h2>
+            <h2>Upload Changes</h2>
             <input
               value={message}
               onChange={e => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="What did you change? (e.g., Updated gearbox plate dimensions)"
+              placeholder="What did you change? (optional — leave blank for a random label)"
               autoFocus
             />
             <div className="actions">
@@ -176,9 +176,9 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
               <button
                 className="toolbar-btn primary"
                 onClick={handlePublish}
-                disabled={!message.trim() || isLoading}
+                disabled={isLoading}
               >
-                {isLoading ? <span className="loading-spinner" /> : 'Publish'}
+                {isLoading ? <span className="loading-spinner" /> : 'Upload'}
               </button>
             </div>
           </div>

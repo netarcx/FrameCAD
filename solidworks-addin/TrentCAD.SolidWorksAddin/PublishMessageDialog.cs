@@ -11,7 +11,7 @@ namespace TrentCAD.SolidWorksAddin
 
         public PublishMessageDialog()
         {
-            Text = "Publish Changes";
+            Text = "Upload Changes";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterScreen;
             MaximizeBox = false;
@@ -22,7 +22,7 @@ namespace TrentCAD.SolidWorksAddin
 
             var lbl = new Label
             {
-                Text = "What changed?",
+                Text = "What changed? (optional — leave blank for a random label)",
                 ForeColor = Color.FromArgb(160, 165, 180),
                 Font = new Font("Segoe UI", 8.25f),
                 Location = new Point(20, 20),
@@ -56,7 +56,7 @@ namespace TrentCAD.SolidWorksAddin
 
             var btnPublish = new Button
             {
-                Text = "Publish",
+                Text = "Upload",
                 DialogResult = DialogResult.OK,
                 Location = new Point(250, 80),
                 Size = new Size(80, 30),

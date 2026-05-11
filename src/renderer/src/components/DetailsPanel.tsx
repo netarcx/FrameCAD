@@ -8,7 +8,7 @@ interface Props {
 
 function stateLabel(state: FileState): string {
   switch (state) {
-    case 'synced': return 'Synced'
+    case 'synced': return 'Up to date'
     case 'modified': return 'Modified locally'
     case 'untracked': return 'New file'
     case 'locked-by-you': return 'Checked out by you'
