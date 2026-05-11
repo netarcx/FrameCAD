@@ -2083,6 +2083,67 @@ input {
   color: var(--text-primary);
 }
 
+.admin-content label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.admin-content input[type="text"],
+.admin-content input[type="password"],
+.admin-content input[type="number"],
+.admin-content input[type="url"],
+.admin-content input:not([type]),
+.admin-content textarea,
+.admin-content select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.admin-content textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.admin-content input:focus,
+.admin-content textarea:focus,
+.admin-content select:focus {
+  border-color: var(--accent);
+}
+
+/* Filter row and parts table have their own narrower input styles —
+   re-scope so the broader .admin-content input rule doesn't blow them
+   up to width:100%. */
+.admin-content .parts-filter-row input,
+.admin-content .parts-filter-row select,
+.admin-content .parts-table input,
+.admin-content .parts-table select {
+  width: auto;
+}
+.admin-content .parts-filter-row input[type="text"],
+.admin-content .parts-filter-row input:not([type]) {
+  flex: 1 1 220px;
+}
+.admin-content .parts-table input,
+.admin-content .parts-table select {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
 /* Parts Manager */
 .parts-filter-row {
   display: flex;
