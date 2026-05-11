@@ -57,7 +57,7 @@ body {
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: var(--radius); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 button {
@@ -182,7 +182,7 @@ input {
   font-family: 'SF Mono', 'Consolas', monospace;
   background: var(--bg-primary);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   font-size: 12px;
 }
 
@@ -1488,7 +1488,7 @@ input {
   padding: 32px 40px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
   min-width: 200px;
@@ -1520,7 +1520,7 @@ input {
   padding: 10px 14px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   flex-wrap: wrap;
 }
 
@@ -1577,7 +1577,7 @@ input {
   padding: 10px 14px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s, background 0.15s;
@@ -1632,7 +1632,7 @@ input {
 
 .setup-form input {
   padding: 8px 12px;
-  background: var(--bg-surface);
+  background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 14px;
@@ -1692,7 +1692,7 @@ input {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
 /* ─── Utilities ─── */
@@ -2174,7 +2174,7 @@ input {
   padding: 4px 6px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius);
   color: var(--text-primary);
   font-size: 12px;
   box-sizing: border-box;
@@ -2320,6 +2320,14 @@ input {
 
 .admin-pin-modal { width: 360px; }
 
+/* PIN gate must sit above every other surface (modal-overlay = 2000,
+   admin-fullscreen = 2000, depsModal = 2000, onboarding = 2000). At the
+   same z-index whatever is rendered last in DOM wins — when any of those
+   are mounted alongside the PIN prompt, they steal clicks. Pinning the
+   PIN overlay to 2100 keeps the input clickable regardless of order. */
+.admin-pin-overlay { z-index: 2100; }
+.admin-pin-modal input { pointer-events: auto; }
+
 .admin-pin-help {
   font-size: 13px;
   color: var(--text-secondary);
@@ -2357,14 +2365,14 @@ input {
 .modal-actions button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--bg-primary);
 }
 
 .admin-section-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 16px;
 }
 
 .admin-divider {
@@ -2497,5 +2505,5 @@ input {
 .error-banner-actions button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--bg-primary);
 }

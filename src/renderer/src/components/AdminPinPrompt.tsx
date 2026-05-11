@@ -45,7 +45,7 @@ export default function AdminPinPrompt({ onSuccess, onClose }: AdminPinPromptPro
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay admin-pin-overlay" onClick={onClose}>
       <div className="modal admin-pin-modal" onClick={e => e.stopPropagation()}>
         <h2>Admin PIN</h2>
         <p className="admin-pin-help">
