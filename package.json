@@ -8,7 +8,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder --config electron-builder.yml",
-    "package:win": "scripts\\build-addin.bat && electron-vite build && electron-builder --config electron-builder.yml --win"
+    "package:win": "scripts\\build-addin.bat && electron-vite build && electron-builder --config electron-builder.yml --win",
+    "test": "vitest run"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
@@ -28,6 +29,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "typescript": "^5.8.3",
-    "vite": "^6.3.4"
+    "vite": "^6.3.4",
+    "vitest": "^4.1.5"
   }
 }
