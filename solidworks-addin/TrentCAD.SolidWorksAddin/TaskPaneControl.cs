@@ -61,9 +61,10 @@ namespace TrentCAD.SolidWorksAddin
         private void BuildUI()
         {
             // --- Header ---
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             var title = new Label
             {
-                Text = "TrentCAD",
+                Text = $"TrentCAD v{version.Major}.{version.Minor}.{version.Build}",
                 Font = new Font("Segoe UI Semibold", 13f),
                 ForeColor = CText,
                 Location = new Point(Pad, 10),

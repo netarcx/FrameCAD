@@ -1,9 +1,33 @@
+!include "LogicLib.nsh"
+
+!macro customInit
+  ; Block install if SolidWorks is running so we can replace the locked add-in DLLs
+  trentcad_sw_check:
+  nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq SLDWORKS.exe" /NH 2>nul | find /I "SLDWORKS.exe"'
+  Pop $0
+  Pop $1
+  ${If} $0 == 0
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "SolidWorks is currently running. The TrentCAD add-in cannot be updated while SolidWorks is open.$\n$\nClose SolidWorks and click Retry, or Cancel to abort." /SD IDCANCEL IDRETRY trentcad_sw_check
+    Abort "Installation aborted - close SolidWorks first."
+  ${EndIf}
+!macroend
+
 !macro customInstall
-  ; Install SolidWorks Add-in files
+  ; Unregister any existing add-in for a clean upgrade
+  ${If} ${FileExists} "$INSTDIR\solidworks-addin\TrentCAD.SolidWorksAddin.dll"
+    nsExec::ExecToLog '"$WINDIR\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" /unregister "$INSTDIR\solidworks-addin\TrentCAD.SolidWorksAddin.dll"'
+    Pop $0
+  ${EndIf}
+
+  ; Remove the old add-in folder entirely so stale files can't linger
+  RMDir /r "$INSTDIR\solidworks-addin"
+
+  ; Install new add-in files
   SetOutPath "$INSTDIR\solidworks-addin"
+  SetOverwrite on
   File /r "${BUILD_RESOURCES_DIR}\solidworks-addin\*.*"
 
-  ; Register COM add-in via RegAsm
+  ; Register the new add-in via RegAsm
   nsExec::ExecToLog '"$WINDIR\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe" /codebase "$INSTDIR\solidworks-addin\TrentCAD.SolidWorksAddin.dll"'
   Pop $0
   ${If} $0 != "0"
