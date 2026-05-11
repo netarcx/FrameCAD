@@ -484,61 +484,137 @@ export async function publish(
     }
 
     const finalMessage = (message ?? '').trim() || randomCommitMessage()
-    await g.raw(['add', '-A'])
-    const result = await g.commit(finalMessage)
 
-    onProgress?.({ phase: 'uploading', files, percent: 0, detail: 'Uploading to GitHub' })
-
-    // Fresh SimpleGit instance with a progress callback so simple-git
-    // surfaces git's own --progress lines as structured events. Falls back
-    // to a simple "uploading" status if the underlying git doesn't stream
-    // progress.
-    const pushGit = simpleGit(getProjectPath(), {
-      progress: ({ method, stage, progress }) => {
-        if (method === 'push' && onProgress) {
-          onProgress({
-            phase: 'uploading',
-            files,
-            percent: typeof progress === 'number' ? progress : undefined,
-            detail: stage
-          })
-        }
+    // Split the push into two commits by FILE SIZE, not by .gitattributes
+    // pattern. Most CAD files (.sldprt under 50 MB) match the LFS
+    // pattern but their LFS objects are small and upload in milliseconds
+    // — there's no value in isolating them from the metadata push.
+    // The real value of splitting is isolating the FEW files large
+    // enough to fail a slow upload: a single 200 MB .sldasm timing out
+    // shouldn't take down the publish of 200 small parts + the
+    // parts.json + the build-season docs.
+    //
+    // Threshold: 50 MB matches GitHub's "recommended max" warning. Files
+    // at or under it go to phase 1 (small files + metadata, fast push,
+    // small LFS objects ride along); files above it go to phase 2 (the
+    // slow few). Deleted files (size 0 because they're missing from
+    // disk) always end up in phase 1.
+    const SPLIT_BYTES = 50 * 1024 * 1024
+    const fileSizes = await Promise.all(files.map(async f => {
+      try {
+        const stat = await fs.stat(path.join(projectDir, f))
+        return { path: f, size: stat.size }
+      } catch {
+        return { path: f, size: 0 }
       }
-    })
+    }))
+    const phase1Files = fileSizes.filter(s => s.size <= SPLIT_BYTES).map(s => s.path)
+    const phase2Files = fileSizes.filter(s => s.size > SPLIT_BYTES).map(s => s.path)
+    const willSplit = phase1Files.length > 0 && phase2Files.length > 0
 
-    // Also parse stderr for git-lfs lines like "Uploading LFS objects: 50% (1/2)..."
-    pushGit.outputHandler((_bin, _stdout, stderr) => {
-      stderr.on('data', (chunk: Buffer) => {
-        const text = chunk.toString()
-        const lfs = text.match(/Uploading LFS objects:\s+(\d+)%\s+\((\d+)\/(\d+)\)/)
-        if (lfs && onProgress) {
-          onProgress({
-            phase: 'uploading',
-            files,
-            percent: parseInt(lfs[1], 10),
-            detail: `LFS ${lfs[2]} of ${lfs[3]} uploaded`
-          })
+    // The renderer's progress modal shows `N files in this upload` based
+    // on `files` in the progress event. We always send the FULL file
+    // list (across both phases) so that count is stable and accurate;
+    // the per-phase detail string distinguishes which phase is running.
+    const buildPushGit = () => {
+      const pushGit = simpleGit(getProjectPath(), {
+        progress: ({ method, stage, progress }) => {
+          if (method === 'push' && onProgress) {
+            onProgress({
+              phase: 'uploading',
+              files,
+              percent: typeof progress === 'number' ? progress : undefined,
+              detail: stage
+            })
+          }
         }
       })
-    })
-
-    try {
-      await pushGit.push()
-    } catch (pushErr) {
-      // The local commit was created above but the push didn't make it.
-      // If we leave the commit in place, TrentCAD's status code sees a
-      // clean working tree and marks every file as 'synced' — which is
-      // a lie since nothing actually reached GitHub. Roll back to the
-      // pre-publish HEAD with --soft so the user's changes stay staged
-      // and the file list correctly shows "still needs upload".
-      try {
-        await g.raw(['reset', '--soft', 'HEAD~1'])
-      } catch { /* best-effort — if reset fails the user can recover manually */ }
-      throw pushErr
+      pushGit.outputHandler((_bin, _stdout, stderr) => {
+        stderr.on('data', (chunk: Buffer) => {
+          const text = chunk.toString()
+          const lfs = text.match(/Uploading LFS objects:\s+(\d+)%\s+\((\d+)\/(\d+)\)/)
+          if (lfs && onProgress) {
+            onProgress({
+              phase: 'uploading',
+              files,
+              percent: parseInt(lfs[1], 10),
+              detail: `LFS ${lfs[2]} of ${lfs[3]} uploaded`
+            })
+          }
+        })
+      })
+      return pushGit
     }
 
+    /**
+     * Stage the given paths, commit with the given message, push.
+     * On push failure, roll back the just-made commit (--soft so the
+     * files stay staged for retry) and throw so the outer catch
+     * surfaces the error. Already-pushed earlier-phase commits are
+     * NOT touched — they succeeded and the user benefits from that
+     * partial progress.
+     */
+    const runPhase = async (
+      phaseFiles: string[],
+      phaseMessage: string,
+      detailLabel: string
+    ): Promise<string | null> => {
+      if (phaseFiles.length === 0) return null
+      // git add doesn't accept too many args at once on Windows command
+      // lines (cmd.exe caps argv at ~8 KB). Chunk in batches of 200 paths.
+      const CHUNK = 200
+      for (let i = 0; i < phaseFiles.length; i += CHUNK) {
+        await g.raw(['add', '--', ...phaseFiles.slice(i, i + CHUNK)])
+      }
+
+      // Staging may have produced an empty diff (e.g. files reverted in
+      // the working tree but still listed in status; or staged-then-
+      // unmodified; or every file was already in the index from an
+      // earlier failed publish). git commit would throw "nothing to
+      // commit" — treat as a successful no-op for this phase and skip
+      // the push. Critical so a metadata-only phase 1 doesn't blow up
+      // the LFS phase on a retry where only LFS changes remain.
+      const statusAfter = await g.status()
+      if (statusAfter.staged.length === 0 && !statusAfter.files.some(f =>
+        phaseFiles.includes(f.path) && (f.index === 'A' || f.index === 'M' || f.index === 'D' || f.index === 'R')
+      )) {
+        return null
+      }
+
+      let commitResult
+      try {
+        commitResult = await g.commit(phaseMessage)
+      } catch (commitErr) {
+        const m = (commitErr as Error).message || ''
+        // "nothing to commit" / "no changes added" — benign, skip push
+        if (/nothing to commit|no changes added/i.test(m)) return null
+        throw commitErr
+      }
+
+      onProgress?.({ phase: 'uploading', files, percent: 0, detail: detailLabel })
+      const pushGit = buildPushGit()
+      try {
+        await pushGit.push()
+      } catch (pushErr) {
+        try { await g.raw(['reset', '--soft', 'HEAD~1']) } catch { /* best-effort */ }
+        throw pushErr
+      }
+      return commitResult.commit
+    }
+
+    const phase1Msg = willSplit ? `${finalMessage} (part 1 of 2)` : finalMessage
+    const phase2Msg = willSplit ? `${finalMessage} (part 2 of 2)` : finalMessage
+
+    const phase1Hash = await runPhase(phase1Files, phase1Msg, willSplit
+      ? `Uploading small files (1 of 2, ${phase1Files.length} files)`
+      : 'Uploading to GitHub')
+
+    const phase2Hash = await runPhase(phase2Files, phase2Msg, willSplit
+      ? `Uploading large files (2 of 2, ${phase2Files.length} files)`
+      : 'Uploading to GitHub')
+
     onProgress?.({ phase: 'done', files, percent: 100, detail: 'Upload complete' })
-    return { success: true, hash: result.commit }
+    return { success: true, hash: phase2Hash ?? phase1Hash ?? undefined }
   } catch (err: unknown) {
     const errMsg = (err as Error).message
     onProgress?.({ phase: 'error', error: errMsg })

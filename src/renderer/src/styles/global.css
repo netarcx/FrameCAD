@@ -1446,7 +1446,15 @@ input {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  /* min-height + padding + box-sizing so the screen centers content
+     vertically when there's room AND grows to scroll when there's not.
+     Fixed `height: 100vh` with `justify-content: center` was clipping
+     the logo off the top whenever the welcome content (logo + 3 cards
+     + recent projects + auth row) was taller than the window. */
+  min-height: 100vh;
+  padding: 32px 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
   gap: 32px;
 }
 

@@ -163,7 +163,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
           <div className="recent-projects">
             <h3>Recent Projects</h3>
             <div className="recent-list">
-              {recentProjects.map(p => (
+              {recentProjects.slice(0, 3).map(p => (
                 <button
                   key={p.path}
                   className="recent-item"
