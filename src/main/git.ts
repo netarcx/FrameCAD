@@ -52,20 +52,39 @@ export async function createProject(name: string, dirPath: string, remote: strin
   ].join('\n')
   await fs.writeFile(path.join(dirPath, '.gitignore'), gitignore)
 
-  const emptyManifest: PartsManifest = {
-    prefix: `${new Date().getFullYear().toString().slice(-2)}-2129`,
-    nextCounters: {},
-    nextAssemblyCounters: {},
-    entries: {},
-    assemblies: {}
+  // Only seed parts.json on a fresh project — never overwrite an existing
+  // manifest, which could destroy a partial reservation list
+  const partsPath = path.join(dirPath, 'parts.json')
+  const partsExists = await fs.stat(partsPath).then(() => true).catch(() => false)
+  if (!partsExists) {
+    const emptyManifest: PartsManifest = {
+      prefix: `${new Date().getFullYear().toString().slice(-2)}-2129`,
+      nextCounters: {},
+      nextAssemblyCounters: {},
+      entries: {},
+      assemblies: {}
+    }
+    await fs.writeFile(partsPath, JSON.stringify(emptyManifest, null, 2) + '\n')
   }
-  await fs.writeFile(path.join(dirPath, 'parts.json'), JSON.stringify(emptyManifest, null, 2) + '\n')
 
   await git.add(['.gitattributes', '.gitignore', 'parts.json'])
-  await git.commit('Initialize TrentCAD project')
+  // Commit may throw "nothing to commit" if create-project is re-run on an
+  // already-initialised repo — treat that as success
+  try {
+    await git.commit('Initialize TrentCAD project')
+  } catch { /* nothing to commit */ }
 
   if (remote) {
-    await git.addRemote('origin', remote)
+    // Idempotent: add origin if missing, update its URL if it already
+    // exists with a different value. Without this, retrying create-project
+    // fails with "remote origin already exists".
+    const remotes = await git.getRemotes(true)
+    const origin = remotes.find(r => r.name === 'origin')
+    if (!origin) {
+      await git.addRemote('origin', remote)
+    } else if (origin.refs.push !== remote && origin.refs.fetch !== remote) {
+      await git.remote(['set-url', 'origin', remote])
+    }
     await git.push(['--set-upstream', 'origin', 'main'])
   }
 }
