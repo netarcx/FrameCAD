@@ -80,6 +80,15 @@ const api: IpcApi = {
   getAppVersion: () =>
     ipcRenderer.invoke('get-app-version'),
 
+  getAdminConfig: () =>
+    ipcRenderer.invoke('get-admin-config'),
+
+  saveAdminConfig: (config) =>
+    ipcRenderer.invoke('save-admin-config', config),
+
+  syncCots: () =>
+    ipcRenderer.invoke('sync-cots'),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

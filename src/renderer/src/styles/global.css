@@ -114,6 +114,100 @@ input {
   margin-top: 2px;
 }
 
+.admin-modal {
+  width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.admin-modal h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.admin-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-section:last-of-type {
+  border-bottom: none;
+}
+
+.admin-modal label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.admin-modal textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+.admin-modal textarea:focus { border-color: var(--accent); }
+
+.admin-modal code {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  background: var(--bg-primary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.admin-warning {
+  font-size: 12px;
+  color: var(--yellow);
+  background: var(--bg-primary);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  border-left: 3px solid var(--yellow);
+}
+
+.admin-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.admin-error {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--red-tint);
+  color: var(--red);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.admin-status {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
 .app-version-corner {
   position: fixed;
   bottom: 6px;

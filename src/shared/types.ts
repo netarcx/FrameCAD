@@ -85,6 +85,15 @@ export interface UpdateInfo {
   version: string
 }
 
+export interface AdminConfig {
+  teamName?: string
+  welcomeMessage?: string
+  defaultPartPrefix?: string
+  mainRepoUrl?: string
+  cotsRepoUrl?: string
+  cotsBranch?: string
+}
+
 export interface AppState {
   currentProject: ProjectConfig | null
   files: FileEntry[]
@@ -121,6 +130,9 @@ export interface IpcApi {
   setGitIdentity(name: string, email: string): Promise<void>
   restartToUpdate(): Promise<void>
   getAppVersion(): Promise<string>
+  getAdminConfig(): Promise<AdminConfig>
+  saveAdminConfig(config: AdminConfig): Promise<void>
+  syncCots(): Promise<{ success: boolean; cloned?: boolean; error?: string }>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void

@@ -140,6 +140,56 @@ export async function publish(message: string): Promise<PublishResult> {
   }
 }
 
+const COTS_DIR = 'COTS'
+
+export async function setMainRemoteUrl(url: string): Promise<void> {
+  const g = getGit()
+  const remotes = await g.getRemotes(true)
+  const origin = remotes.find(r => r.name === 'origin')
+  if (origin) {
+    await g.remote(['set-url', 'origin', url])
+  } else {
+    await g.remote(['add', 'origin', url])
+  }
+}
+
+async function ensureCotsGitignored(): Promise<void> {
+  const ignorePath = path.join(getProjectPath(), '.gitignore')
+  let existing = ''
+  try { existing = await fs.readFile(ignorePath, 'utf-8') } catch { /* missing */ }
+  if (existing.split('\n').some(line => line.trim() === COTS_DIR || line.trim() === COTS_DIR + '/')) return
+  const updated = (existing.endsWith('\n') || existing === '' ? existing : existing + '\n') + COTS_DIR + '/\n'
+  await fs.writeFile(ignorePath, updated)
+}
+
+export async function syncCotsRepo(repoUrl: string, branch?: string): Promise<{ success: boolean; cloned?: boolean; error?: string }> {
+  if (!repoUrl) return { success: false, error: 'No COTS repo URL configured' }
+  const projectDir = getProjectPath()
+  const cotsDir = path.join(projectDir, COTS_DIR)
+  await ensureCotsGitignored()
+  try {
+    const exists = await fs.stat(cotsDir).then(() => true).catch(() => false)
+    if (!exists) {
+      // Clone fresh
+      const args = ['clone']
+      if (branch) args.push('-b', branch)
+      args.push(repoUrl, COTS_DIR)
+      await simpleGit(projectDir).raw(args)
+      return { success: true, cloned: true }
+    }
+    // Pull latest. Use a SimpleGit instance scoped to the COTS folder.
+    const cotsGit = simpleGit(cotsDir)
+    await cotsGit.fetch('origin')
+    if (branch) {
+      await cotsGit.raw(['checkout', branch])
+    }
+    await cotsGit.pull(['--ff-only'])
+    return { success: true, cloned: false }
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+}
+
 export async function pullPartsJson(): Promise<void> {
   const g = getGit()
   try {
@@ -202,7 +252,7 @@ export async function getStatus(): Promise<FileEntry[]> {
     }
 
     for (const item of items) {
-      if (item === '.git' || item === '.claude') continue
+      if (item === '.git' || item === '.claude' || item === '.trentcad') continue
 
       const fullPath = path.join(dir, item)
       const relPath = path.relative(relativeTo, fullPath).replace(/\\/g, '/')

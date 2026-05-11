@@ -4,6 +4,7 @@ import { watch } from 'chokidar'
 import * as gitOps from './git'
 import * as lockOps from './locking'
 import * as partsOps from './parts'
+import * as adminOps from './admin'
 import { addRecentProject, getRecentProjects } from './config'
 import { setRestProject, stopRestServer, queuePendingCreate } from './rest'
 import * as driveOps from './drive'
@@ -87,6 +88,10 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     await addRecentProject(currentProject)
     setRestProject(currentProject)
     driveOps.initDrive().catch(() => {})
+    // Apply admin config: pull the shared COTS library in the background
+    adminOps.loadAdminConfig().then(cfg => {
+      if (cfg.cotsRepoUrl) gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch).catch(() => {})
+    }).catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
     return currentProject
@@ -195,6 +200,23 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle('get-app-version', () => app.getVersion())
+
+  ipcMain.handle('get-admin-config', async () => {
+    try { return await adminOps.loadAdminConfig() } catch { return {} }
+  })
+
+  ipcMain.handle('save-admin-config', async (_e, config) => {
+    await adminOps.saveAndPublishAdminConfig(config)
+    if (config?.mainRepoUrl) {
+      try { await gitOps.setMainRemoteUrl(config.mainRepoUrl) } catch { /* leave to admin */ }
+    }
+  })
+
+  ipcMain.handle('sync-cots', async () => {
+    const config = await adminOps.loadAdminConfig()
+    if (!config.cotsRepoUrl) return { success: false, error: 'No COTS repo configured' }
+    return gitOps.syncCotsRepo(config.cotsRepoUrl, config.cotsBranch)
+  })
 }
 
 export { stopWatching, stopRestServer }

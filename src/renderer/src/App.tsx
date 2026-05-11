@@ -6,7 +6,8 @@ import ProjectBrowser from './components/ProjectBrowser'
 import Toolbar from './components/Toolbar'
 import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
-import type { FileEntry, UpdateInfo } from '@shared/types'
+import AdminPage from './components/AdminPage'
+import type { AdminConfig, FileEntry, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
   let count = 0
@@ -52,10 +53,29 @@ export default function App() {
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
   const [updateReady, setUpdateReady] = useState(false)
   const [appVersion, setAppVersion] = useState<string>('')
+  const [adminConfig, setAdminConfig] = useState<AdminConfig>({})
+  const [showAdmin, setShowAdmin] = useState(false)
 
   useEffect(() => {
     window.api.getAppVersion().then(setAppVersion).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!project) return
+    window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
+  }, [project])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+        if (!project) return
+        e.preventDefault()
+        setShowAdmin(s => !s)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [project])
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('trentcad-theme')
     return stored === 'light' ? 'light' : 'dark'
@@ -219,7 +239,7 @@ export default function App() {
         >
           {gitName}
         </button>
-        <span className="team-badge">FRC 2129</span>
+        <span className="team-badge">{adminConfig.teamName || 'FRC 2129'}</span>
       </div>
 
       <Toolbar
@@ -252,6 +272,13 @@ export default function App() {
           onCheckIn={checkIn}
         />
       </div>
+
+      {showAdmin && (
+        <AdminPage onClose={() => {
+          setShowAdmin(false)
+          window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
+        }} />
+      )}
 
       <div className="status-bar">
         {stats.modified > 0 && (
