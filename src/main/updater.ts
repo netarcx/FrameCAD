@@ -30,6 +30,10 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
     }
   })
 
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-update error:', err?.message || err)
+  })
+
   ipcMain.handle('restart-to-update', () => {
     autoUpdater.quitAndInstall()
   })

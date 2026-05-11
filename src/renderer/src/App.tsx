@@ -93,11 +93,32 @@ export default function App() {
     if (error) navigator.clipboard.writeText(error)
   }
 
+  const updateBanner = updateInfo && (
+    <div className="update-banner">
+      {updateReady ? (
+        <>
+          <span>Update v{updateInfo.version} ready to install</span>
+          <button onClick={() => window.api.restartToUpdate()}>Restart Now</button>
+        </>
+      ) : updateProgress != null ? (
+        <>
+          <span>Downloading v{updateInfo.version}... {updateProgress}%</span>
+          <div className="update-progress">
+            <div className="update-progress-bar" style={{ width: `${updateProgress}%` }} />
+          </div>
+        </>
+      ) : (
+        <span>Update v{updateInfo.version} available — downloading...</span>
+      )}
+    </div>
+  )
+
   if (!identityChecked) return null
 
   if (needsProfile || showProfileEdit) {
     return (
       <div className="app">
+        {updateBanner}
         <ProfileSetup
           onComplete={handleProfileComplete}
           onCancel={needsProfile ? undefined : () => setShowProfileEdit(false)}
@@ -111,6 +132,7 @@ export default function App() {
   if (!project) {
     return (
       <div className="app">
+        {updateBanner}
         {error && (
           <div className="error-banner">
             <span>{error}</span>
@@ -132,25 +154,7 @@ export default function App() {
 
   return (
     <div className="app">
-      {updateInfo && (
-        <div className="update-banner">
-          {updateReady ? (
-            <>
-              <span>Update v{updateInfo.version} ready to install</span>
-              <button onClick={() => window.api.restartToUpdate()}>Restart Now</button>
-            </>
-          ) : updateProgress != null ? (
-            <>
-              <span>Downloading v{updateInfo.version}... {updateProgress}%</span>
-              <div className="update-progress">
-                <div className="update-progress-bar" style={{ width: `${updateProgress}%` }} />
-              </div>
-            </>
-          ) : (
-            <span>Update v{updateInfo.version} available — downloading...</span>
-          )}
-        </div>
-      )}
+      {updateBanner}
 
       {error && (
         <div className="error-banner">

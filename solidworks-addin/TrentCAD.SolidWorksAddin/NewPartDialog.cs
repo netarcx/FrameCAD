@@ -142,7 +142,7 @@ namespace TrentCAD.SolidWorksAddin
             var showDesc = !_rbFolder.Checked;
             _lblName.Visible = showName;
             _txtName.Visible = showName;
-            _lblName.Text = _rbFolder.Checked ? "Folder name" : "Folder name";
+            _lblName.Text = "Folder name";
 
             var y = 52;
             if (showName)

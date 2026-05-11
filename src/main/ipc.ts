@@ -5,7 +5,7 @@ import * as gitOps from './git'
 import * as lockOps from './locking'
 import * as partsOps from './parts'
 import { addRecentProject, getRecentProjects } from './config'
-import { startRestServer, stopRestServer } from './rest'
+import { setRestProject, stopRestServer } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
 
@@ -57,7 +57,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     await gitOps.createProject(name, dirPath, remote)
     currentProject = { name, path: dirPath, remote }
     await addRecentProject(currentProject)
-    startRestServer(currentProject)
+    setRestProject(currentProject)
     driveOps.initDrive().catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
@@ -68,7 +68,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     const name = path.basename(dirPath)
     currentProject = { name, path: dirPath, remote: url }
     await addRecentProject(currentProject)
-    startRestServer(currentProject)
+    setRestProject(currentProject)
     driveOps.initDrive().catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
@@ -85,7 +85,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     } catch { /* no remote */ }
     currentProject = { name, path: dirPath, remote }
     await addRecentProject(currentProject)
-    startRestServer(currentProject)
+    setRestProject(currentProject)
     driveOps.initDrive().catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)

@@ -92,12 +92,14 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       }
 
       case 'GET /api/status': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const files = await gitOps.getStatus()
         json(res, 200, files)
         return
       }
 
       case 'GET /api/file': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const filePath = url.searchParams.get('path')
         if (!filePath) {
           json(res, 400, { error: 'Missing path parameter' })
@@ -223,9 +225,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 }
 
-export function startRestServer(project: ProjectConfig, port?: number): void {
-  stopRestServer()
-  currentProject = project
+export function startRestServer(project?: ProjectConfig, port?: number): void {
+  if (project) currentProject = project
+
+  if (server) return
+
   activePort = port || Number(process.env.TRENTCAD_API_PORT) || DEFAULT_PORT
 
   server = http.createServer((req, res) => {
@@ -241,6 +245,10 @@ export function startRestServer(project: ProjectConfig, port?: number): void {
   server.on('error', (err) => {
     console.error('REST API server error:', err.message)
   })
+}
+
+export function setRestProject(project: ProjectConfig): void {
+  currentProject = project
 }
 
 export function stopRestServer(): void {

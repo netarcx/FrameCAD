@@ -299,7 +299,7 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
               <button
                 className="toolbar-btn"
                 onClick={() => {
-                  window.api.openFileExplorer(createdFolder + '/.gitkeep')
+                  window.api.openFileExplorer(createdFolder)
                   setCreatedFolder(null)
                 }}
               >

@@ -284,15 +284,21 @@ namespace TrentCAD.SolidWorksAddin
                 var isConnected = health?.Running == true;
                 SafeInvoke(() =>
                 {
-                    _connected = isConnected;
-                    if (isConnected)
+                    var hasProject = health?.Project != null;
+                    _connected = isConnected && hasProject;
+                    if (isConnected && hasProject)
                     {
                         _dot.DotColor = CGreen;
-                        var projectName = health?.Project?.Name;
-                        _lblConnection.Text = string.IsNullOrEmpty(projectName) ? "Connected" : projectName;
+                        _lblConnection.Text = health.Project.Name;
                         SetButtonStates(false, false);
                         if (!wasConnected && !string.IsNullOrEmpty(_currentFilePath))
                             UpdateForDocument(_currentFilePath);
+                    }
+                    else if (isConnected)
+                    {
+                        _dot.DotColor = CYellow;
+                        _lblConnection.Text = "No Project Open";
+                        SetButtonStates(false, false);
                     }
                     else
                     {

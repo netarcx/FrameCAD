@@ -324,9 +324,16 @@ export async function createSubsystem(
   parentFolder: string,
   name: string
 ): Promise<{ folderPath: string }> {
+  const trimmed = name.trim()
+  if (!trimmed || /[\\/:"*?<>|]/.test(trimmed) || trimmed === '.' || trimmed === '..') {
+    throw new Error('Invalid folder name')
+  }
   const projectDir = getProjectPath()
-  const folderPath = parentFolder ? `${parentFolder}/${name}` : name
+  const folderPath = parentFolder ? `${parentFolder}/${trimmed}` : trimmed
   const fullPath = path.join(projectDir, folderPath)
+  if (!fullPath.startsWith(projectDir + path.sep) && fullPath !== projectDir) {
+    throw new Error('Folder path escapes project directory')
+  }
   await fs.mkdir(fullPath, { recursive: true })
   await fs.writeFile(path.join(fullPath, '.gitkeep'), '')
   return { folderPath }
