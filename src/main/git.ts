@@ -120,26 +120,33 @@ export async function sync(): Promise<SyncResult> {
   }
 }
 
+// Engineering, robotics, and architecture vocabulary used when an upload
+// is submitted with an empty message. Three picks from this list form a
+// human-memorable label like "torque truss flywheel" or "scaffold lidar
+// spline".
 const RANDOM_WORDS = [
-  'amber', 'anchor', 'arrow', 'ash', 'aspen', 'autumn', 'azure',
-  'bay', 'beacon', 'bear', 'birch', 'blue', 'bold', 'branch',
-  'breeze', 'bridge', 'bright', 'calm', 'candle', 'cedar',
-  'cherry', 'cliff', 'cloud', 'comet', 'compass', 'copper', 'coral',
-  'crimson', 'crystal', 'daisy', 'dawn', 'deer', 'deep', 'drum',
-  'dusk', 'eagle', 'ember', 'emerald', 'fern', 'fierce', 'flame',
-  'forest', 'fox', 'fresh', 'garden', 'gentle', 'glade', 'glow',
-  'golden', 'harbor', 'hare', 'heron', 'indigo', 'island', 'ivory',
-  'jade', 'jay', 'kind', 'kite', 'koi', 'lake', 'lantern', 'lark',
-  'leaf', 'lily', 'lively', 'lucky', 'maple', 'marble', 'meadow',
-  'merry', 'mint', 'mist', 'misty', 'moss', 'nest', 'newt', 'oak',
-  'orbit', 'otter', 'owl', 'peak', 'pebble', 'pine', 'pike',
-  'prism', 'quail', 'quartz', 'quill', 'quiet', 'raven', 'ribbon',
-  'ridge', 'river', 'rose', 'ruby', 'sail', 'sapphire', 'scarlet',
-  'silver', 'silent', 'sleek', 'slate', 'snow', 'soft', 'sparkle',
-  'spring', 'starlit', 'stone', 'storm', 'sunny', 'swan', 'swift',
-  'thunder', 'tide', 'toad', 'tower', 'tulip', 'twig', 'valley',
-  'velvet', 'violet', 'vole', 'wheel', 'whisper', 'wild', 'willow',
-  'wolf', 'yak', 'yarrow'
+  'actuator', 'anchor', 'arch', 'archway', 'armature', 'atrium',
+  'autonomy', 'axle', 'balcony', 'balustrade', 'beam', 'bearing',
+  'blueprint', 'bolt', 'brace', 'bracket', 'buttress', 'cam',
+  'cantilever', 'capital', 'capstan', 'caster', 'chamfer', 'chassis',
+  'clamp', 'claw', 'clutch', 'column', 'controller', 'cornice',
+  'coupling', 'crank', 'cupola', 'dashboard', 'dome', 'dormer',
+  'drivetrain', 'eave', 'encoder', 'facade', 'fastener', 'fillet',
+  'flange', 'flywheel', 'foundation', 'frieze', 'fulcrum', 'gable',
+  'gasket', 'gear', 'girder', 'gripper', 'gusset', 'gyro', 'hinge',
+  'hub', 'hydraulic', 'impeller', 'intake', 'joist', 'journal',
+  'keystone', 'kinematic', 'lattice', 'lever', 'lidar', 'linkage',
+  'lintel', 'lug', 'manifold', 'manipulator', 'mezzanine', 'motor',
+  'mullion', 'nut', 'obelisk', 'parapet', 'payload', 'pediment',
+  'pier', 'pillar', 'pinion', 'piston', 'pivot', 'pneumatic',
+  'portico', 'pulley', 'quadrant', 'rafter', 'ratchet', 'ridge',
+  'rivet', 'robot', 'rotor', 'rotunda', 'scaffold', 'screw',
+  'sensor', 'servo', 'shaft', 'shim', 'shooter', 'socket',
+  'solenoid', 'span', 'spire', 'spline', 'spring', 'sprocket',
+  'strut', 'suspension', 'swerve', 'telemetry', 'terrace', 'throttle',
+  'torque', 'transom', 'truss', 'turbine', 'valve', 'vault',
+  'vector', 'vernier', 'vision', 'washer', 'waveform', 'wedge',
+  'wheel', 'winch', 'yoke'
 ]
 
 function randomCommitMessage(): string {
