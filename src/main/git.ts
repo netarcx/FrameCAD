@@ -189,6 +189,31 @@ export async function publish(
     const files = status.files.map(f => f.path)
     onProgress?.({ phase: 'preparing', files, detail: 'Preparing upload' })
 
+    // Pre-flight size check: warn if any file is over GitHub's 100 MB
+    // non-LFS limit. SolidWorks files are LFS-tracked via .gitattributes,
+    // so this mostly catches accidental non-LFS additions or files that
+    // slipped through the LFS net.
+    const projectDir = getProjectPath()
+    const sizes = await Promise.all(
+      files.map(async f => {
+        try {
+          const stat = await fs.stat(path.join(projectDir, f))
+          return { path: f, size: stat.size }
+        } catch {
+          return { path: f, size: 0 }
+        }
+      })
+    )
+    const oversized = sizes.filter(s => s.size > 100 * 1024 * 1024)
+    if (oversized.length > 0) {
+      const summary = oversized.map(s => `${s.path} (${(s.size / 1024 / 1024).toFixed(0)} MB)`).join(', ')
+      onProgress?.({
+        phase: 'preparing',
+        files,
+        detail: `Large files detected (>100 MB) — may upload slowly or be rejected: ${summary}`
+      })
+    }
+
     const finalMessage = (message ?? '').trim() || randomCommitMessage()
     await g.raw(['add', '-A'])
     const result = await g.commit(finalMessage)

@@ -1,7 +1,7 @@
-import { app, BrowserWindow, Menu } from 'electron'
+import { app, BrowserWindow, Menu, dialog } from 'electron'
 import path from 'path'
 import { is } from '@electron-toolkit/utils'
-import { setupIpc, stopWatching, stopRestServer } from './ipc'
+import { setupIpc, stopWatching, stopRestServer, isPublishing } from './ipc'
 import { startRestServer } from './rest'
 import { initAutoUpdater } from './updater'
 
@@ -35,6 +35,26 @@ function createWindow(): void {
       { role: 'selectAll', enabled: params.editFlags.canSelectAll }
     ])
     menu.popup()
+  })
+
+  mainWindow.on('close', (e) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (isPublishing()) {
+      e.preventDefault()
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'warning',
+        buttons: ['Keep TrentCAD open', 'Close anyway'],
+        defaultId: 0,
+        cancelId: 0,
+        title: 'Upload in progress',
+        message: 'TrentCAD is uploading parts to GitHub.',
+        detail: 'Closing now will interrupt the upload. Files that have already been uploaded will be safe, but anything still in flight will need to be re-uploaded on the next attempt.'
+      })
+      if (choice === 1) {
+        // User chose to close anyway — bypass the guard and force-destroy
+        mainWindow.destroy()
+      }
+    }
   })
 
   mainWindow.on('closed', () => {

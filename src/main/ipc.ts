@@ -12,6 +12,11 @@ import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
 
 let watcher: ReturnType<typeof watch> | null = null
+let publishingNow = false
+
+export function isPublishing(): boolean {
+  return publishingNow
+}
 
 function debounce<T extends (...args: unknown[]) => unknown>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout>
@@ -116,13 +121,18 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('publish', async (_e, message: string) => {
     const win = getMainWindow()
-    const result = await gitOps.publish(message, (progress) => {
-      if (win && !win.isDestroyed()) win.webContents.send('publish-progress', progress)
-    })
-    if (result.success && driveOps.isDriveConnected()) {
-      driveOps.syncToDrive().catch(() => {})
+    publishingNow = true
+    try {
+      const result = await gitOps.publish(message, (progress) => {
+        if (win && !win.isDestroyed()) win.webContents.send('publish-progress', progress)
+      })
+      if (result.success && driveOps.isDriveConnected()) {
+        driveOps.syncToDrive().catch(() => {})
+      }
+      return result
+    } finally {
+      publishingNow = false
     }
-    return result
   })
 
   ipcMain.handle('get-status', async () => {
