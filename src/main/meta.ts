@@ -56,13 +56,11 @@ async function modifyAndSync(
   mutator(entry)
   all[filePath] = entry
   await saveAllMeta(all)
-  try {
-    await commitAndPushFile(metaRelPath(), commitMessage)
-  } catch (err) {
-    // Roll back the in-memory write so a retry sees the upstream state
-    // again (caller will re-pull on next attempt via modifyAndSync).
-    throw err
-  }
+  // commitAndPushFile throws on push failure (after rolling back the git
+  // commit + stage). We let the throw propagate so the UI can show the
+  // error; the local parts-meta.json keeps the mutation so the user's
+  // edit isn't lost on a retry.
+  await commitAndPushFile(metaRelPath(), commitMessage)
 }
 
 export async function setReleaseState(

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { FileEntry, FileState, ManufacturingMethod, PartMeta, ReleaseState } from '@shared/types'
 
 interface Props {
@@ -58,11 +58,11 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
   const [commentText, setCommentText] = useState('')
   const [posting, setPosting] = useState(false)
   const [mfgNotes, setMfgNotes] = useState('')
+  const [mfgMaterial, setMfgMaterial] = useState('')
   const [massText, setMassText] = useState('')
   const [costText, setCostText] = useState('')
   const [savingState, setSavingState] = useState<ReleaseState | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const mfgTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshMeta = useCallback(async (path: string) => {
     setLoading(true)
@@ -70,11 +70,13 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
       const m = await window.api.getPartMeta(path)
       setMeta(m || {})
       setMfgNotes(m?.manufacturingNotes || '')
+      setMfgMaterial(m?.manufacturingMaterial || '')
       setMassText(typeof m?.mass === 'number' ? String(m.mass) : '')
       setCostText(typeof m?.cost === 'number' ? String(m.cost) : '')
     } catch {
       setMeta({})
       setMfgNotes('')
+      setMfgMaterial('')
       setMassText('')
       setCostText('')
     } finally {
@@ -135,16 +137,13 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
     }
   }
 
-  const handleMfgChange = (value: string) => {
-    setMfgNotes(value)
-    if (mfgTimeout.current) clearTimeout(mfgTimeout.current)
-    mfgTimeout.current = setTimeout(async () => {
-      try {
-        await window.api.setManufacturingNotes(file.path, value)
-      } catch (err) {
-        setError((err as Error).message)
-      }
-    }, 1500)
+  const commitMfgNotes = async () => {
+    if (mfgNotes === (meta.manufacturingNotes || '')) return
+    try {
+      await window.api.setManufacturingNotes(file.path, mfgNotes)
+    } catch (err) {
+      setError((err as Error).message)
+    }
   }
 
   const commitMass = async () => {
@@ -335,11 +334,12 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
             <input
               className="mfg-material-input"
               placeholder="Material (e.g. 6061, PLA, polycarb)"
-              defaultValue={meta.manufacturingMaterial || ''}
-              onBlur={async e => {
-                if (e.target.value === (meta.manufacturingMaterial || '')) return
+              value={mfgMaterial}
+              onChange={e => setMfgMaterial(e.target.value)}
+              onBlur={async () => {
+                if (mfgMaterial === (meta.manufacturingMaterial || '')) return
                 try {
-                  await window.api.setManufacturingMaterial(file.path, e.target.value)
+                  await window.api.setManufacturingMaterial(file.path, mfgMaterial)
                   await refreshMeta(file.path)
                 } catch (err) { setError((err as Error).message) }
               }}
@@ -351,11 +351,12 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
             <textarea
               className="mfg-notes-input"
               value={mfgNotes}
-              onChange={e => handleMfgChange(e.target.value)}
+              onChange={e => setMfgNotes(e.target.value)}
+              onBlur={commitMfgNotes}
               placeholder="e.g., 1/4&quot; 6061, deburr edges"
               rows={3}
             />
-            <div className="mfg-hint">Saves automatically</div>
+            <div className="mfg-hint">Saves when you click away</div>
           </div>
         </>
       )}

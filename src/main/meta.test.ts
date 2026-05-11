@@ -224,6 +224,78 @@ describe('meta module', () => {
     })
   })
 
+  describe('setManufacturingMethod / setManufacturingMaterial', () => {
+    it('stores manufacturing method', async () => {
+      await meta.setManufacturingMethod('foo.sldprt', 'cnc')
+      expect((await meta.getPartMeta('foo.sldprt')).manufacturingMethod).toBe('cnc')
+    })
+
+    it('clears manufacturing method via null', async () => {
+      await meta.setManufacturingMethod('foo.sldprt', 'print')
+      await meta.setManufacturingMethod('foo.sldprt', null)
+      expect((await meta.getPartMeta('foo.sldprt')).manufacturingMethod).toBeUndefined()
+    })
+
+    it('trims and stores material', async () => {
+      await meta.setManufacturingMaterial('foo.sldprt', '  6061-T6  ')
+      expect((await meta.getPartMeta('foo.sldprt')).manufacturingMaterial).toBe('6061-T6')
+    })
+
+    it('clears material when given empty string', async () => {
+      await meta.setManufacturingMaterial('foo.sldprt', '6061')
+      await meta.setManufacturingMaterial('foo.sldprt', '')
+      expect((await meta.getPartMeta('foo.sldprt')).manufacturingMaterial).toBeUndefined()
+    })
+  })
+
+  describe('getManufacturingQueue', () => {
+    it('returns empty for empty project', async () => {
+      const queue = await meta.getManufacturingQueue()
+      expect(queue).toEqual([])
+    })
+
+    it('only includes parts in the released state', async () => {
+      await meta.setReleaseState('draft.sldprt', 'draft')
+      await meta.setReleaseState('review.sldprt', 'in-review')
+      await meta.setReleaseState('ready.sldprt', 'released')
+      await meta.setReleaseState('made.sldprt', 'manufactured')
+      const queue = await meta.getManufacturingQueue()
+      expect(queue.map(i => i.path)).toEqual(['ready.sldprt'])
+    })
+
+    it('orders oldest-released first', async () => {
+      await meta.setReleaseState('a.sldprt', 'released')
+      // small wait so timestamps differ
+      await new Promise(r => setTimeout(r, 5))
+      await meta.setReleaseState('b.sldprt', 'released')
+      await new Promise(r => setTimeout(r, 5))
+      await meta.setReleaseState('c.sldprt', 'released')
+      const queue = await meta.getManufacturingQueue()
+      expect(queue.map(i => i.path)).toEqual(['a.sldprt', 'b.sldprt', 'c.sldprt'])
+    })
+
+    it('includes method, material, mass, notes in queue items', async () => {
+      await meta.setPartMass('foo.sldprt', 2.5)
+      await meta.setManufacturingMethod('foo.sldprt', 'cnc')
+      await meta.setManufacturingMaterial('foo.sldprt', '6061')
+      await meta.setManufacturingNotes('foo.sldprt', 'tap M6 holes')
+      await meta.setReleaseState('foo.sldprt', 'released')
+      const queue = await meta.getManufacturingQueue()
+      expect(queue).toHaveLength(1)
+      expect(queue[0].method).toBe('cnc')
+      expect(queue[0].material).toBe('6061')
+      expect(queue[0].mass).toBe(2.5)
+      expect(queue[0].notes).toBe('tap M6 holes')
+      expect(queue[0].releasedBy).toBe('tfox')
+    })
+
+    it('defaults method to "other" when not set', async () => {
+      await meta.setReleaseState('foo.sldprt', 'released')
+      const queue = await meta.getManufacturingQueue()
+      expect(queue[0].method).toBe('other')
+    })
+  })
+
   describe('getProjectTotals', () => {
     it('returns zeros for an empty project', async () => {
       const totals = await meta.getProjectTotals()
