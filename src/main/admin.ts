@@ -24,6 +24,13 @@ export interface AdminConfig {
    * buttons) since COTS files have their own external numbering authority.
    */
   isCotsProject?: boolean
+  /**
+   * Optional LFS storage override. When set, TrentCAD writes a `.lfsconfig`
+   * pointing at this URL so the project's LFS objects go to a self-hosted
+   * server (rudolfs / giftless / Gitea / etc.) instead of GitHub LFS. Blank
+   * = use GitHub LFS (default).
+   */
+  lfsUrl?: string
 }
 
 // `teamName`, `welcomeMessage`, `gitHubOrg`, `projectPrefix` moved to the
@@ -67,21 +74,60 @@ async function writeAdminConfig(config: AdminConfig): Promise<void> {
   await fs.writeFile(fullPath, JSON.stringify(config, null, 2) + '\n')
 }
 
+const LFSCONFIG_FILE = '.lfsconfig'
+
+function lfsConfigPath(): string {
+  return path.join(getProjectPath(), LFSCONFIG_FILE)
+}
+
+/**
+ * Write or remove the project-root `.lfsconfig` to redirect Git LFS to a
+ * self-hosted server. The file is part of the repo so teammates pick the
+ * redirect up automatically on their next pull. Blank URL = delete the
+ * file (revert to GitHub LFS).
+ */
+async function applyLfsConfig(url: string | undefined): Promise<boolean> {
+  const target = (url || '').trim()
+  const filePath = lfsConfigPath()
+  let existing = ''
+  try { existing = await fs.readFile(filePath, 'utf-8') } catch { /* missing */ }
+
+  if (!target) {
+    if (existing === '') return false
+    await fs.unlink(filePath).catch(() => { /* best-effort */ })
+    return true
+  }
+
+  // Standard git LFS config format. Trailing newline required by some
+  // git versions or the [lfs] block silently fails to parse.
+  const desired = `[lfs]\n\turl = ${target}\n`
+  if (existing === desired) return false
+  await fs.writeFile(filePath, desired)
+  return true
+}
+
 /**
  * Save admin settings and push them to git so every client gets them on
  * their next sync. The whole point of admin config is that it propagates
- * to teammates — so this commits + pushes atomically.
+ * to teammates — so this commits + pushes atomically. Also writes/clears
+ * the project-root `.lfsconfig` when the lfsUrl field changes, so the
+ * LFS redirect propagates the same way.
  */
 export async function saveAndPublishAdminConfig(config: AdminConfig): Promise<void> {
   await writeAdminConfig(config)
+  const lfsChanged = await applyLfsConfig(config.lfsUrl)
 
   const g = getGit()
   await g.raw(['add', relAdminPath()])
-  const status = await g.status()
-  if (!status.files.some(f => f.path === relAdminPath())) {
-    // Nothing actually changed
-    return
+  if (lfsChanged) {
+    // Stage both write + delete of .lfsconfig in one shot
+    await g.raw(['add', '-A', '--', LFSCONFIG_FILE]).catch(() => {})
   }
+  const status = await g.status()
+  const changed = status.files.some(f =>
+    f.path === relAdminPath() || f.path === LFSCONFIG_FILE
+  )
+  if (!changed) return
 
   await g.commit('[admin] Update settings')
 
@@ -92,9 +138,13 @@ export async function saveAndPublishAdminConfig(config: AdminConfig): Promise<vo
     await g.push()
   } catch (err) {
     // Roll back the local commit so working tree is clean — admin can retry
-    // after resolving (likely needs to pull first)
-    await g.raw(['reset', '--soft', 'HEAD~1'])
-    await g.raw(['reset', '--', relAdminPath()])
+    // after resolving (likely needs to pull first). The rollback itself is
+    // best-effort: if any step throws (e.g. first commit on a brand-new
+    // repo with no HEAD~1), don't let that error swallow the original push
+    // error the admin actually needs to see.
+    try { await g.raw(['reset', '--soft', 'HEAD~1']) } catch { /* best-effort */ }
+    await g.raw(['reset', '--', relAdminPath()]).catch(() => {})
+    if (lfsChanged) await g.raw(['reset', '--', LFSCONFIG_FILE]).catch(() => {})
     throw new Error('Could not publish admin settings — pull/sync first and try again. (' + (err as Error).message + ')')
   }
 }

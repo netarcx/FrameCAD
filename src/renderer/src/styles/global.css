@@ -919,6 +919,10 @@ input {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  /* Without this, grid items default to min-width: auto (= intrinsic
+     content width), so the cost/mass inputs overflow the 320px Details
+     panel rather than shrinking to fit their 1fr column. */
+  min-width: 0;
 }
 
 .mass-cost-field span {
@@ -930,6 +934,8 @@ input {
 }
 
 .mass-cost-field input {
+  width: 100%;
+  box-sizing: border-box;
   padding: 6px 8px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
@@ -1790,6 +1796,18 @@ input {
   justify-content: space-between;
 }
 
+.error-banner-message {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  flex: 1;
+  margin-right: 12px;
+  min-width: 0;
+}
+
 .error-banner-actions {
   display: flex;
   align-items: center;
@@ -1886,6 +1904,46 @@ input {
   border: none;
   border-top: 1px solid var(--border);
   margin: 20px 0;
+}
+
+.admin-hint-inline {
+  font-weight: normal;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 8px;
+}
+
+.doc-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.doc-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-primary);
+}
+
+.doc-card-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.doc-card-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.doc-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .error-banner-prompt {

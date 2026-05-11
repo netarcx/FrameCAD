@@ -8,6 +8,8 @@ import * as adminOps from './admin'
 import * as depsOps from './deps'
 import * as authOps from './auth'
 import { reportIssue } from './issue'
+import { generateDocument } from './documents'
+import type { DocType } from './documents'
 import * as metaOps from './meta'
 import { isPinRequired, verifyPin } from './admin-pin'
 import {
@@ -259,6 +261,26 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('report-issue', async (_e, errorMessage: string) => {
     return reportIssue(errorMessage || '')
+  })
+
+  ipcMain.handle('generate-document', async (_e, type: DocType) => {
+    try {
+      const cfg = await import('./git').then(m => m.getGit())
+      const raw = await cfg.raw(['config', '--get', 'user.name']).catch(() => '')
+      const generatedBy = raw.trim() || 'TrentCAD'
+      return generateDocument(type, generatedBy)
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('open-path', async (_e, absPath: string) => {
+    try {
+      const result = await shell.openPath(absPath)
+      return { success: result === '', error: result || undefined }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
   })
   ipcMain.handle('git-resetup', async () => authOps.gitResetup())
 

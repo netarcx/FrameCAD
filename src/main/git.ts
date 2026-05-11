@@ -27,7 +27,20 @@ const LFS_PATTERNS = [
   '*.x_t', '*.X_T', '*.x_b', '*.X_B',
   // Documents and images that CAD users tend to commit alongside their parts
   '*.pdf', '*.PDF',
-  '*.png', '*.PNG', '*.jpg', '*.JPG', '*.jpeg', '*.JPEG', '*.bmp', '*.BMP'
+  '*.png', '*.PNG', '*.jpg', '*.JPG', '*.jpeg', '*.JPEG', '*.bmp', '*.BMP',
+  // Archives + installers. These DON'T really belong in a CAD repo, but
+  // teams regularly Pack-and-Go into a zip or drop a CacheCAD installer
+  // alongside their files. Without LFS coverage these silently exceed
+  // GitHub's 100 MB per-file hard limit and the whole push gets rejected
+  // (pre-receive hook declined). LFS them defensively so a stray drop
+  // doesn't nuke a 3+ GB publish.
+  '*.zip', '*.ZIP',
+  '*.rar', '*.RAR',
+  '*.7z', '*.7Z',
+  '*.tar', '*.TAR',
+  '*.gz', '*.GZ',
+  '*.exe', '*.EXE',
+  '*.msi', '*.MSI'
 ]
 
 // Smaller text-format CAD/SolidWorks files that should NEVER be merged
@@ -342,11 +355,13 @@ export async function publish(
     const files = status.files.map(f => f.path)
     onProgress?.({ phase: 'preparing', files, detail: 'Preparing upload' })
 
-    // Pre-flight size check: warn if any file is over GitHub's 100 MB
-    // non-LFS limit. SolidWorks files are LFS-tracked via .gitattributes,
-    // so this mostly catches accidental non-LFS additions or files that
-    // slipped through the LFS net.
+    // Pre-flight: any file over 50 MB that is NOT LFS-tracked will trip
+    // GitHub's 100 MB hard limit (warned at 50 MB) and get the whole push
+    // rejected by the pre-receive hook AFTER the LFS portion finishes —
+    // wasting potentially gigabytes of upload time. Catch them up front
+    // and abort with an actionable error instead.
     const projectDir = getProjectPath()
+    const WARN_BYTES = 50 * 1024 * 1024
     const sizes = await Promise.all(
       files.map(async f => {
         try {
@@ -357,14 +372,36 @@ export async function publish(
         }
       })
     )
-    const oversized = sizes.filter(s => s.size > 100 * 1024 * 1024)
-    if (oversized.length > 0) {
-      const summary = oversized.map(s => `${s.path} (${(s.size / 1024 / 1024).toFixed(0)} MB)`).join(', ')
-      onProgress?.({
-        phase: 'preparing',
-        files,
-        detail: `Large files detected (>100 MB) — may upload slowly or be rejected: ${summary}`
-      })
+    const largeCandidates = sizes.filter(s => s.size > WARN_BYTES)
+    if (largeCandidates.length > 0) {
+      // Batch one `git check-attr filter -- <path>...` to learn which of
+      // the large files are LFS-tracked. Anything matching .gitattributes'
+      // `filter=lfs` is fine at any size up to LFS's 5 GB cap; everything
+      // else is going through regular git and will fail.
+      const checkOut = await g.raw([
+        'check-attr', 'filter', '--',
+        ...largeCandidates.map(s => s.path)
+      ])
+      const lfsPaths = new Set<string>()
+      for (const line of checkOut.split('\n')) {
+        const m = line.match(/^(.+):\s*filter:\s*lfs\s*$/)
+        if (m) lfsPaths.add(m[1].trim())
+      }
+      const blockers = largeCandidates.filter(s => !lfsPaths.has(s.path))
+      if (blockers.length > 0) {
+        const list = blockers.map(s =>
+          `  - ${s.path} (${(s.size / 1024 / 1024).toFixed(0)} MB)`
+        ).join('\n')
+        const msg =
+          `${blockers.length} file(s) over 50 MB aren't tracked by Git LFS — ` +
+          `GitHub will reject the push for any of these over 100 MB:\n\n${list}\n\n` +
+          `Fix: either delete these files (installers and large zips usually ` +
+          `don't belong in a CAD repo), or add the extension to .gitattributes ` +
+          `and re-stage them. TrentCAD now LFS-tracks zip/rar/7z/tar/gz/exe/msi ` +
+          `out of the box, so this should auto-resolve on new projects.`
+        onProgress?.({ phase: 'error', error: msg })
+        return { success: false, error: msg }
+      }
     }
 
     const finalMessage = (message ?? '').trim() || randomCommitMessage()
@@ -406,7 +443,20 @@ export async function publish(
       })
     })
 
-    await pushGit.push()
+    try {
+      await pushGit.push()
+    } catch (pushErr) {
+      // The local commit was created above but the push didn't make it.
+      // If we leave the commit in place, TrentCAD's status code sees a
+      // clean working tree and marks every file as 'synced' — which is
+      // a lie since nothing actually reached GitHub. Roll back to the
+      // pre-publish HEAD with --soft so the user's changes stay staged
+      // and the file list correctly shows "still needs upload".
+      try {
+        await g.raw(['reset', '--soft', 'HEAD~1'])
+      } catch { /* best-effort — if reset fails the user can recover manually */ }
+      throw pushErr
+    }
 
     onProgress?.({ phase: 'done', files, percent: 100, detail: 'Upload complete' })
     return { success: true, hash: result.commit }

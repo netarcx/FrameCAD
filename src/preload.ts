@@ -98,6 +98,12 @@ const api: IpcApi = {
   reportIssue: (errorMessage) =>
     ipcRenderer.invoke('report-issue', errorMessage),
 
+  generateDocument: (type) =>
+    ipcRenderer.invoke('generate-document', type),
+
+  openPath: (absPath) =>
+    ipcRenderer.invoke('open-path', absPath),
+
   gitResetup: () =>
     ipcRenderer.invoke('git-resetup'),
 

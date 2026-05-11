@@ -270,7 +270,7 @@ export default function App() {
 
   const errorBanner = error && (
     <div className="error-banner">
-      <span>{error}</span>
+      <span className="error-banner-message" title={error}>{error}</span>
       <div className="error-banner-actions">
         {reportState === 'idle' && ghLoggedIn && (
           <button

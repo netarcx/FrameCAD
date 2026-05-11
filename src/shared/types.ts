@@ -161,6 +161,14 @@ export interface AdminConfig {
   cotsRepoUrl?: string
   cotsBranch?: string
   isCotsProject?: boolean
+  /**
+   * Optional override for where LFS object bytes are stored. When set,
+   * TrentCAD writes a `.lfsconfig` file at the project root pointing at
+   * this URL — git clone/pull/push respect it for LFS operations while
+   * the repo itself stays on GitHub. Blank = use GitHub LFS (default).
+   * Auth is left to the user via .netrc / git credential.
+   */
+  lfsUrl?: string
 }
 
 /**
@@ -232,6 +240,8 @@ export interface IpcApi {
   githubAuthStatus(): Promise<GitHubAuthStatus>
   githubLogin(): Promise<{ launched: boolean; error?: string }>
   reportIssue(errorMessage: string): Promise<{ success: boolean; url?: string; number?: number; error?: string }>
+  generateDocument(type: 'bom' | 'manufacturing' | 'summary'): Promise<{ success: boolean; filePath?: string; relPath?: string; error?: string }>
+  openPath(absPath: string): Promise<{ success: boolean; error?: string }>
   gitResetup(): Promise<{ success: boolean; messages: string[]; error?: string }>
   listGitHubRepos(org: string, prefix?: string): Promise<{ success: boolean; repos: GitHubRepoSummary[]; error?: string }>
   createGitHubRepo(org: string, name: string, isPrivate: boolean, description?: string): Promise<{ success: boolean; url?: string; error?: string }>

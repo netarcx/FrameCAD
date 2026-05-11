@@ -26,6 +26,8 @@ export default function AdminPage({ hasProject, onClose }: Props) {
   })
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [generating, setGenerating] = useState<null | 'bom' | 'manufacturing' | 'summary'>(null)
+  const [generated, setGenerated] = useState<Record<string, { filePath: string; relPath: string } | undefined>>({})
 
   useEffect(() => {
     let done = 0
@@ -136,6 +138,32 @@ export default function AdminPage({ hasProject, onClose }: Props) {
     } finally {
       setTaggingNow(false)
     }
+  }
+
+  const handleGenerate = async (type: 'bom' | 'manufacturing' | 'summary') => {
+    setGenerating(type)
+    setError(null)
+    setStatus(null)
+    try {
+      const r = await window.api.generateDocument(type)
+      if (r.success && r.filePath && r.relPath) {
+        setGenerated(prev => ({ ...prev, [type]: { filePath: r.filePath!, relPath: r.relPath! } }))
+        setStatus(`✓ Wrote ${r.relPath}. Upload to share with the team.`)
+      } else {
+        setError(r.error || 'Could not generate document')
+      }
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  const handleOpenDoc = async (type: 'bom' | 'manufacturing' | 'summary') => {
+    const doc = generated[type]
+    if (!doc) return
+    const r = await window.api.openPath(doc.filePath)
+    if (!r.success) setError(r.error || 'Could not open file')
   }
 
   const handleSyncCots = async () => {
@@ -286,6 +314,84 @@ export default function AdminPage({ hasProject, onClose }: Props) {
                   {taggingNow ? 'Tagging...' : 'Tag now'}
                 </button>
               </div>
+            </div>
+
+            <div className="admin-section">
+              <h3>Build & Manufacturing Documents</h3>
+              <p className="admin-hint">
+                Generate up-to-date documents from this project's part data —
+                Bill of Materials, manufacturing cut list, and project summary.
+                Files are written to a <code>Documents/</code> folder in the
+                project root and uploaded with your next publish so the build
+                team always sees the latest version.
+              </p>
+              <div className="doc-grid">
+                {(['bom', 'manufacturing', 'summary'] as const).map(t => {
+                  const meta = ({
+                    bom: {
+                      title: 'Bill of Materials',
+                      sub: 'Every released and in-progress part — BOM.csv',
+                    },
+                    manufacturing: {
+                      title: 'Manufacturing Queue',
+                      sub: 'Released + in-review parts grouped by method / material',
+                    },
+                    summary: {
+                      title: 'Project Summary',
+                      sub: 'Mass + cost rollup by subsystem and by shop method',
+                    }
+                  } as const)[t]
+                  const doc = generated[t]
+                  return (
+                    <div key={t} className="doc-card">
+                      <div className="doc-card-title">{meta.title}</div>
+                      <div className="doc-card-sub">{meta.sub}</div>
+                      <div className="doc-card-actions">
+                        <button
+                          className="toolbar-btn primary"
+                          disabled={generating !== null}
+                          onClick={() => handleGenerate(t)}
+                        >
+                          {generating === t ? 'Generating…' : doc ? 'Regenerate' : 'Generate'}
+                        </button>
+                        {doc && (
+                          <button
+                            className="toolbar-btn"
+                            onClick={() => handleOpenDoc(t)}
+                            title={doc.filePath}
+                          >
+                            Open
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="admin-section">
+              <h3>Self-Hosted LFS Storage <span className="admin-hint-inline">(advanced)</span></h3>
+              <p className="admin-hint">
+                By default, large CAD files are stored in GitHub's LFS.
+                Set a URL here to redirect LFS storage to your own server
+                (rudolfs, giftless, Gitea, GitLab, etc.) — git push/pull
+                still go to GitHub, only the LFS object bytes change
+                hosts. Leave blank to use GitHub LFS. Auth (if your server
+                needs it) is handled by `.netrc` or git credential helpers,
+                not by TrentCAD.
+              </p>
+              <label>LFS server URL</label>
+              <input
+                value={config.lfsUrl ?? ''}
+                onChange={e => set('lfsUrl', e.target.value)}
+                placeholder="https://lfs.your-server.com/team/robot.git/info/lfs"
+              />
+              <p className="admin-hint">
+                Saving writes a <code>.lfsconfig</code> at the project root
+                and pushes it, so teammates auto-pick the redirect on their
+                next sync.
+              </p>
             </div>
 
             <div className="admin-section">
