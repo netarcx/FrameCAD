@@ -2,8 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcApi } from '@shared/types'
 
 const api: IpcApi = {
-  createProject: (name, path, remote) =>
-    ipcRenderer.invoke('create-project', name, path, remote),
+  createProject: (name, path, remote, isCotsProject) =>
+    ipcRenderer.invoke('create-project', name, path, remote, isCotsProject),
 
   joinProject: (url, path) =>
     ipcRenderer.invoke('join-project', url, path),

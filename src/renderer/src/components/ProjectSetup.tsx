@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import type { ProjectConfig } from '@shared/types'
 
 interface Props {
-  onCreateProject: (name: string, path: string, remote: string) => Promise<void>
+  onCreateProject: (name: string, path: string, remote: string, isCotsProject?: boolean) => Promise<void>
   onJoinProject: (url: string, path: string) => Promise<void>
   onOpenProject: (path: string) => Promise<void>
   isLoading: boolean
@@ -16,6 +16,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   const [path, setPath] = useState('')
   const [remote, setRemote] = useState('')
   const [url, setUrl] = useState('')
+  const [isCotsProject, setIsCotsProject] = useState(false)
   const [recentProjects, setRecentProjects] = useState<ProjectConfig[]>([])
 
   useEffect(() => {
@@ -100,12 +101,23 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
               placeholder="https://github.com/frc2129/2026-robot.git"
             />
           </div>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={isCotsProject}
+              onChange={e => setIsCotsProject(e.target.checked)}
+            />
+            <span>
+              <strong>COTS library project</strong>
+              <span className="checkbox-hint">Holds shared off-the-shelf parts. No part numbers will be assigned.</span>
+            </span>
+          </label>
           <div className="form-actions">
             <button className="toolbar-btn" onClick={() => setMode('select')}>Back</button>
             <button
               className="toolbar-btn primary"
               disabled={!name || !path || isLoading}
-              onClick={() => onCreateProject(name, `${path}/${name}`, remote)}
+              onClick={() => onCreateProject(name, `${path}/${name}`, remote, isCotsProject)}
             >
               {isLoading ? <span className="loading-spinner" /> : 'Create'}
             </button>

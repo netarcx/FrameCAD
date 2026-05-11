@@ -311,6 +311,7 @@ export default function App() {
         selectedFile={selectedFile}
         isLoading={isLoading}
         hasProject={true}
+        isCotsProject={adminConfig.isCotsProject}
       />
 
       <div className="app-body">

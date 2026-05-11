@@ -5,6 +5,18 @@ import { getProjectPath, pullPartsJson, pushPartsJson } from './git'
 
 const MANIFEST_FILE = 'parts.json'
 const SOLIDWORKS_EXTS = new Set(['.sldprt', '.sldasm', '.slddrw'])
+
+async function isCotsProject(): Promise<boolean> {
+  // Read .trentcad/admin.json directly to avoid a circular import with admin.ts.
+  // COTS-library projects skip the entire part-numbering layer.
+  try {
+    const adminFile = path.join(getProjectPath(), '.trentcad', 'admin.json')
+    const raw = await fs.readFile(adminFile, 'utf-8')
+    return JSON.parse(raw).isCotsProject === true
+  } catch {
+    return false
+  }
+}
 function defaultPrefix(): string {
   const yy = new Date().getFullYear().toString().slice(-2)
   return `${yy}-2129`
@@ -251,7 +263,10 @@ async function syncManifestImpl(): Promise<PartsManifest> {
 }
 
 export function syncManifest(): Promise<PartsManifest> {
-  const p = manifestLock.then(() => syncManifestImpl())
+  const p = manifestLock.then(async () => {
+    if (await isCotsProject()) return emptyManifest()
+    return syncManifestImpl()
+  })
   manifestLock = p.then(() => {}, () => {})
   return p
 }
@@ -265,6 +280,9 @@ export async function createNewPart(
   folder: string,
   description?: string
 ): Promise<{ partNumber: string; filePath: string }> {
+  if (await isCotsProject()) {
+    throw new Error('COTS library projects do not use part numbers')
+  }
   // Pull the latest parts.json from the team so we don't reserve a number
   // someone else already took
   await pullPartsJson()
@@ -320,6 +338,9 @@ export async function createNewAssembly(
   name: string,
   description?: string
 ): Promise<{ partNumber: string; filePath: string }> {
+  if (await isCotsProject()) {
+    throw new Error('COTS library projects do not use part numbers')
+  }
   await pullPartsJson()
 
   const projectDir = getProjectPath()

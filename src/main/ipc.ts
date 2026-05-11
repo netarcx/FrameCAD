@@ -55,8 +55,11 @@ function stopWatching(): void {
 export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   let currentProject: ProjectConfig | null = null
 
-  ipcMain.handle('create-project', async (_e, name: string, dirPath: string, remote: string) => {
+  ipcMain.handle('create-project', async (_e, name: string, dirPath: string, remote: string, isCotsProject?: boolean) => {
     await gitOps.createProject(name, dirPath, remote)
+    if (isCotsProject) {
+      await adminOps.writeLocalAdminConfig({ isCotsProject: true })
+    }
     currentProject = { name, path: dirPath, remote }
     await addRecentProject(currentProject)
     setRestProject(currentProject)
@@ -72,10 +75,15 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     await addRecentProject(currentProject)
     setRestProject(currentProject)
     driveOps.initDrive().catch(() => {})
-    // If the joined project already has admin-configured COTS, pull it now
-    adminOps.loadAdminConfig().then(cfg => {
-      if (cfg.cotsRepoUrl) gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch).catch(() => {})
-    }).catch(() => {})
+    // If the joined project has admin-configured COTS, download it as part
+    // of the join so the COTS library is ready before the user enters the
+    // project. Network errors are tolerated — the project still opens.
+    try {
+      const cfg = await adminOps.loadAdminConfig()
+      if (cfg.cotsRepoUrl) {
+        await gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch)
+      }
+    } catch { /* best effort */ }
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
   })

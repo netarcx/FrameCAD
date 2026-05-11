@@ -97,6 +97,7 @@ export interface AdminConfig {
   mainRepoUrl?: string
   cotsRepoUrl?: string
   cotsBranch?: string
+  isCotsProject?: boolean
 }
 
 export interface AppState {
@@ -109,7 +110,7 @@ export interface AppState {
 }
 
 export interface IpcApi {
-  createProject(name: string, path: string, remote: string): Promise<void>
+  createProject(name: string, path: string, remote: string, isCotsProject?: boolean): Promise<void>
   joinProject(url: string, path: string): Promise<void>
   openProject(path: string): Promise<ProjectConfig>
   closeProject(): Promise<void>

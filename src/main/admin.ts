@@ -20,6 +20,22 @@ export interface AdminConfig {
    */
   cotsRepoUrl?: string
   cotsBranch?: string
+  /**
+   * Set to true when THIS project is itself a COTS library. Disables the
+   * part-numbering layer (no parts.json, no auto-assign, no + Part / + Assembly
+   * buttons) since COTS files have their own external numbering authority.
+   */
+  isCotsProject?: boolean
+}
+
+/**
+ * Write admin.json to disk without committing or pushing. Used during
+ * create-project where there may not be anything pushed yet.
+ */
+export async function writeLocalAdminConfig(config: AdminConfig): Promise<void> {
+  const fullPath = adminPath()
+  await fs.mkdir(path.dirname(fullPath), { recursive: true })
+  await fs.writeFile(fullPath, JSON.stringify(config, null, 2) + '\n')
 }
 
 const ADMIN_DIR = '.trentcad'

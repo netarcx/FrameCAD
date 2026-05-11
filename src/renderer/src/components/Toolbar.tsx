@@ -12,6 +12,7 @@ interface Props {
   selectedFile: FileEntry | null
   isLoading: boolean
   hasProject: boolean
+  isCotsProject?: boolean
 }
 
 function getSelectedFolder(file: FileEntry | null): string {
@@ -20,7 +21,7 @@ function getSelectedFolder(file: FileEntry | null): string {
   return file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : ''
 }
 
-export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNewPart, onNewAssembly, onNewSubsystem, selectedFile, isLoading, hasProject }: Props) {
+export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNewPart, onNewAssembly, onNewSubsystem, selectedFile, isLoading, hasProject, isCotsProject }: Props) {
   const [showPublish, setShowPublish] = useState(false)
   const [message, setMessage] = useState('')
   const [showNewPart, setShowNewPart] = useState(false)
@@ -131,22 +132,26 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
         <div className="toolbar-sep" />
 
         <div className="toolbar-group">
-          <button
-            className="toolbar-btn"
-            onClick={() => setShowNewPart(true)}
-            disabled={!hasProject || isLoading}
-            title="Create a new part file with an assigned part number"
-          >
-            + Part
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => setShowNewAssembly(true)}
-            disabled={!hasProject || isLoading}
-            title="Create a new assembly folder with an assigned part number"
-          >
-            + Assembly
-          </button>
+          {!isCotsProject && (
+            <>
+              <button
+                className="toolbar-btn"
+                onClick={() => setShowNewPart(true)}
+                disabled={!hasProject || isLoading}
+                title="Create a new part file with an assigned part number"
+              >
+                + Part
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => setShowNewAssembly(true)}
+                disabled={!hasProject || isLoading}
+                title="Create a new assembly folder with an assigned part number"
+              >
+                + Assembly
+              </button>
+            </>
+          )}
           <button
             className="toolbar-btn"
             onClick={() => setShowNewSubsystem(true)}

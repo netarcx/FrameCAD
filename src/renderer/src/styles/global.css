@@ -412,6 +412,35 @@ input {
 
 /* ─── File Table ─── */
 
+.file-tree-controls {
+  display: flex;
+  gap: 4px;
+  padding: 4px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.tree-control {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  padding: 3px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tree-control:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tree-control:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .file-table-header {
   display: flex;
   align-items: center;
@@ -1002,6 +1031,36 @@ input {
 }
 
 .setup-form .browse-btn:hover { background: var(--bg-hover); }
+
+.setup-form .checkbox-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.setup-form .checkbox-row input[type="checkbox"] {
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.setup-form .checkbox-row strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.setup-form .checkbox-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
 
 .setup-form .form-actions {
   display: flex;

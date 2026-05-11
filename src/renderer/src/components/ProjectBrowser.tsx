@@ -147,6 +147,23 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
   )
   const rows = flattenTree(sortedFiles, 0, collapsed)
 
+  const allFolderPaths = useMemo(() => {
+    const out: string[] = []
+    const walk = (entries: FileEntry[]) => {
+      for (const e of entries) {
+        if (e.isDirectory) {
+          out.push(e.path)
+          if (e.children) walk(e.children)
+        }
+      }
+    }
+    walk(files)
+    return out
+  }, [files])
+
+  const collapseAll = () => setCollapsed(new Set(allFolderPaths))
+  const expandAll = () => setCollapsed(new Set())
+
   const canCheckOut = contextMenu?.file && !contextMenu.file.isDirectory &&
     contextMenu.file.state !== 'locked-by-you' && contextMenu.file.state !== 'locked-by-other'
 
@@ -157,6 +174,14 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
 
   return (
     <>
+      <div className="file-tree-controls">
+        <button className="tree-control" onClick={collapseAll} disabled={allFolderPaths.length === 0}>
+          Collapse all
+        </button>
+        <button className="tree-control" onClick={expandAll} disabled={collapsed.size === 0}>
+          Expand all
+        </button>
+      </div>
       <div className="file-table-header">
         <span className="col-name sortable" onClick={() => setSort('name')}>Name{sortArrow('name')}</span>
         <span className="col-partnum sortable" onClick={() => setSort('partnum')}>Part #{sortArrow('partnum')}</span>

@@ -45,11 +45,11 @@ export function useGit() {
     }
   }, [project])
 
-  const createProject = useCallback(async (name: string, path: string, remote: string) => {
+  const createProject = useCallback(async (name: string, path: string, remote: string, isCotsProject?: boolean) => {
     setIsLoading(true)
     setError(null)
     try {
-      await window.api.createProject(name, path, remote)
+      await window.api.createProject(name, path, remote, isCotsProject)
       const config = await window.api.getProjectConfig()
       setProject(config)
       await fetchAll()

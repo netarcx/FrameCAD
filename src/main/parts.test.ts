@@ -201,6 +201,32 @@ describe('parts module (with temp project dir)', () => {
     })
   })
 
+  describe('COTS-library project behavior', () => {
+    async function markAsCotsProject() {
+      const dir = path.join(tempDir, '.trentcad')
+      await fs.mkdir(dir, { recursive: true })
+      await fs.writeFile(path.join(dir, 'admin.json'), JSON.stringify({ isCotsProject: true }))
+    }
+
+    it('createNewPart throws on a COTS-library project', async () => {
+      await markAsCotsProject()
+      await expect(parts.createNewPart('', 'thing')).rejects.toThrow(/COTS/i)
+    })
+
+    it('createNewAssembly throws on a COTS-library project', async () => {
+      await markAsCotsProject()
+      await expect(parts.createNewAssembly('', 'Drivetrain')).rejects.toThrow(/COTS/i)
+    })
+
+    it('syncManifest returns an empty manifest on a COTS-library project', async () => {
+      await markAsCotsProject()
+      // Even with .sldprt files lying around, no entries are created
+      await fs.writeFile(path.join(tempDir, 'foo.sldprt'), '')
+      const manifest = await parts.syncManifest()
+      expect(Object.keys(manifest.entries)).toHaveLength(0)
+    })
+  })
+
   describe('assignPartNumber (idempotency)', () => {
     it('returns the existing entry for a path that already has one', async () => {
       const r = await parts.createNewPart('', 'thing')
