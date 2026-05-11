@@ -10,6 +10,24 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Compute which platforms to build for this run. Windows on every
+  # push; mac/linux only when the workflow is manually dispatched.
+  # GitHub Actions doesn't allow `matrix` in job-level `if:`, so we
+  # compute the matrix dynamically here and let `release` consume it
+  # via `fromJSON`.
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.compute.outputs.matrix }}
+    steps:
+      - id: compute
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo 'matrix={"include":[{"os":"windows-2022","platform":"win"},{"os":"macos-latest","platform":"mac"},{"os":"ubuntu-latest","platform":"linux"}]}' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix={"include":[{"os":"windows-2022","platform":"win"}]}' >> "$GITHUB_OUTPUT"
+          fi
+
   # Pre-create the GitHub Release (idempotent) BEFORE the matrix runs.
   # Without this, all three matrix jobs race to POST /releases and two
   # of them die with HTTP 422 "already_exists" — electron-builder
@@ -41,25 +59,10 @@ jobs:
           fi
 
   release:
-    needs: prepare-release
+    needs: [prepare-matrix, prepare-release]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: windows-2022
-            platform: win
-          - os: macos-latest
-            platform: mac
-          - os: ubuntu-latest
-            platform: linux
-
-    # Windows builds on every push; Mac and Linux only build when the
-    # workflow is dispatched manually (Actions tab → Run workflow). Most
-    # pushes only need a Windows installer for the team's SolidWorks
-    # users — skipping mac/linux saves ~5 minutes of CI runner time per
-    # push and a meaningful chunk of macOS-runner minutes if the repo
-    # ever becomes private.
-    if: matrix.platform == 'win' || github.event_name == 'workflow_dispatch'
+      matrix: ${{ fromJSON(needs.prepare-matrix.outputs.matrix) }}
 
     runs-on: ${{ matrix.os }}
 
