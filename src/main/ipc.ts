@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell, BrowserWindow } from 'electron'
+import { ipcMain, dialog, shell, app, BrowserWindow } from 'electron'
 import path from 'path'
 import { watch } from 'chokidar'
 import * as gitOps from './git'
@@ -193,6 +193,8 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('set-git-identity', async (_e, name: string, email: string) => {
     await gitOps.setGitIdentity(name, email)
   })
+
+  ipcMain.handle('get-app-version', () => app.getVersion())
 }
 
 export { stopWatching, stopRestServer }

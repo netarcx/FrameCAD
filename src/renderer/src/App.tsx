@@ -51,6 +51,11 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
   const [updateReady, setUpdateReady] = useState(false)
+  const [appVersion, setAppVersion] = useState<string>('')
+
+  useEffect(() => {
+    window.api.getAppVersion().then(setAppVersion).catch(() => {})
+  }, [])
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('trentcad-theme')
     return stored === 'light' ? 'light' : 'dark'
@@ -128,6 +133,8 @@ export default function App() {
 
   if (!identityChecked) return null
 
+  const versionCorner = appVersion && <div className="app-version-corner">v{appVersion}</div>
+
   if (needsProfile || showProfileEdit) {
     return (
       <div className="app">
@@ -138,6 +145,7 @@ export default function App() {
           initialName={gitName}
           initialEmail={gitEmail}
         />
+        {versionCorner}
       </div>
     )
   }
@@ -161,6 +169,7 @@ export default function App() {
           onOpenProject={openProject}
           isLoading={isLoading}
         />
+        {versionCorner}
       </div>
     )
   }
@@ -181,6 +190,7 @@ export default function App() {
 
       <div className="app-header">
         <span className="logo">TrentCAD</span>
+        {appVersion && <span className="version">v{appVersion}</span>}
         <span className="divider" />
         <span className="project-name">{project.name}</span>
         <span className="spacer" />

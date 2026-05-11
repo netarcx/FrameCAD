@@ -120,6 +120,7 @@ export interface IpcApi {
   getGitIdentity(): Promise<{ name: string; email: string }>
   setGitIdentity(name: string, email: string): Promise<void>
   restartToUpdate(): Promise<void>
+  getAppVersion(): Promise<string>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void

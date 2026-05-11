@@ -77,6 +77,9 @@ const api: IpcApi = {
   restartToUpdate: () =>
     ipcRenderer.invoke('restart-to-update'),
 
+  getAppVersion: () =>
+    ipcRenderer.invoke('get-app-version'),
+
   onFileChange: (callback) => {
     const handler = (_event: Electron.IpcRendererEvent, files: unknown) =>
       callback(files as Parameters<typeof callback>[0])

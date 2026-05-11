@@ -105,6 +105,27 @@ input {
   background: var(--border);
 }
 
+.app-header .version {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+  margin-left: -6px;
+  margin-top: 2px;
+}
+
+.app-version-corner {
+  position: fixed;
+  bottom: 6px;
+  right: 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 100;
+  letter-spacing: 0.3px;
+}
+
 .app-header .project-name {
   font-size: 13px;
   font-weight: 500;
