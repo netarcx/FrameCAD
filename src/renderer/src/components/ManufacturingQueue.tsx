@@ -3,6 +3,13 @@ import type { ManufacturingMethod, ManufacturingQueueItem } from '@shared/types'
 
 interface Props {
   onClose: () => void
+  /**
+   * When `embedded`, renders without the modal-overlay wrapper so the
+   * queue can live inside a dedicated full-screen view (Manufacturing
+   * View on the welcome screen). The Close button still calls onClose
+   * so the parent can exit the view.
+   */
+  embedded?: boolean
 }
 
 const METHODS: ManufacturingMethod[] = ['print', 'cnc', 'manual', 'other']
@@ -26,7 +33,7 @@ function relativeTime(iso?: string): string {
   return d.toLocaleDateString()
 }
 
-export default function ManufacturingQueue({ onClose }: Props) {
+export default function ManufacturingQueue({ onClose, embedded = false }: Props) {
   const [items, setItems] = useState<ManufacturingQueueItem[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<ManufacturingMethod>('print')
@@ -67,9 +74,8 @@ export default function ManufacturingQueue({ onClose }: Props) {
     }
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal mfg-queue-modal" onClick={e => e.stopPropagation()}>
+  const body = (
+    <>
         <h2>Manufacturing Queue</h2>
         <p className="admin-hint">
           Every part with release state <strong>Released</strong> appears here, grouped by manufacturing method. Click <em>Done</em> when the part has been made and state will move to <strong>Manufactured</strong>.
@@ -125,6 +131,18 @@ export default function ManufacturingQueue({ onClose }: Props) {
           <button className="toolbar-btn" onClick={refresh}>Refresh</button>
           <button className="toolbar-btn primary" onClick={onClose}>Close</button>
         </div>
+    </>
+  )
+
+  if (embedded) {
+    // Full-screen Manufacturing View — no modal overlay, content
+    // takes the whole available space
+    return <div className="mfg-queue-embedded">{body}</div>
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal mfg-queue-modal" onClick={e => e.stopPropagation()}>
+        {body}
       </div>
     </div>
   )

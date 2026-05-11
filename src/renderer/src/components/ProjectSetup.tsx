@@ -7,6 +7,10 @@ interface Props {
   onCreateProject: (name: string, path: string, remote: string, isCotsProject?: boolean) => Promise<void>
   onJoinProject: (url: string, path: string) => Promise<void>
   onOpenProject: (path: string) => Promise<void>
+  /** Open the most recently used project and jump straight into the
+   *  Manufacturing View (shop-floor mode). Disabled when there are no
+   *  recent projects to open. */
+  onEnterManufacturingView?: () => void
   isLoading: boolean
   /**
    * Install-wide admin settings (Team + Browse). Used to enable the
@@ -17,7 +21,7 @@ interface Props {
 
 type Mode = 'select' | 'create' | 'join' | 'open'
 
-export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, isLoading, globalAdmin }: Props) {
+export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, onEnterManufacturingView, isLoading, globalAdmin }: Props) {
   const [mode, setMode] = useState<Mode>('select')
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
@@ -133,6 +137,18 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <span className="card-icon">{'⊞'}</span>
             <span className="card-title">Open Project</span>
             <span className="card-desc">Open an existing<br />project folder</span>
+          </button>
+          <button
+            className="setup-card"
+            onClick={() => onEnterManufacturingView?.()}
+            disabled={!onEnterManufacturingView || recentProjects.length === 0}
+            title={recentProjects.length === 0
+              ? 'Open or create a project first — the manufacturing queue lives inside a project'
+              : 'Shop-floor view: just what needs to be made'}
+          >
+            <span className="card-icon">{'⚙'}</span>
+            <span className="card-title">Manufacturing View</span>
+            <span className="card-desc">Shop-floor queue<br />grouped by method</span>
           </button>
         </div>
 

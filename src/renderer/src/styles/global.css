@@ -1884,6 +1884,119 @@ input {
   flex-shrink: 0;
 }
 
+.mfg-queue-embedded {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+  background: var(--bg-primary);
+}
+
+.mfg-queue-embedded h2 {
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+
+/* Big readable part numbers when the queue is rendered shop-floor-style.
+   Targets the path element inside .mfg-queue-item only when inside the
+   embedded container so the modal version stays compact. */
+.mfg-queue-embedded .mfg-queue-path {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  color: var(--text-primary);
+}
+
+.mfg-queue-embedded .mfg-queue-meta {
+  font-size: 13px;
+}
+
+.mfg-queue-embedded .mfg-queue-item {
+  padding: 14px 16px;
+}
+
+.mfg-queue-embedded .mfg-queue-tab {
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.mfg-queue-embedded .mfg-queue-tab .mfg-queue-count {
+  font-size: 13px;
+}
+
+.mfg-mode-project {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mfg-mode-chevron {
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.mfg-mode-switcher {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 280px;
+  max-width: 420px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.mfg-mode-switcher-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 8px 12px 4px;
+}
+
+.mfg-mode-switcher-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.mfg-mode-switcher-item:hover {
+  background: var(--bg-secondary);
+}
+
+.mfg-mode-switcher-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.mfg-mode-switcher-path {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mfg-mode-status {
+  padding: 6px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .error-banner-actions {
   display: flex;
   align-items: center;

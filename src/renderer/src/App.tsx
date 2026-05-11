@@ -9,6 +9,7 @@ import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
 import AdminPinPrompt from './components/AdminPinPrompt'
 import ManufacturingQueue from './components/ManufacturingQueue'
+import ManufacturingModeShell from './components/ManufacturingModeShell'
 import OnboardingTour from './components/OnboardingTour'
 import logoUrl from './assets/logo.png'
 import type { AdminConfig, DependencyStatus, FileEntry, GlobalAdminConfig, ProjectTotals, PublishProgress, UpdateInfo } from '@shared/types'
@@ -69,6 +70,23 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [adminPinPromptOpen, setAdminPinPromptOpen] = useState(false)
   const [showMfgQueue, setShowMfgQueue] = useState(false)
+  // Shop-floor mode triggered from the welcome screen. When true AND a
+  // project is open, App renders a stripped-down full-screen layout
+  // (just the queue + an Exit button) instead of the regular file
+  // browser / toolbar / details panel. Distinct from `showMfgQueue` so
+  // the existing "Shop" toolbar button (inside the project view) keeps
+  // working as a modal overlay.
+  const [manufacturingView, setManufacturingView] = useState(false)
+
+  // Bail out of manufacturing mode if we somehow lose the project
+  // (switch failure, project deleted on disk, etc.). Done in an effect
+  // rather than during render to avoid the "setState in render" React
+  // warning + the infinite re-render risk it creates.
+  useEffect(() => {
+    if (manufacturingView && !project) {
+      setManufacturingView(false)
+    }
+  }, [manufacturingView, project])
   const [ghLoggedIn, setGhLoggedIn] = useState(false)
   // Error-banner report state: 'idle' → 'confirm' → 'sending' → 'sent' | 'failed'
   const [reportState, setReportState] = useState<'idle' | 'confirm' | 'sending' | 'sent' | 'failed'>('idle')
@@ -447,6 +465,18 @@ export default function App() {
           onCreateProject={createProject}
           onJoinProject={joinProject}
           onOpenProject={openProject}
+          onEnterManufacturingView={async () => {
+            // Most recent project from recents; opens it then flips the
+            // app into shop-floor mode where the rest of the UI hides
+            try {
+              const recents = await window.api.getRecentProjects()
+              if (recents.length === 0) return
+              await openProject(recents[0].path)
+              setManufacturingView(true)
+            } catch {
+              // openProject already surfaces errors via the standard error banner
+            }
+          }}
           isLoading={isLoading}
           globalAdmin={globalAdmin}
         />
@@ -473,6 +503,34 @@ export default function App() {
         {onboardingModal}
         {versionCorner}
       </div>
+    )
+  }
+
+  // Shop-floor mode: when entered from the welcome screen, render a
+  // dedicated stripped-down layout — just a slim header (logo, project
+  // name, exit) and the manufacturing queue full-screen. No file
+  // browser, no toolbar, no details panel.
+  if (manufacturingView && project) {
+    return (
+      <ManufacturingModeShell
+        project={project}
+        onSwitchProject={async (targetPath) => {
+          // Close current, open the picked project, stay in manufacturing
+          // mode the whole time so the UI doesn't flash through the
+          // regular project view
+          try {
+            await closeProject()
+            await openProject(targetPath)
+          } catch {
+            // Switch failed (probably the target was deleted/moved).
+            // Drop out of manufacturing mode so we don't end up rendering
+            // with a null project; the welcome screen + error banner
+            // take over from here.
+            setManufacturingView(false)
+          }
+        }}
+        onExit={() => { setManufacturingView(false); closeProject() }}
+      />
     )
   }
 
