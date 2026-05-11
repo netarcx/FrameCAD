@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import type { FileEntry, FileState } from '@shared/types'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import type { FileEntry, FileState, ReleaseState } from '@shared/types'
 
 interface Props {
   files: FileEntry[]
@@ -63,6 +63,74 @@ function fileIconTitle(entry: FileEntry): string {
     default: return 'File'
   }
 }
+
+interface FileRowProps {
+  path: string
+  name: string
+  isDirectory: boolean
+  depth: number
+  selected: boolean
+  collapsed: boolean
+  state: FileState
+  partNumber: string | undefined
+  releaseState: ReleaseState | undefined
+  commentCount: number | undefined
+  lockedBy: string | undefined
+  iconChar: string
+  iconTitle: string
+  onClick: (path: string) => void
+  onContextMenu: (e: React.MouseEvent, path: string) => void
+}
+
+const FileRow = memo(function FileRow({
+  path, name, isDirectory, depth, selected, collapsed,
+  state, partNumber, releaseState, commentCount, lockedBy,
+  iconChar, iconTitle, onClick, onContextMenu
+}: FileRowProps) {
+  return (
+    <div
+      className={`file-row${selected ? ' selected' : ''}`}
+      onClick={() => onClick(path)}
+      onContextMenu={e => onContextMenu(e, path)}
+    >
+      <div className="col-name">
+        <span className="indent" style={{ width: depth * 20 }} />
+        {isDirectory ? (
+          <span className="expand-toggle">{collapsed ? '▸' : '▾'}</span>
+        ) : (
+          <span className="expand-toggle" />
+        )}
+        <span className="icon" title={iconTitle}>{iconChar}</span>
+        <span className="name">{name}</span>
+      </div>
+      <div className="col-partnum">
+        {!isDirectory && partNumber && (
+          <span className="part-number">{partNumber}</span>
+        )}
+      </div>
+      <div className="col-status">
+        {!isDirectory && (
+          <>
+            <span className={`status-dot ${state}`} />
+            <span className={`status-label ${state}`}>{stateLabel(state)}</span>
+            {releaseState && releaseState !== 'draft' && (
+              <span
+                className={`release-dot release-${releaseState}`}
+                title={`Release: ${releaseState}`}
+              />
+            )}
+            {commentCount && commentCount > 0 && (
+              <span className="comment-count" title={`${commentCount} comment(s)`}>
+                {commentCount}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+      <div className="col-lock">{lockedBy || ''}</div>
+    </div>
+  )
+})
 
 function compareEntries(a: FileEntry, b: FileEntry, key: SortKey, dir: SortDir): number {
   // Directories always come first regardless of sort
@@ -163,11 +231,6 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
     }
   }
 
-  const handleContext = (e: React.MouseEvent, file: FileEntry) => {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, file })
-  }
-
   const filteredFiles = useMemo(
     () => filterTree(files, search.trim()),
     [files, search]
@@ -177,8 +240,40 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
     [filteredFiles, sortKey, sortDir]
   )
   // Expand all when there's a search query so matches are visible
-  const effectiveCollapsed = search.trim() ? new Set<string>() : collapsed
-  const rows = flattenTree(sortedFiles, 0, effectiveCollapsed)
+  const rows = useMemo(() => {
+    const effectiveCollapsed = search.trim() ? new Set<string>() : collapsed
+    return flattenTree(sortedFiles, 0, effectiveCollapsed)
+  }, [sortedFiles, collapsed, search])
+
+  const selectedPath = selectedFile?.path
+
+  // Path → entry map so memoized FileRow click handlers can look up
+  // the FileEntry without us recreating the closure per row each render.
+  const entryByPath = useMemo(() => {
+    const map = new Map<string, FileEntry>()
+    const walk = (entries: FileEntry[]) => {
+      for (const e of entries) {
+        map.set(e.path, e)
+        if (e.children) walk(e.children)
+      }
+    }
+    walk(files)
+    return map
+  }, [files])
+
+  const handleRowClick = useCallback((path: string) => {
+    const entry = entryByPath.get(path)
+    if (!entry) return
+    if (entry.isDirectory) toggleCollapse(path)
+    else onSelect(entry)
+  }, [entryByPath, onSelect])
+
+  const handleRowContext = useCallback((e: React.MouseEvent, path: string) => {
+    const entry = entryByPath.get(path)
+    if (!entry) return
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, file: entry })
+  }, [entryByPath])
 
   const allFolderPaths = useMemo(() => {
     const out: string[] = []
@@ -239,55 +334,24 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
           </div>
         ) : (
           rows.map(({ entry, depth }) => (
-            <div
+            <FileRow
               key={entry.path}
-              className={`file-row${selectedFile?.path === entry.path ? ' selected' : ''}`}
-              onClick={() => {
-                if (entry.isDirectory) toggleCollapse(entry.path)
-                else onSelect(entry)
-              }}
-              onContextMenu={e => handleContext(e, entry)}
-            >
-              <div className="col-name">
-                <span className="indent" style={{ width: depth * 20 }} />
-                {entry.isDirectory ? (
-                  <span className="expand-toggle">
-                    {collapsed.has(entry.path) ? '▸' : '▾'}
-                  </span>
-                ) : (
-                  <span className="expand-toggle" />
-                )}
-                <span className="icon" title={fileIconTitle(entry)}>{fileIcon(entry)}</span>
-                <span className="name">{entry.name}</span>
-              </div>
-              <div className="col-partnum">
-                {!entry.isDirectory && entry.partNumber && (
-                  <span className="part-number">{entry.partNumber}</span>
-                )}
-              </div>
-              <div className="col-status">
-                {!entry.isDirectory && (
-                  <>
-                    <span className={`status-dot ${entry.state}`} />
-                    <span className={`status-label ${entry.state}`}>{stateLabel(entry.state)}</span>
-                    {entry.releaseState && entry.releaseState !== 'draft' && (
-                      <span
-                        className={`release-dot release-${entry.releaseState}`}
-                        title={`Release: ${entry.releaseState}`}
-                      />
-                    )}
-                    {entry.commentCount && entry.commentCount > 0 && (
-                      <span className="comment-count" title={`${entry.commentCount} comment(s)`}>
-                        {entry.commentCount}
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="col-lock">
-                {entry.lockedBy || ''}
-              </div>
-            </div>
+              path={entry.path}
+              name={entry.name}
+              isDirectory={entry.isDirectory}
+              depth={depth}
+              selected={selectedPath === entry.path}
+              collapsed={collapsed.has(entry.path)}
+              state={entry.state}
+              partNumber={entry.partNumber}
+              releaseState={entry.releaseState}
+              commentCount={entry.commentCount}
+              lockedBy={entry.lockedBy}
+              iconChar={fileIcon(entry)}
+              iconTitle={fileIconTitle(entry)}
+              onClick={handleRowClick}
+              onContextMenu={handleRowContext}
+            />
           ))
         )}
       </div>

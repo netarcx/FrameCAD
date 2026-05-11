@@ -59,9 +59,12 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
   const [posting, setPosting] = useState(false)
   const [mfgNotes, setMfgNotes] = useState('')
   const [mfgMaterial, setMfgMaterial] = useState('')
+  const [mfgMethod, setMfgMethod] = useState<ManufacturingMethod | null>(null)
   const [massText, setMassText] = useState('')
   const [costText, setCostText] = useState('')
   const [savingState, setSavingState] = useState<ReleaseState | null>(null)
+  const [savingMeta, setSavingMeta] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const refreshMeta = useCallback(async (path: string) => {
@@ -71,12 +74,14 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
       setMeta(m || {})
       setMfgNotes(m?.manufacturingNotes || '')
       setMfgMaterial(m?.manufacturingMaterial || '')
+      setMfgMethod(m?.manufacturingMethod ?? null)
       setMassText(typeof m?.mass === 'number' ? String(m.mass) : '')
       setCostText(typeof m?.cost === 'number' ? String(m.cost) : '')
     } catch {
       setMeta({})
       setMfgNotes('')
       setMfgMaterial('')
+      setMfgMethod(null)
       setMassText('')
       setCostText('')
     } finally {
@@ -137,50 +142,61 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
     }
   }
 
-  const commitMfgNotes = async () => {
-    if (mfgNotes === (meta.manufacturingNotes || '')) return
+  const parseNumber = (text: string, label: string): { ok: true; value: number | null } | { ok: false; error: string } => {
+    const trimmed = text.trim()
+    if (trimmed === '') return { ok: true, value: null }
+    const parsed = parseFloat(trimmed)
+    if (isNaN(parsed) || parsed < 0) return { ok: false, error: `${label} must be a positive number` }
+    return { ok: true, value: parsed }
+  }
+
+  const massParsed = parseNumber(massText, 'Mass')
+  const costParsed = parseNumber(costText, 'Cost')
+
+  // Dirty = any of the meta fields differ from the last server-fetched
+  // meta. Comments and release-state aren't covered here — they have
+  // their own Post / pill actions that commit immediately.
+  const massSaved = typeof meta.mass === 'number' ? meta.mass : null
+  const costSaved = typeof meta.cost === 'number' ? meta.cost : null
+  const massDirty = massParsed.ok && massParsed.value !== massSaved
+  const costDirty = costParsed.ok && costParsed.value !== costSaved
+  const materialDirty = mfgMaterial !== (meta.manufacturingMaterial || '')
+  const methodDirty = mfgMethod !== (meta.manufacturingMethod ?? null)
+  const notesDirty = mfgNotes !== (meta.manufacturingNotes || '')
+  const dirty = massDirty || costDirty || materialDirty || methodDirty || notesDirty
+  const hasInputError = !massParsed.ok || !costParsed.ok
+
+  const handleSaveMeta = async () => {
+    if (!dirty || hasInputError) return
+    setError(null)
+    setSaveStatus(null)
+    setSavingMeta(true)
     try {
-      await window.api.setManufacturingNotes(file.path, mfgNotes)
+      if (massDirty && massParsed.ok) await window.api.setPartMass(file.path, massParsed.value)
+      if (costDirty && costParsed.ok) await window.api.setPartCost(file.path, costParsed.value)
+      if (materialDirty) await window.api.setManufacturingMaterial(file.path, mfgMaterial)
+      if (methodDirty) await window.api.setManufacturingMethod(file.path, mfgMethod)
+      if (notesDirty) await window.api.setManufacturingNotes(file.path, mfgNotes)
+      await refreshMeta(file.path)
+      setSaveStatus('Saved')
+      setTimeout(() => setSaveStatus(s => (s === 'Saved' ? null : s)), 2000)
     } catch (err) {
       setError((err as Error).message)
+    } finally {
+      setSavingMeta(false)
     }
   }
 
-  const commitMass = async () => {
+  const handleRevertMeta = () => {
+    setMassText(typeof meta.mass === 'number' ? String(meta.mass) : '')
+    setCostText(typeof meta.cost === 'number' ? String(meta.cost) : '')
+    setMfgMaterial(meta.manufacturingMaterial || '')
+    setMfgMethod(meta.manufacturingMethod ?? null)
+    setMfgNotes(meta.manufacturingNotes || '')
     setError(null)
-    const trimmed = massText.trim()
-    if (trimmed === '' && typeof meta.mass !== 'number') return
-    const parsed = trimmed === '' ? null : parseFloat(trimmed)
-    if (parsed !== null && (isNaN(parsed) || parsed < 0)) {
-      setError('Mass must be a positive number')
-      return
-    }
-    if (parsed === meta.mass) return
-    try {
-      await window.api.setPartMass(file.path, parsed)
-      await refreshMeta(file.path)
-    } catch (err) {
-      setError((err as Error).message)
-    }
   }
 
-  const commitCost = async () => {
-    setError(null)
-    const trimmed = costText.trim()
-    if (trimmed === '' && typeof meta.cost !== 'number') return
-    const parsed = trimmed === '' ? null : parseFloat(trimmed)
-    if (parsed !== null && (isNaN(parsed) || parsed < 0)) {
-      setError('Cost must be a positive number')
-      return
-    }
-    if (parsed === meta.cost) return
-    try {
-      await window.api.setPartCost(file.path, parsed)
-      await refreshMeta(file.path)
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }
+  const inputError = !massParsed.ok ? massParsed.error : !costParsed.ok ? costParsed.error : null
 
   return (
     <div className="details-panel">
@@ -291,8 +307,6 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
                   step="0.01"
                   value={massText}
                   onChange={e => setMassText(e.target.value)}
-                  onBlur={commitMass}
-                  onKeyDown={e => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
                   placeholder="0.0"
                 />
               </label>
@@ -304,13 +318,10 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
                   step="0.01"
                   value={costText}
                   onChange={e => setCostText(e.target.value)}
-                  onBlur={commitCost}
-                  onKeyDown={e => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
                   placeholder="0.00"
                 />
               </label>
             </div>
-            <div className="mfg-hint">Press Enter or click away to save</div>
           </div>
 
           <div className="details-section">
@@ -319,13 +330,9 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
               {(['print', 'cnc', 'manual', 'other'] as ManufacturingMethod[]).map(m => (
                 <button
                   key={m}
-                  className={`mfg-method-pill${meta.manufacturingMethod === m ? ' active' : ''}`}
-                  onClick={async () => {
-                    try {
-                      await window.api.setManufacturingMethod(file.path, meta.manufacturingMethod === m ? null : m)
-                      await refreshMeta(file.path)
-                    } catch (err) { setError((err as Error).message) }
-                  }}
+                  className={`mfg-method-pill${mfgMethod === m ? ' active' : ''}`}
+                  onClick={() => setMfgMethod(mfgMethod === m ? null : m)}
+                  disabled={savingMeta}
                 >
                   {m === 'print' ? '3D Print' : m === 'cnc' ? 'CNC' : m === 'manual' ? 'Hand' : 'Other'}
                 </button>
@@ -336,13 +343,7 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
               placeholder="Material (e.g. 6061, PLA, polycarb)"
               value={mfgMaterial}
               onChange={e => setMfgMaterial(e.target.value)}
-              onBlur={async () => {
-                if (mfgMaterial === (meta.manufacturingMaterial || '')) return
-                try {
-                  await window.api.setManufacturingMaterial(file.path, mfgMaterial)
-                  await refreshMeta(file.path)
-                } catch (err) { setError((err as Error).message) }
-              }}
+              disabled={savingMeta}
             />
           </div>
 
@@ -352,11 +353,30 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
               className="mfg-notes-input"
               value={mfgNotes}
               onChange={e => setMfgNotes(e.target.value)}
-              onBlur={commitMfgNotes}
               placeholder="e.g., 1/4&quot; 6061, deburr edges"
               rows={3}
+              disabled={savingMeta}
             />
-            <div className="mfg-hint">Saves when you click away</div>
+          </div>
+
+          <div className="details-save-bar">
+            <span className="details-save-status">
+              {inputError ? inputError : dirty ? 'Unsaved changes' : saveStatus || ''}
+            </span>
+            <button
+              className="toolbar-btn"
+              onClick={handleRevertMeta}
+              disabled={!dirty || savingMeta}
+            >
+              Revert
+            </button>
+            <button
+              className="toolbar-btn primary"
+              onClick={handleSaveMeta}
+              disabled={!dirty || hasInputError || savingMeta}
+            >
+              {savingMeta ? 'Saving…' : 'Save'}
+            </button>
           </div>
         </>
       )}
