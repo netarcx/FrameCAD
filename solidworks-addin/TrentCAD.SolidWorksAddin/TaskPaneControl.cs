@@ -63,12 +63,34 @@ namespace TrentCAD.SolidWorksAddin
         {
             // --- Header ---
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+
+            // Logo loaded from disk (copied alongside the DLL by the csproj)
+            try
+            {
+                var dllDir = System.IO.Path.GetDirectoryName(
+                    System.Reflection.Assembly.GetExecutingAssembly().Location);
+                var logoPath = System.IO.Path.Combine(dllDir ?? "", "logo.png");
+                if (System.IO.File.Exists(logoPath))
+                {
+                    var logo = new PictureBox
+                    {
+                        Image = Image.FromFile(logoPath),
+                        SizeMode = PictureBoxSizeMode.Zoom,
+                        Size = new Size(26, 26),
+                        Location = new Point(Pad, 8),
+                        BackColor = Color.Transparent
+                    };
+                    Controls.Add(logo);
+                }
+            }
+            catch { /* missing logo is non-fatal */ }
+
             var title = new Label
             {
                 Text = $"TrentCAD v{version.Major}.{version.Minor}.{version.Build}",
                 Font = new Font("Segoe UI Semibold", 13f),
                 ForeColor = CText,
-                Location = new Point(Pad, 10),
+                Location = new Point(Pad + 32, 13),
                 AutoSize = true
             };
             Controls.Add(title);

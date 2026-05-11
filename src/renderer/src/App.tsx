@@ -7,6 +7,7 @@ import Toolbar from './components/Toolbar'
 import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
+import logoUrl from './assets/logo.png'
 import type { AdminConfig, DependencyStatus, FileEntry, UpdateInfo } from '@shared/types'
 
 function countByState(files: FileEntry[], state: string): number {
@@ -261,6 +262,7 @@ export default function App() {
       )}
 
       <div className="app-header">
+        <img className="logo-img" src={logoUrl} alt="TrentCAD" />
         <span className="logo">TrentCAD</span>
         {appVersion && <span className="version">v{appVersion}</span>}
         <span className="divider" />

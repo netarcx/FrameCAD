@@ -92,11 +92,24 @@ input {
   gap: 12px;
 }
 
+.app-header .logo-img {
+  width: 24px;
+  height: 24px;
+  margin-right: -4px;
+  -webkit-app-region: no-drag;
+}
+
 .app-header .logo {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--accent);
+}
+
+.setup-logo {
+  width: 96px;
+  height: 96px;
+  margin-bottom: -16px;
 }
 
 .app-header .divider {

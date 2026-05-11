@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import logoUrl from '../assets/logo.png'
 import type { ProjectConfig } from '@shared/types'
 
 interface Props {
@@ -31,6 +32,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   if (mode === 'select') {
     return (
       <div className="setup-screen">
+        <img className="setup-logo" src={logoUrl} alt="TrentCAD" />
         <h1>TrentCAD</h1>
         <p className="subtitle">CAD collaboration for FRC Team 2129</p>
         <div className="setup-cards">
