@@ -3,8 +3,9 @@ import type {
   AdminConfig, GlobalAdminConfig, GlobalAdminState,
   PartsManifest, PartMeta, ReleaseState, ManufacturingMethod
 } from '@shared/types'
+import ProfileSetup from './ProfileSetup'
 
-type AdminTab = 'settings' | 'parts' | 'approvals' | 'documents' | 'health' | 'tools'
+type AdminTab = 'settings' | 'parts' | 'approvals' | 'documents' | 'health' | 'tools' | 'profile' | 'about'
 
 interface JoinedPart {
   path: string
@@ -23,9 +24,13 @@ function topLevelOf(path: string): string {
 interface Props {
   hasProject: boolean
   onClose: () => void
+  appVersion: string
+  gitName: string
+  gitEmail: string
+  onProfileUpdate: () => void
 }
 
-export default function AdminPage({ hasProject, onClose }: Props) {
+export default function AdminPage({ hasProject, onClose, appVersion, gitName, gitEmail, onProfileUpdate }: Props) {
   const [tab, setTab] = useState<AdminTab>('settings')
 
   // Per-project (only used in project mode)
@@ -471,7 +476,9 @@ export default function AdminPage({ hasProject, onClose }: Props) {
     { id: 'approvals', label: 'Approvals', projectOnly: true },
     { id: 'documents', label: 'Documents', projectOnly: true },
     { id: 'health', label: 'Repository Health', projectOnly: true },
-    { id: 'tools', label: 'Tools', projectOnly: true }
+    { id: 'tools', label: 'Tools', projectOnly: true },
+    { id: 'profile', label: 'Profile' },
+    { id: 'about', label: 'About' }
   ]
   const visibleTabs = tabs.filter(t => !t.projectOnly || hasProject)
 
@@ -849,6 +856,27 @@ export default function AdminPage({ hasProject, onClose }: Props) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {tab === 'profile' && (
+          <div className="settings-profile-wrap">
+            <ProfileSetup
+              onComplete={onProfileUpdate}
+              initialName={gitName}
+              initialEmail={gitEmail}
+              embedded
+            />
+          </div>
+        )}
+
+        {tab === 'about' && (
+          <div className="admin-section">
+            <h3>About TrentCAD</h3>
+            <p>Version {appVersion || 'unknown'}</p>
+            <p className="admin-hint">
+              Press Ctrl+Shift+R to check for updates manually.
+            </p>
           </div>
         )}
 

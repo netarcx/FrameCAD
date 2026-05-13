@@ -14,7 +14,6 @@ import ManufacturingQueue from './components/ManufacturingQueue'
 import ManufacturingModeShell from './components/ManufacturingModeShell'
 import OnboardingTour from './components/OnboardingTour'
 import Sidebar, { type SidebarSection } from './components/Sidebar'
-import SettingsView from './components/SettingsView'
 import ActivityView from './components/ActivityView'
 import PartsManager from './components/PartsManager'
 import ApprovalsPanel from './components/ApprovalsPanel'
@@ -78,34 +77,10 @@ export default function App() {
   // Welcome-screen admin (kept for when no project is open)
   const [showAdmin, setShowAdmin] = useState(false)
   const [adminPinPromptOpen, setAdminPinPromptOpen] = useState(false)
-  // What the PIN prompt is gating — so onSuccess can route correctly
-  // (Admin overlay vs Settings view). Default 'settings' preserves the
-  // historical Ctrl+Shift+A welcome-screen behaviour.
-  const [pinPromptReason, setPinPromptReason] = useState<'admin' | 'settings'>('settings')
-  // Easter-egg: 9-click bottom-right corner of admin overlay flips this
-  // on permanently. Renders an Admin button on the welcome screen AND
-  // an Admin item in the project sidebar.
-  const [adminShortcutUnlocked, setAdminShortcutUnlocked] = useState(
-    () => localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1'
-  )
-  useEffect(() => {
-    const recheck = () =>
-      setAdminShortcutUnlocked(localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1')
-    window.addEventListener('admin-shortcut-unlocked', recheck)
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'trentcad-admin-shortcut-unlocked') recheck()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.removeEventListener('admin-shortcut-unlocked', recheck)
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [])
 
   // Sidebar navigation (project view)
   const [activeSection, setActiveSection] = useState<SidebarSection>('files')
   const [inspectorOpen, setInspectorOpen] = useState(true)
-  const [adminUnlocked, setAdminUnlocked] = useState(false)
 
   const [manufacturingView, setManufacturingView] = useState(false)
 
@@ -248,51 +223,27 @@ export default function App() {
     return () => clearInterval(id)
   }, [project])
 
-  // Settings navigation with PIN gate
-  const handleSettingsNav = useCallback(() => {
-    if (adminUnlocked) {
-      setActiveSection('settings')
-      return
-    }
-    window.api.adminPinRequired().then(required => {
-      if (required) {
-        setPinPromptReason('settings')
-        setAdminPinPromptOpen(true)
-      } else {
-        setAdminUnlocked(true)
-        setActiveSection('settings')
-      }
-    }).catch(() => {
-      setPinPromptReason('settings')
-      setAdminPinPromptOpen(true)
-    })
-  }, [adminUnlocked])
-
   const openAdminOverlay = useCallback(() => {
     if (showAdmin) return
     if (adminPinPromptOpen) return
     window.api.adminPinRequired().then(required => {
       if (required) {
-        setPinPromptReason('admin')
         setAdminPinPromptOpen(true)
       } else {
         setShowAdmin(true)
       }
     }).catch(() => {
-      setPinPromptReason('admin')
       setAdminPinPromptOpen(true)
     })
   }, [showAdmin, adminPinPromptOpen])
 
   const handleSidebarSelect = useCallback((section: SidebarSection) => {
-    if (section === 'settings') {
-      handleSettingsNav()
-    } else if (section === 'admin') {
+    if (section === 'admin') {
       openAdminOverlay()
     } else {
       setActiveSection(section)
     }
-  }, [handleSettingsNav, openAdminOverlay])
+  }, [openAdminOverlay])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -315,38 +266,19 @@ export default function App() {
         })()
         return
       }
-      // Ctrl+Shift+A: toggle settings (works in both welcome and project views)
+      // Ctrl+Shift+A: toggle the Admin overlay (works in welcome and project views)
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault()
-        if (project) {
-          // In project view, navigate to settings via sidebar
-          if (activeSection === 'settings') {
-            setActiveSection('files')
-          } else {
-            handleSettingsNav()
-          }
-        } else {
-          // Welcome screen: use the old admin overlay
-          if (showAdmin) {
-            setShowAdmin(false)
-            return
-          }
-          if (adminPinPromptOpen) return
-          window.api.adminPinRequired().then(required => {
-            if (required) {
-              setAdminPinPromptOpen(true)
-            } else {
-              setShowAdmin(true)
-            }
-          }).catch(() => {
-            setAdminPinPromptOpen(true)
-          })
+        if (showAdmin) {
+          setShowAdmin(false)
+          return
         }
+        openAdminOverlay()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [showAdmin, adminPinPromptOpen, project, activeSection, adminUnlocked, handleSettingsNav])
+  }, [showAdmin, openAdminOverlay])
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('trentcad-theme')
@@ -649,6 +581,10 @@ export default function App() {
         {showAdmin && (
           <AdminPage
             hasProject={false}
+            appVersion={appVersion}
+            gitName={gitName}
+            gitEmail={gitEmail}
+            onProfileUpdate={handleProfileComplete}
             onClose={() => {
               setShowAdmin(false)
               refreshGlobalAdmin()
@@ -760,7 +696,6 @@ export default function App() {
           active={activeSection}
           onSelect={handleSidebarSelect}
           badges={sidebarBadges}
-          adminShortcutUnlocked={adminShortcutUnlocked}
         />
 
         <div className="app-content">
@@ -832,16 +767,6 @@ export default function App() {
           {activeSection === 'shop' && (
             <ManufacturingQueue embedded onClose={() => setActiveSection('files')} />
           )}
-
-          {activeSection === 'settings' && (
-            <SettingsView
-              hasProject={!!project}
-              appVersion={appVersion}
-              gitName={gitName}
-              gitEmail={gitEmail}
-              onProfileUpdate={handleProfileComplete}
-            />
-          )}
         </div>
 
         {showInspector && (
@@ -858,12 +783,7 @@ export default function App() {
           onClose={() => setAdminPinPromptOpen(false)}
           onSuccess={() => {
             setAdminPinPromptOpen(false)
-            setAdminUnlocked(true)
-            if (pinPromptReason === 'admin') {
-              setShowAdmin(true)
-            } else {
-              setActiveSection('settings')
-            }
+            setShowAdmin(true)
           }}
         />
       )}
@@ -871,6 +791,10 @@ export default function App() {
       {showAdmin && (
         <AdminPage
           hasProject={true}
+          appVersion={appVersion}
+          gitName={gitName}
+          gitEmail={gitEmail}
+          onProfileUpdate={handleProfileComplete}
           onClose={() => {
             setShowAdmin(false)
             refreshGlobalAdmin()

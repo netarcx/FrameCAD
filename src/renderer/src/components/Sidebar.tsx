@@ -1,15 +1,11 @@
-import { FolderOpen, Wrench, Activity, Factory, Settings, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { FolderOpen, Wrench, Activity, Factory, Settings, type LucideIcon } from 'lucide-react'
 
-export type SidebarSection = 'files' | 'parts' | 'activity' | 'shop' | 'settings' | 'admin'
+export type SidebarSection = 'files' | 'parts' | 'activity' | 'shop' | 'admin'
 
 interface Props {
   active: SidebarSection
   onSelect: (section: SidebarSection) => void
   badges?: { files?: number; parts?: number }
-  /** Whether the easter-egg admin shortcut has been unlocked. When true,
-   *  the Admin item appears as a peer of Settings at the bottom of the
-   *  sidebar. */
-  adminShortcutUnlocked?: boolean
 }
 
 const items: { id: SidebarSection; label: string; Icon: LucideIcon }[] = [
@@ -19,7 +15,7 @@ const items: { id: SidebarSection; label: string; Icon: LucideIcon }[] = [
   { id: 'shop', label: 'Shop', Icon: Factory }
 ]
 
-export default function Sidebar({ active, onSelect, badges, adminShortcutUnlocked }: Props) {
+export default function Sidebar({ active, onSelect, badges }: Props) {
   return (
     <nav className="app-sidebar">
       {items.map(({ id, label, Icon }) => (
@@ -36,18 +32,9 @@ export default function Sidebar({ active, onSelect, badges, adminShortcutUnlocke
         </button>
       ))}
       <div className="sidebar-spacer" />
-      {adminShortcutUnlocked && (
-        <button
-          className={`sidebar-item${active === 'admin' ? ' active' : ''}`}
-          onClick={() => onSelect('admin')}
-        >
-          <span className="sidebar-icon"><ShieldCheck size={20} strokeWidth={1.75} /></span>
-          <span className="sidebar-label">Admin</span>
-        </button>
-      )}
       <button
-        className={`sidebar-item${active === 'settings' ? ' active' : ''}`}
-        onClick={() => onSelect('settings')}
+        className={`sidebar-item${active === 'admin' ? ' active' : ''}`}
+        onClick={() => onSelect('admin')}
       >
         <span className="sidebar-icon"><Settings size={20} strokeWidth={1.75} /></span>
         <span className="sidebar-label">Settings</span>
