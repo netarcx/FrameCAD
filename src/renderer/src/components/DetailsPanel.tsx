@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { X } from 'lucide-react'
 import type { FileEntry, FileState, ManufacturingMethod, PartMeta, ReleaseState } from '@shared/types'
+import FileThumbnail from './FileThumbnail'
 
 interface Props {
   file: FileEntry | null
@@ -10,6 +11,9 @@ interface Props {
    *  as an overlay (medium/compact responsive tiers). When unset the
    *  panel is inline and never shows a close button. */
   onClose?: () => void
+  /** Jump-to-file callback used by the Where Used list. Wired by the
+   *  parent so clicking an assembly there selects it in the file tree. */
+  onNavigate?: (path: string) => void
 }
 
 function stateLabel(state: FileState): string {
@@ -57,7 +61,7 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString()
 }
 
-export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose }: Props) {
+export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose, onNavigate }: Props) {
   const [meta, setMeta] = useState<PartMeta>({})
   const [loading, setLoading] = useState(false)
   const [commentText, setCommentText] = useState('')
@@ -97,6 +101,24 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose }: P
   useEffect(() => {
     if (file && !file.isDirectory) refreshMeta(file.path)
   }, [file, refreshMeta])
+
+  // Where-used: list of assemblies that contain this part (folder
+  // heuristic, see main/parts.ts findWhereUsed). Loads in parallel with
+  // the part meta, doesn't block the rest of the panel rendering.
+  // Keyed on path (not `file`) so a chokidar-driven files refresh that
+  // just hands us a new FileEntry object for the same path doesn't
+  // trigger a redundant IPC.
+  const [whereUsed, setWhereUsed] = useState<string[]>([])
+  const filePath = file?.path
+  const isDir = !!file?.isDirectory
+  useEffect(() => {
+    if (!filePath || isDir) { setWhereUsed([]); return }
+    let cancelled = false
+    window.api.getWhereUsed(filePath)
+      .then(list => { if (!cancelled) setWhereUsed(list) })
+      .catch(() => { if (!cancelled) setWhereUsed([]) })
+    return () => { cancelled = true }
+  }, [filePath, isDir])
 
   if (!file) {
     return (
@@ -216,6 +238,14 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose }: P
         </button>
       )}
       <div className="details-header">
+        {!file.isDirectory && (
+          <FileThumbnail
+            path={file.path}
+            size={200}
+            className="details-thumb"
+            fallback={null}
+          />
+        )}
         <div className="file-name">{file.name}</div>
         <div className="file-path">{dir}</div>
       </div>
@@ -249,6 +279,29 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose }: P
           </div>
         )}
       </div>
+
+      {!file.isDirectory && whereUsed.length > 0 && (
+        <div className="details-section">
+          <div className="section-title">Where Used</div>
+          <ul className="where-used-list">
+            {whereUsed.map(p => {
+              const base = p.split('/').pop() ?? p
+              return (
+                <li key={p}>
+                  <button
+                    className="where-used-link"
+                    onClick={() => onNavigate?.(p)}
+                    title={p}
+                    disabled={!onNavigate}
+                  >
+                    {base}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
 
       {!file.isDirectory && (
         <>

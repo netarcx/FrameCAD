@@ -405,6 +405,28 @@ export default function App() {
     lockedByOther: countByState(files, 'locked-by-other')
   }), [files])
 
+  // Path → FileEntry index for cross-component navigation (e.g. the
+  // DetailsPanel "Where Used" links). Rebuilt only when the file tree
+  // changes since it's a O(n) walk.
+  const filesByPath = useMemo(() => {
+    const map = new Map<string, FileEntry>()
+    const walk = (entries: FileEntry[]) => {
+      for (const e of entries) {
+        map.set(e.path, e)
+        if (e.children) walk(e.children)
+      }
+    }
+    walk(files)
+    return map
+  }, [files])
+
+  const navigateToPath = useCallback((p: string) => {
+    const entry = filesByPath.get(p)
+    if (!entry) return
+    setActiveSection('files')
+    setSelectedFile(entry)
+  }, [filesByPath, setSelectedFile])
+
   const sidebarBadges = useMemo(() => {
     const filesBadge = stats.modified + stats.untracked
     return {
@@ -878,6 +900,7 @@ export default function App() {
             onCheckOut={checkOut}
             onCheckIn={checkIn}
             onClose={isOverlayTier ? () => setInspectorOpen(false) : undefined}
+            onNavigate={navigateToPath}
           />
         )}
       </div>

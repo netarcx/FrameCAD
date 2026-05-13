@@ -1198,6 +1198,30 @@ input {
   color: var(--text-secondary);
 }
 
+/* OS-rendered thumbnail variant — replaces the letter icon at the same
+   width so the rows don't reflow when thumbnails arrive asynchronously. */
+.file-row .col-name img.icon.thumb {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 2px;
+}
+
+/* Big preview at the top of the DetailsPanel for the currently selected
+   file. Falls back to nothing when no preview is available. */
+.details-thumb {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  height: auto;
+  margin: 0 auto 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  object-fit: contain;
+}
+
 .file-row .col-name .name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1459,6 +1483,42 @@ input {
 .details-section {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.where-used-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.where-used-link {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.where-used-link:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.where-used-link:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 .details-section .section-title {

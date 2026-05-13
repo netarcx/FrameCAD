@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo, type ReactNode } from 'react'
 import type { FileEntry, FileState, ReleaseState } from '@shared/types'
+import FileThumbnail from './FileThumbnail'
 
 interface Props {
   files: FileEntry[]
@@ -119,7 +120,17 @@ const FileRow = memo(function FileRow({
         ) : (
           <span className="expand-toggle" />
         )}
-        <span className="icon" title={iconTitle}>{iconChar}</span>
+        {isDirectory ? (
+          <span className="icon" title={iconTitle}>{iconChar}</span>
+        ) : (
+          <FileThumbnail
+            path={path}
+            size={24}
+            className="icon thumb"
+            title={iconTitle}
+            fallback={<span className="icon" title={iconTitle}>{iconChar}</span>}
+          />
+        )}
         <span className={`name${isDirectory ? ' folder' : ''}`}>
           {isDirectory ? name : renderFilename(name)}
         </span>

@@ -52,6 +52,51 @@ export async function loadManifest(): Promise<PartsManifest> {
   }
 }
 
+/**
+ * "Where used" for a given part: the assembly (.sldasm) files that
+ * sit in this part's folder OR any ancestor folder up to the project
+ * root. We use folder containment as the relationship because the
+ * team's part-numbering convention already groups parts by their
+ * containing assembly folder (e.g. Drivetrain/Frame.sldprt is part of
+ * Drivetrain/Drivetrain.sldasm). Doesn't crack open .sldasm bytes to
+ * inspect actual references — that'd be a Windows-only Solidworks
+ * round-trip and is overkill for the current workflow.
+ *
+ * Returns paths ordered closest-to-the-part first.
+ */
+export async function findWhereUsed(filePath: string): Promise<string[]> {
+  const manifest = await loadManifest()
+  const norm = filePath.replace(/\\/g, '/')
+  const folder = path.posix.dirname(norm)
+  if (folder === '.') return []
+
+  // Build the list of ancestor folder prefixes, deepest first.
+  const ancestors: string[] = []
+  let cursor = folder
+  while (cursor && cursor !== '.') {
+    ancestors.push(cursor)
+    const next = path.posix.dirname(cursor)
+    if (next === cursor) break
+    cursor = next
+  }
+
+  const out: string[] = []
+  for (const folderPath of ancestors) {
+    const folderPrefix = folderPath + '/'
+    for (const p of Object.keys(manifest.entries)) {
+      if (p === filePath) continue
+      const pn = p.replace(/\\/g, '/')
+      if (!pn.toLowerCase().endsWith('.sldasm')) continue
+      // Direct child of this ancestor folder (not deeper).
+      if (!pn.startsWith(folderPrefix)) continue
+      const rest = pn.slice(folderPrefix.length)
+      if (rest.includes('/')) continue
+      if (!out.includes(p)) out.push(p)
+    }
+  }
+  return out
+}
+
 export async function saveManifest(manifest: PartsManifest): Promise<void> {
   const filePath = path.join(getProjectPath(), MANIFEST_FILE)
   await fs.writeFile(filePath, JSON.stringify(manifest, null, 2) + '\n')

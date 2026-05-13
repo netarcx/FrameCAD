@@ -108,24 +108,76 @@ async function modifyAndSync(
   await commitAndPushFile(metaRelPath(), commitMessage)
 }
 
+/**
+ * In-place mutator that expands a set of "trigger" paths (assemblies
+ * moved to in-review) into every part under their folder subtree, also
+ * marked in-review. Mutates `all` directly so the caller can fold the
+ * cascade into the same write/commit cycle. Returns the number of
+ * extra files that were touched. Manufactured parts are deliberately
+ * skipped — re-reviewing something the shop already made would be
+ * confusing.
+ */
+async function cascadeAssemblyInReview(
+  all: PartsMetaFile,
+  triggerPaths: string[],
+  by: string,
+  at: string,
+  note: string | undefined
+): Promise<number> {
+  if (triggerPaths.length === 0) return 0
+  const { loadManifest } = await import('./parts')
+  const manifest = await loadManifest().catch(() => null)
+  if (!manifest) return 0
+
+  let count = 0
+  const visited = new Set<string>()
+  for (const trigger of triggerPaths) {
+    const folder = path.posix.dirname(trigger.replace(/\\/g, '/'))
+    const prefix = folder === '.' ? '' : folder + '/'
+    for (const p of Object.keys(manifest.entries)) {
+      if (p === trigger || visited.has(p)) continue
+      const norm = p.replace(/\\/g, '/')
+      if (prefix && !norm.startsWith(prefix)) continue
+      const current = all[p]?.release?.state
+      if (current === 'manufactured') continue
+      all[p] = {
+        ...(all[p] || {}),
+        release: { state: 'in-review', by, at, note }
+      }
+      visited.add(p)
+      count++
+    }
+  }
+  return count
+}
+
 export async function setReleaseState(
   filePath: string,
   state: ReleaseState,
   note?: string
 ): Promise<void> {
   const by = await gitUsername()
-  await modifyAndSync(
-    filePath,
-    entry => {
-      entry.release = {
-        state,
-        by,
-        at: new Date().toISOString(),
-        note: note?.trim() || undefined
-      }
-    },
-    `[release] ${path.basename(filePath, path.extname(filePath))} → ${state}`
-  )
+  const at = new Date().toISOString()
+  const trimmedNote = note?.trim() || undefined
+
+  await pullRemoteFile(metaRelPath())
+  const all = await loadAllMeta()
+  all[filePath] = {
+    ...(all[filePath] || {}),
+    release: { state, by, at, note: trimmedNote }
+  }
+
+  let cascadeCount = 0
+  if (state === 'in-review' && filePath.toLowerCase().endsWith('.sldasm')) {
+    cascadeCount = await cascadeAssemblyInReview(all, [filePath], by, at, trimmedNote)
+  }
+  await saveAllMeta(all)
+
+  const baseName = path.basename(filePath, path.extname(filePath))
+  const msg = cascadeCount > 0
+    ? `[release] ${baseName} → ${state} (+ ${cascadeCount} cascaded)`
+    : `[release] ${baseName} → ${state}`
+  await commitAndPushFile(metaRelPath(), msg)
 }
 
 export async function addComment(filePath: string, text: string): Promise<void> {
@@ -232,6 +284,7 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
   const fieldCounts: Record<string, number> = {}
   let uniformRelease: ReleaseState | null | 'mixed' = null
   let uniformMethod: ManufacturingMethod | null | 'mixed' | undefined = undefined
+  const assemblyInReviewTriggers: string[] = []
 
   for (const [filePath, patch] of entries) {
     const entry = all[filePath] || {}
@@ -240,6 +293,9 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
       fieldCounts.release = (fieldCounts.release || 0) + 1
       if (uniformRelease === null) uniformRelease = patch.release
       else if (uniformRelease !== patch.release) uniformRelease = 'mixed'
+      if (patch.release === 'in-review' && filePath.toLowerCase().endsWith('.sldasm')) {
+        assemblyInReviewTriggers.push(filePath)
+      }
     }
     if (patch.manufacturingMethod !== undefined) {
       if (patch.manufacturingMethod === null) delete entry.manufacturingMethod
@@ -257,6 +313,10 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
     all[filePath] = entry
     touched++
   }
+
+  const cascadeCount = await cascadeAssemblyInReview(
+    all, assemblyInReviewTriggers, by, now, undefined
+  )
   await saveAllMeta(all)
 
   const labelParts: string[] = []
@@ -269,6 +329,7 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
     labelParts.push(m)
   }
   if (fieldCounts.material) labelParts.push(`material×${fieldCounts.material}`)
+  if (cascadeCount > 0) labelParts.push(`+${cascadeCount} cascaded`)
   const msg = `[bulk-meta] ${touched} part${touched === 1 ? '' : 's'}: ${labelParts.join(', ')}`
   await commitAndPushFile(metaRelPath(), msg)
   return touched

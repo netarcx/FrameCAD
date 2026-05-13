@@ -167,6 +167,12 @@ const api: IpcApi = {
   getPartMeta: (filePath) =>
     ipcRenderer.invoke('get-part-meta', filePath),
 
+  getWhereUsed: (filePath) =>
+    ipcRenderer.invoke('get-where-used', filePath),
+
+  getThumbnail: (filePath, size) =>
+    ipcRenderer.invoke('get-thumbnail', filePath, size),
+
   setReleaseState: (filePath, state, note) =>
     ipcRenderer.invoke('set-release-state', filePath, state, note),
 

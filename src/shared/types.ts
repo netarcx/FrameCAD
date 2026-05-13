@@ -297,6 +297,8 @@ export interface IpcApi {
   createProgressTag(name: string, message?: string): Promise<{ success: boolean; error?: string }>
   getMainRemoteUrl(): Promise<string>
   getPartMeta(filePath: string): Promise<PartMeta>
+  getWhereUsed(filePath: string): Promise<string[]>
+  getThumbnail(filePath: string, size: number): Promise<string | null>
   setReleaseState(filePath: string, state: ReleaseState, note?: string): Promise<void>
   addComment(filePath: string, text: string): Promise<void>
   setManufacturingNotes(filePath: string, notes: string): Promise<void>

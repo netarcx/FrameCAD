@@ -22,6 +22,7 @@ import {
 import { addRecentProject, getRecentProjects, getCachedBrowseConfig, setProjectPinned, removeRecentProject } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate, setRestMainWindow } from './rest'
 import * as driveOps from './drive'
+import { getThumbnail, clearThumbnailCache } from './thumbnails'
 import type { ProjectConfig } from '@shared/types'
 
 let watcher: ReturnType<typeof watch> | null = null
@@ -287,6 +288,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     currentProject = null
     clearRestProject()
     stopWatching()
+    clearThumbnailCache()
   })
 
   ipcMain.handle('get-app-version', () => app.getVersion())
@@ -399,6 +401,14 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('get-part-meta', async (_e, filePath: string) => {
     return metaOps.getPartMeta(filePath)
+  })
+
+  ipcMain.handle('get-where-used', async (_e, filePath: string) => {
+    return partsOps.findWhereUsed(filePath)
+  })
+
+  ipcMain.handle('get-thumbnail', async (_e, filePath: string, size: number) => {
+    return getThumbnail(filePath, size)
   })
 
   ipcMain.handle('set-release-state', async (_e, filePath: string, state: string, note?: string) => {
