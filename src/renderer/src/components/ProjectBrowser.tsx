@@ -354,20 +354,19 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
   }, [files])
 
   // Default the tree to fully collapsed the first time folders show up
-  // for this project. After that, leave the user's expand/collapse
+  // for this mount. After that, leave the user's expand/collapse
   // choices alone — new folders that arrive on a sync stay expanded so
   // the user can see what was added.
   //
-  // Edge case: a fresh project may load with zero folders. We don't
-  // want the *first* folder the user creates later to suddenly auto-
-  // collapse, so we mark the initial-collapse opportunity "spent"
-  // after a short grace period even if no folders ever appeared.
+  // Previously this used a 1500ms grace-period timer that marked the
+  // collapse "spent" even when no folders had appeared yet. For
+  // medium-sized clones the file watcher can take longer than that to
+  // report its first batch, leaving the tree fully expanded on load.
+  // Now we just wait — auto-collapse fires whenever folders first
+  // appear, even if it takes 30 seconds.
   useEffect(() => {
     if (didInitialCollapse.current) return
-    if (allFolderPaths.length === 0) {
-      const t = setTimeout(() => { didInitialCollapse.current = true }, 1500)
-      return () => clearTimeout(t)
-    }
+    if (allFolderPaths.length === 0) return
     setCollapsed(new Set(allFolderPaths))
     didInitialCollapse.current = true
   }, [allFolderPaths])
