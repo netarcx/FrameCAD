@@ -28,6 +28,12 @@ export interface PartReleaseInfo {
 
 export type ManufacturingMethod = 'print' | 'cnc' | 'manual' | 'other'
 
+export interface BulkMetaPatch {
+  release?: ReleaseState
+  manufacturingMethod?: ManufacturingMethod | null
+  manufacturingMaterial?: string | null
+}
+
 export interface PartMeta {
   release?: PartReleaseInfo
   comments?: PartComment[]
@@ -289,6 +295,7 @@ export interface IpcApi {
   getProjectTotals(): Promise<ProjectTotals>
   setManufacturingMethod(filePath: string, method: ManufacturingMethod | null): Promise<void>
   setManufacturingMaterial(filePath: string, material: string): Promise<void>
+  bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Promise<number>
   getManufacturingQueue(): Promise<ManufacturingQueueItem[]>
   getAllPartsMeta(): Promise<Record<string, PartMeta>>
   checkManifestIntegrity(): Promise<{

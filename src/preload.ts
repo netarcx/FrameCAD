@@ -188,6 +188,9 @@ const api: IpcApi = {
   setManufacturingMaterial: (filePath, material) =>
     ipcRenderer.invoke('set-mfg-material', filePath, material),
 
+  bulkUpdateMeta: (updates) =>
+    ipcRenderer.invoke('bulk-update-meta', updates),
+
   getManufacturingQueue: () =>
     ipcRenderer.invoke('get-manufacturing-queue'),
 

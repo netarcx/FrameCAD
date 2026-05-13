@@ -1,4 +1,5 @@
-import type { ReleaseState, ManufacturingMethod, PartMeta } from '@shared/types'
+import { useMemo, useState } from 'react'
+import type { BulkMetaPatch, ReleaseState, ManufacturingMethod, PartMeta } from '@shared/types'
 
 export interface JoinedPart {
   path: string
@@ -25,30 +26,93 @@ interface Props {
   subsystemOptions: string[]
   state: ReleaseState | 'all'
   setState: (s: ReleaseState | 'all') => void
-  rowSaving: string | null
+  pendingCount: number
+  flushing: boolean
+  flushNow: () => void
   onRefresh: () => void
   onSetRelease: (path: string, state: ReleaseState) => void
   onSetMethod: (path: string, m: ManufacturingMethod | null) => void
   onSetMaterial: (path: string, m: string) => void
   onSetMass: (path: string, mass: number | null) => void
   onSetCost: (path: string, cost: number | null) => void
+  onBulkApply: (paths: string[], patch: BulkMetaPatch) => Promise<void>
 }
 
 export default function PartsManager(props: Props) {
   const {
     loading, parts, allParts, filter, setFilter, subsystem, setSubsystem,
-    subsystemOptions, state, setState, rowSaving,
-    onRefresh, onSetRelease, onSetMethod, onSetMaterial, onSetMass, onSetCost
+    subsystemOptions, state, setState,
+    pendingCount, flushing, flushNow,
+    onRefresh, onSetRelease, onSetMethod, onSetMaterial, onSetMass, onSetCost,
+    onBulkApply
   } = props
+
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkRelease, setBulkRelease] = useState<ReleaseState | ''>('')
+  const [bulkMethod, setBulkMethod] = useState<ManufacturingMethod | '' | 'clear'>('')
+  const [bulkMaterial, setBulkMaterial] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  const visiblePaths = useMemo(() => parts.map(p => p.path), [parts])
+  const allVisibleSelected = visiblePaths.length > 0 && visiblePaths.every(p => selected.has(p))
+  const someVisibleSelected = visiblePaths.some(p => selected.has(p))
+
+  const toggleOne = (path: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path); else next.add(path)
+      return next
+    })
+  }
+  const toggleAllVisible = () => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        visiblePaths.forEach(p => next.delete(p))
+      } else {
+        visiblePaths.forEach(p => next.add(p))
+      }
+      return next
+    })
+  }
+  const clearSelection = () => setSelected(new Set())
+
+  const applyBulk = async () => {
+    const patch: BulkMetaPatch = {}
+    if (bulkRelease) patch.release = bulkRelease
+    if (bulkMethod === 'clear') patch.manufacturingMethod = null
+    else if (bulkMethod) patch.manufacturingMethod = bulkMethod
+    if (bulkMaterial.trim()) patch.manufacturingMaterial = bulkMaterial.trim()
+    if (Object.keys(patch).length === 0 || selected.size === 0) return
+    const paths = Array.from(selected)
+    setBulkBusy(true)
+    try {
+      await onBulkApply(paths, patch)
+      setBulkRelease('')
+      setBulkMethod('')
+      setBulkMaterial('')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const selectedCount = selected.size
+  const nothingChosen = !bulkRelease && !bulkMethod && !bulkMaterial.trim()
+
+  // Saving indicator: pendingCount is queued edits not yet flushed,
+  // flushing is true while a commit/push is in flight.
+  let saveStatus: string | null = null
+  if (flushing) saveStatus = `Saving ${pendingCount > 0 ? pendingCount : ''} change${pendingCount === 1 ? '' : 's'}…`
+  else if (pendingCount > 0) saveStatus = `${pendingCount} pending change${pendingCount === 1 ? '' : 's'}`
 
   return (
     <div className="admin-section">
       <h3>Parts Manager</h3>
       <p className="admin-hint">
-        Inline-edit metadata for every part in the project. Changes save
-        automatically when you leave a cell. Mentors: use this to fix
-        misclassified parts, bulk-update material/method, or move parts
-        between release states.
+        Inline-edit metadata for every part in the project. Edits apply
+        immediately and batch into a single commit a moment after you stop
+        typing. Tick rows to bulk-update release state, manufacturing
+        method, or material across many parts at once.
       </p>
       <div className="parts-filter-row">
         <input
@@ -71,7 +135,65 @@ export default function PartsManager(props: Props) {
           {loading ? 'Loading…' : 'Refresh'}
         </button>
         <span className="parts-count">{parts.length} of {allParts.length}</span>
+        {saveStatus && (
+          <span className={`parts-save-status${flushing ? ' parts-save-status-active' : ''}`}>
+            {saveStatus}
+            {pendingCount > 0 && !flushing && (
+              <button className="toolbar-btn-tiny" onClick={flushNow}>Save now</button>
+            )}
+          </span>
+        )}
       </div>
+
+      {selectedCount > 0 && (
+        <div className="parts-bulk-bar">
+          <span className="parts-bulk-count">{selectedCount} selected</span>
+          <select
+            value={bulkRelease}
+            onChange={e => setBulkRelease(e.target.value as ReleaseState | '')}
+            disabled={bulkBusy}
+            title="Release state"
+          >
+            <option value="">Release…</option>
+            <option value="draft">draft</option>
+            <option value="in-review">in-review</option>
+            <option value="released">released</option>
+            <option value="manufactured">manufactured</option>
+          </select>
+          <select
+            value={bulkMethod}
+            onChange={e => setBulkMethod(e.target.value as ManufacturingMethod | '' | 'clear')}
+            disabled={bulkBusy}
+            title="Manufacturing method"
+          >
+            <option value="">Method…</option>
+            <option value="print">3D Print</option>
+            <option value="cnc">CNC</option>
+            <option value="manual">Hand</option>
+            <option value="other">Other</option>
+            <option value="clear">(clear)</option>
+          </select>
+          <input
+            type="text"
+            list="default-materials"
+            value={bulkMaterial}
+            onChange={e => setBulkMaterial(e.target.value)}
+            placeholder="Material…"
+            disabled={bulkBusy}
+          />
+          <button
+            className="toolbar-btn primary"
+            onClick={applyBulk}
+            disabled={bulkBusy || nothingChosen}
+          >
+            {bulkBusy ? 'Saving…' : `Apply to ${selectedCount}`}
+          </button>
+          <button className="toolbar-btn" onClick={clearSelection} disabled={bulkBusy}>
+            Clear
+          </button>
+        </div>
+      )}
+
       {loading && <div className="admin-status">Loading parts…</div>}
       {!loading && parts.length === 0 && (
         <div className="admin-status">
@@ -83,6 +205,15 @@ export default function PartsManager(props: Props) {
           <table className="parts-table">
             <thead>
               <tr>
+                <th className="parts-cell-select">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    ref={el => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected }}
+                    onChange={toggleAllVisible}
+                    aria-label="Select all visible parts"
+                  />
+                </th>
                 <th>Part #</th>
                 <th>File</th>
                 <th>Subsystem</th>
@@ -96,9 +227,17 @@ export default function PartsManager(props: Props) {
             <tbody>
               {parts.map(p => {
                 const filename = p.path.includes('/') ? p.path.slice(p.path.lastIndexOf('/') + 1) : p.path
-                const isSaving = rowSaving === p.path
+                const isSelected = selected.has(p.path)
                 return (
-                  <tr key={p.path} className={isSaving ? 'parts-row-saving' : ''}>
+                  <tr key={p.path} className={isSelected ? 'parts-row-selected' : ''}>
+                    <td className="parts-cell-select">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleOne(p.path)}
+                        aria-label={`Select ${p.partNumber}`}
+                      />
+                    </td>
                     <td className="parts-cell-pn">{p.partNumber}</td>
                     <td className="parts-cell-file" title={p.path}>{filename}</td>
                     <td>{p.topLevel}</td>
@@ -106,7 +245,6 @@ export default function PartsManager(props: Props) {
                       <select
                         value={p.meta.release?.state ?? 'draft'}
                         onChange={e => onSetRelease(p.path, e.target.value as ReleaseState)}
-                        disabled={isSaving}
                       >
                         <option value="draft">draft</option>
                         <option value="in-review">in-review</option>
@@ -118,7 +256,6 @@ export default function PartsManager(props: Props) {
                       <select
                         value={p.meta.manufacturingMethod ?? ''}
                         onChange={e => onSetMethod(p.path, e.target.value ? e.target.value as ManufacturingMethod : null)}
-                        disabled={isSaving}
                       >
                         <option value="">—</option>
                         <option value="print">3D Print</option>
@@ -136,7 +273,6 @@ export default function PartsManager(props: Props) {
                           const v = e.target.value.trim()
                           if (v !== (p.meta.manufacturingMaterial ?? '')) onSetMaterial(p.path, v)
                         }}
-                        disabled={isSaving}
                         placeholder="—"
                       />
                     </td>
@@ -153,7 +289,6 @@ export default function PartsManager(props: Props) {
                             (parsed !== null && parsed === p.meta.mass)
                           if (!same) onSetMass(p.path, parsed)
                         }}
-                        disabled={isSaving}
                       />
                     </td>
                     <td>
@@ -169,7 +304,6 @@ export default function PartsManager(props: Props) {
                             (parsed !== null && parsed === p.meta.cost)
                           if (!same) onSetCost(p.path, parsed)
                         }}
-                        disabled={isSaving}
                       />
                     </td>
                   </tr>

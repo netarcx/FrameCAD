@@ -730,7 +730,6 @@ export default function App() {
                 {parts.stateFilter === 'in-review' ? (
                   <ApprovalsPanel
                     parts={parts.inReviewParts}
-                    rowSaving={parts.rowSaving}
                     onApprove={(p) => parts.setReleaseState(p, 'released')}
                     onReject={(p) => parts.setReleaseState(p, 'draft')}
                     onRefresh={parts.loadAllParts}
@@ -747,13 +746,16 @@ export default function App() {
                     subsystemOptions={parts.subsystemOptions}
                     state={parts.stateFilter}
                     setState={parts.setStateFilter}
-                    rowSaving={parts.rowSaving}
+                    pendingCount={parts.pendingCount}
+                    flushing={parts.flushing}
+                    flushNow={parts.flushNow}
                     onRefresh={parts.loadAllParts}
                     onSetRelease={parts.setReleaseState}
                     onSetMethod={parts.setMethod}
                     onSetMaterial={parts.setMaterial}
                     onSetMass={parts.setMass}
                     onSetCost={parts.setCost}
+                    onBulkApply={parts.bulkApply}
                   />
                 )}
               </div>

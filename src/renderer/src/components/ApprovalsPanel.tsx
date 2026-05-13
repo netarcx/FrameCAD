@@ -2,13 +2,12 @@ import type { JoinedPart } from './PartsManager'
 
 interface Props {
   parts: JoinedPart[]
-  rowSaving: string | null
   onApprove: (path: string) => void
   onReject: (path: string) => void
   onRefresh: () => void
 }
 
-export default function ApprovalsPanel({ parts, rowSaving, onApprove, onReject, onRefresh }: Props) {
+export default function ApprovalsPanel({ parts, onApprove, onReject, onRefresh }: Props) {
   return (
     <div className="admin-section">
       <h3>Approvals — In-Review Parts</h3>
@@ -27,7 +26,6 @@ export default function ApprovalsPanel({ parts, rowSaving, onApprove, onReject, 
         <div className="approvals-list">
           {parts.map(p => {
             const filename = p.path.includes('/') ? p.path.slice(p.path.lastIndexOf('/') + 1) : p.path
-            const isSaving = rowSaving === p.path
             return (
               <div key={p.path} className="approval-row">
                 <div className="approval-main">
@@ -44,14 +42,12 @@ export default function ApprovalsPanel({ parts, rowSaving, onApprove, onReject, 
                   <button
                     className="toolbar-btn"
                     onClick={() => onReject(p.path)}
-                    disabled={isSaving}
                   >
                     Send back to draft
                   </button>
                   <button
                     className="toolbar-btn primary"
                     onClick={() => onApprove(p.path)}
-                    disabled={isSaving}
                   >
                     Approve & release
                   </button>

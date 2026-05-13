@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type {
-  AdminConfig, GlobalAdminConfig, GlobalAdminState,
+  AdminConfig, BulkMetaPatch, GlobalAdminConfig, GlobalAdminState,
   PartsManifest, PartMeta, ReleaseState, ManufacturingMethod
 } from '@shared/types'
 import ProfileSetup from './ProfileSetup'
+import PartsManager from './PartsManager'
+import ApprovalsPanel from './ApprovalsPanel'
 
 type AdminTab = 'settings' | 'parts' | 'approvals' | 'documents' | 'health' | 'tools' | 'profile' | 'about'
 
@@ -69,7 +71,13 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
   const [partsFilter, setPartsFilter] = useState('')
   const [partsSubsystem, setPartsSubsystem] = useState<string>('all')
   const [partsState, setPartsState] = useState<ReleaseState | 'all'>('all')
-  const [rowSaving, setRowSaving] = useState<string | null>(null)
+  // Edit queue: optimistic per-cell edits accumulate here and flush
+  // through bulkUpdateMeta on a 1.2s idle debounce so rapid edits collapse
+  // to one commit and the UI never blocks the user.
+  const pendingRef = useRef<Map<string, BulkMetaPatch>>(new Map())
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [flushing, setFlushing] = useState(false)
 
   // Tools
   const [integrity, setIntegrity] = useState<null | {
@@ -321,7 +329,10 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
     let timer: ReturnType<typeof setTimeout> | null = null
     const cleanup = window.api.onFileChange(() => {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => { loadAllParts() }, 250)
+      timer = setTimeout(() => {
+        if (pendingRef.current.size > 0 || flushing) return
+        loadAllParts()
+      }, 250)
     })
     return () => {
       if (timer) clearTimeout(timer)
@@ -329,41 +340,98 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
     }
   }, [tab, hasProject, loadAllParts])
 
-  // Save a single editable cell. Updates the row in-place after success
-  // so the table reflects the new value without a full reload.
-  const updatePart = async (
-    rowPath: string,
-    update: (m: PartMeta) => Promise<void>,
-    optimisticPatch: Partial<PartMeta>
-  ) => {
-    setRowSaving(rowPath)
+  const flushNow = useCallback(async () => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current)
+      flushTimerRef.current = null
+    }
+    if (pendingRef.current.size === 0) return
+    const batch = Object.fromEntries(pendingRef.current)
+    pendingRef.current = new Map()
+    setPendingCount(0)
+    setFlushing(true)
     setError(null)
     try {
-      await update({})
-      setAllParts(prev => prev.map(r =>
-        r.path === rowPath ? { ...r, meta: { ...r.meta, ...optimisticPatch } } : r
-      ))
+      await window.api.bulkUpdateMeta(batch)
     } catch (err) {
       setError((err as Error).message)
+      loadAllParts()
     } finally {
-      setRowSaving(null)
+      setFlushing(false)
     }
+  }, [loadAllParts])
+
+  const scheduleFlush = useCallback(() => {
+    if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
+    flushTimerRef.current = setTimeout(() => {
+      flushTimerRef.current = null
+      flushNow()
+    }, 1200)
+  }, [flushNow])
+
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current)
+        flushTimerRef.current = null
+      }
+      if (pendingRef.current.size > 0) {
+        const batch = Object.fromEntries(pendingRef.current)
+        pendingRef.current = new Map()
+        window.api.bulkUpdateMeta(batch).catch(() => {})
+      }
+    }
+  }, [])
+
+  const queueEdit = (rowPath: string, patch: BulkMetaPatch, optimisticPatch: Partial<PartMeta>) => {
+    const existing = pendingRef.current.get(rowPath) || {}
+    pendingRef.current.set(rowPath, { ...existing, ...patch })
+    setPendingCount(pendingRef.current.size)
+    setAllParts(prev => prev.map(r =>
+      r.path === rowPath ? { ...r, meta: { ...r.meta, ...optimisticPatch } } : r
+    ))
+    scheduleFlush()
   }
 
   const handleSetReleaseState = (rowPath: string, state: ReleaseState) =>
-    updatePart(rowPath, () => window.api.setReleaseState(rowPath, state), { release: { state } })
+    queueEdit(rowPath, { release: state }, { release: { state } })
 
   const handleSetMethod = (rowPath: string, method: ManufacturingMethod | null) =>
-    updatePart(rowPath, () => window.api.setManufacturingMethod(rowPath, method), { manufacturingMethod: method ?? undefined })
+    queueEdit(rowPath, { manufacturingMethod: method }, { manufacturingMethod: method ?? undefined })
 
   const handleSetMaterial = (rowPath: string, material: string) =>
-    updatePart(rowPath, () => window.api.setManufacturingMaterial(rowPath, material), { manufacturingMaterial: material })
+    queueEdit(rowPath, { manufacturingMaterial: material }, { manufacturingMaterial: material })
 
-  const handleSetMass = (rowPath: string, mass: number | null) =>
-    updatePart(rowPath, () => window.api.setPartMass(rowPath, mass), { mass: mass ?? undefined })
+  const handleSetMass = async (rowPath: string, mass: number | null) => {
+    setAllParts(prev => prev.map(r => r.path === rowPath ? { ...r, meta: { ...r.meta, mass: mass ?? undefined } } : r))
+    try { await window.api.setPartMass(rowPath, mass) } catch (err) { setError((err as Error).message); loadAllParts() }
+  }
 
-  const handleSetCost = (rowPath: string, cost: number | null) =>
-    updatePart(rowPath, () => window.api.setPartCost(rowPath, cost), { cost: cost ?? undefined })
+  const handleSetCost = async (rowPath: string, cost: number | null) => {
+    setAllParts(prev => prev.map(r => r.path === rowPath ? { ...r, meta: { ...r.meta, cost: cost ?? undefined } } : r))
+    try { await window.api.setPartCost(rowPath, cost) } catch (err) { setError((err as Error).message); loadAllParts() }
+  }
+
+  const handleBulkApply = async (paths: string[], patch: BulkMetaPatch) => {
+    if (paths.length === 0 || Object.keys(patch).length === 0) return
+    const optimisticPatch: Partial<PartMeta> = {}
+    if (patch.release !== undefined) optimisticPatch.release = { state: patch.release }
+    if (patch.manufacturingMethod !== undefined) {
+      optimisticPatch.manufacturingMethod = patch.manufacturingMethod ?? undefined
+    }
+    if (patch.manufacturingMaterial !== undefined) {
+      optimisticPatch.manufacturingMaterial = (patch.manufacturingMaterial ?? '').trim() || undefined
+    }
+    for (const p of paths) {
+      const existing = pendingRef.current.get(p) || {}
+      pendingRef.current.set(p, { ...existing, ...patch })
+    }
+    setPendingCount(pendingRef.current.size)
+    setAllParts(prev => prev.map(r =>
+      paths.includes(r.path) ? { ...r, meta: { ...r.meta, ...optimisticPatch } } : r
+    ))
+    await flushNow()
+  }
 
   // Tools
   const handleIntegrityCheck = async () => {
@@ -511,7 +579,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
         <div className="admin-content">
 
         {tab === 'parts' && hasProject && (
-          <PartsTab
+          <PartsManager
             loading={partsLoading}
             parts={filteredParts}
             allParts={allParts}
@@ -522,20 +590,22 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
             subsystemOptions={subsystemOptions}
             state={partsState}
             setState={setPartsState}
-            rowSaving={rowSaving}
+            pendingCount={pendingCount}
+            flushing={flushing}
+            flushNow={flushNow}
             onRefresh={loadAllParts}
             onSetRelease={handleSetReleaseState}
             onSetMethod={handleSetMethod}
             onSetMaterial={handleSetMaterial}
             onSetMass={handleSetMass}
             onSetCost={handleSetCost}
+            onBulkApply={handleBulkApply}
           />
         )}
 
         {tab === 'approvals' && hasProject && (
-          <ApprovalsTab
+          <ApprovalsPanel
             parts={inReviewParts}
-            rowSaving={rowSaving}
             onApprove={(p) => handleSetReleaseState(p, 'released')}
             onReject={(p) => handleSetReleaseState(p, 'draft')}
             onRefresh={loadAllParts}
@@ -893,240 +963,6 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
 // Sub-components for the new tabs. Kept in the same file to avoid
 // component-file sprawl; they read state passed down from AdminPage.
 // ---------------------------------------------------------------------
-
-interface PartsTabProps {
-  loading: boolean
-  parts: JoinedPart[]
-  allParts: JoinedPart[]
-  filter: string
-  setFilter: (s: string) => void
-  subsystem: string
-  setSubsystem: (s: string) => void
-  subsystemOptions: string[]
-  state: ReleaseState | 'all'
-  setState: (s: ReleaseState | 'all') => void
-  rowSaving: string | null
-  onRefresh: () => void
-  onSetRelease: (path: string, state: ReleaseState) => void
-  onSetMethod: (path: string, m: ManufacturingMethod | null) => void
-  onSetMaterial: (path: string, m: string) => void
-  onSetMass: (path: string, mass: number | null) => void
-  onSetCost: (path: string, cost: number | null) => void
-}
-
-function PartsTab(props: PartsTabProps) {
-  const {
-    loading, parts, allParts, filter, setFilter, subsystem, setSubsystem,
-    subsystemOptions, state, setState, rowSaving,
-    onRefresh, onSetRelease, onSetMethod, onSetMaterial, onSetMass, onSetCost
-  } = props
-
-  return (
-    <div className="admin-section">
-      <h3>Parts Manager</h3>
-      <p className="admin-hint">
-        Inline-edit metadata for every part in the project. Changes save
-        automatically when you leave a cell. Mentors: use this to fix
-        misclassified parts, bulk-update material/method, or move parts
-        between release states.
-      </p>
-      <div className="parts-filter-row">
-        <input
-          placeholder="Search part #, file, description…"
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-        />
-        <select value={subsystem} onChange={e => setSubsystem(e.target.value)}>
-          <option value="all">All subsystems</option>
-          {subsystemOptions.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={state} onChange={e => setState(e.target.value as ReleaseState | 'all')}>
-          <option value="all">All states</option>
-          <option value="draft">draft</option>
-          <option value="in-review">in-review</option>
-          <option value="released">released</option>
-          <option value="manufactured">manufactured</option>
-        </select>
-        <button className="toolbar-btn" onClick={onRefresh} disabled={loading}>
-          {loading ? 'Loading…' : 'Refresh'}
-        </button>
-        <span className="parts-count">{parts.length} of {allParts.length}</span>
-      </div>
-      {loading && <div className="admin-status">Loading parts…</div>}
-      {!loading && parts.length === 0 && (
-        <div className="admin-status">
-          {allParts.length === 0 ? 'No parts in this project yet.' : 'No parts match the current filter.'}
-        </div>
-      )}
-      {!loading && parts.length > 0 && (
-        <div className="parts-table-wrap">
-          <table className="parts-table">
-            <thead>
-              <tr>
-                <th>Part #</th>
-                <th>File</th>
-                <th>Subsystem</th>
-                <th>Release</th>
-                <th>Method</th>
-                <th>Material</th>
-                <th>Mass (lb)</th>
-                <th>Cost ($)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {parts.map(p => {
-                const filename = p.path.includes('/') ? p.path.slice(p.path.lastIndexOf('/') + 1) : p.path
-                const isSaving = rowSaving === p.path
-                return (
-                  <tr key={p.path} className={isSaving ? 'parts-row-saving' : ''}>
-                    <td className="parts-cell-pn">{p.partNumber}</td>
-                    <td className="parts-cell-file" title={p.path}>{filename}</td>
-                    <td>{p.topLevel}</td>
-                    <td>
-                      <select
-                        value={p.meta.release?.state ?? 'draft'}
-                        onChange={e => onSetRelease(p.path, e.target.value as ReleaseState)}
-                        disabled={isSaving}
-                      >
-                        <option value="draft">draft</option>
-                        <option value="in-review">in-review</option>
-                        <option value="released">released</option>
-                        <option value="manufactured">manufactured</option>
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        value={p.meta.manufacturingMethod ?? ''}
-                        onChange={e => onSetMethod(p.path, e.target.value ? e.target.value as ManufacturingMethod : null)}
-                        disabled={isSaving}
-                      >
-                        <option value="">—</option>
-                        <option value="print">3D Print</option>
-                        <option value="cnc">CNC</option>
-                        <option value="manual">Hand</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        list="default-materials"
-                        defaultValue={p.meta.manufacturingMaterial ?? ''}
-                        onBlur={e => {
-                          const v = e.target.value.trim()
-                          if (v !== (p.meta.manufacturingMaterial ?? '')) onSetMaterial(p.path, v)
-                        }}
-                        disabled={isSaving}
-                        placeholder="—"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        defaultValue={typeof p.meta.mass === 'number' ? p.meta.mass : ''}
-                        onBlur={e => {
-                          const raw = e.target.value.trim()
-                          const parsed = raw === '' ? null : parseFloat(raw)
-                          const same = (parsed === null && typeof p.meta.mass !== 'number') ||
-                            (parsed !== null && parsed === p.meta.mass)
-                          if (!same) onSetMass(p.path, parsed)
-                        }}
-                        disabled={isSaving}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        defaultValue={typeof p.meta.cost === 'number' ? p.meta.cost : ''}
-                        onBlur={e => {
-                          const raw = e.target.value.trim()
-                          const parsed = raw === '' ? null : parseFloat(raw)
-                          const same = (parsed === null && typeof p.meta.cost !== 'number') ||
-                            (parsed !== null && parsed === p.meta.cost)
-                          if (!same) onSetCost(p.path, parsed)
-                        }}
-                        disabled={isSaving}
-                      />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface ApprovalsTabProps {
-  parts: JoinedPart[]
-  rowSaving: string | null
-  onApprove: (path: string) => void
-  onReject: (path: string) => void
-  onRefresh: () => void
-}
-
-function ApprovalsTab({ parts, rowSaving, onApprove, onReject, onRefresh }: ApprovalsTabProps) {
-  return (
-    <div className="admin-section">
-      <h3>Approvals — In-Review Parts</h3>
-      <p className="admin-hint">
-        Parts marked <em>in-review</em> are waiting for a mentor sign-off
-        before they enter the manufacturing queue. Approve to mark
-        <strong> released</strong>; reject to send back to <strong> draft</strong>.
-      </p>
-      <div className="admin-section-actions" style={{ justifyContent: 'flex-start' }}>
-        <button className="toolbar-btn" onClick={onRefresh}>Refresh</button>
-        <span className="parts-count">{parts.length} awaiting review</span>
-      </div>
-      {parts.length === 0 ? (
-        <div className="admin-status">✓ No parts waiting on a review right now.</div>
-      ) : (
-        <div className="approvals-list">
-          {parts.map(p => {
-            const filename = p.path.includes('/') ? p.path.slice(p.path.lastIndexOf('/') + 1) : p.path
-            const isSaving = rowSaving === p.path
-            return (
-              <div key={p.path} className="approval-row">
-                <div className="approval-main">
-                  <div className="approval-pn">{p.partNumber}</div>
-                  <div className="approval-meta">
-                    <strong>{filename}</strong> · {p.topLevel}
-                    {p.meta.manufacturingMethod && <> · {p.meta.manufacturingMethod}</>}
-                    {p.meta.manufacturingMaterial && <> · {p.meta.manufacturingMaterial}</>}
-                    {typeof p.meta.mass === 'number' && <> · {p.meta.mass.toFixed(2)} lb</>}
-                  </div>
-                  {p.description && <div className="approval-desc">{p.description}</div>}
-                </div>
-                <div className="approval-actions">
-                  <button
-                    className="toolbar-btn"
-                    onClick={() => onReject(p.path)}
-                    disabled={isSaving}
-                  >
-                    Send back to draft
-                  </button>
-                  <button
-                    className="toolbar-btn primary"
-                    onClick={() => onApprove(p.path)}
-                    disabled={isSaving}
-                  >
-                    Approve & release
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
 
 interface ToolsTabProps {
   integrity: null | {

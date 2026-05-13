@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs/promises'
-import type { ManufacturingMethod, ManufacturingQueueItem, PartMeta, ProjectTotals, ReleaseState } from '@shared/types'
+import type { BulkMetaPatch, ManufacturingMethod, ManufacturingQueueItem, PartMeta, ProjectTotals, ReleaseState } from '@shared/types'
+export type { BulkMetaPatch }
 import { getProjectPath, getGit, pullRemoteFile, commitAndPushFile } from './git'
 
 const META_DIR = '.trentcad'
@@ -206,6 +207,71 @@ export async function setManufacturingMaterial(filePath: string, material: strin
     },
     `[mfg-material] ${path.basename(filePath)}`
   )
+}
+
+/**
+ * Apply many per-path patches in a single pull/commit/push cycle. Used
+ * by the renderer's edit queue so rapid cell edits and bulk-select
+ * actions both collapse to one commit + push instead of N.
+ *
+ * `updates` may include the same field across many paths (bulk select)
+ * or different fields per path (queued user edits) — both work. Returns
+ * the count of patched entries.
+ */
+export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Promise<number> {
+  const entries = Object.entries(updates).filter(([, p]) => p && Object.keys(p).length > 0)
+  if (entries.length === 0) return 0
+
+  const by = await gitUsername()
+  const now = new Date().toISOString()
+
+  await pullRemoteFile(metaRelPath())
+  const all = await loadAllMeta()
+
+  let touched = 0
+  const fieldCounts: Record<string, number> = {}
+  let uniformRelease: ReleaseState | null | 'mixed' = null
+  let uniformMethod: ManufacturingMethod | null | 'mixed' | undefined = undefined
+
+  for (const [filePath, patch] of entries) {
+    const entry = all[filePath] || {}
+    if (patch.release !== undefined) {
+      entry.release = { state: patch.release, by, at: now }
+      fieldCounts.release = (fieldCounts.release || 0) + 1
+      if (uniformRelease === null) uniformRelease = patch.release
+      else if (uniformRelease !== patch.release) uniformRelease = 'mixed'
+    }
+    if (patch.manufacturingMethod !== undefined) {
+      if (patch.manufacturingMethod === null) delete entry.manufacturingMethod
+      else entry.manufacturingMethod = patch.manufacturingMethod
+      fieldCounts.method = (fieldCounts.method || 0) + 1
+      if (uniformMethod === undefined) uniformMethod = patch.manufacturingMethod
+      else if (uniformMethod !== patch.manufacturingMethod) uniformMethod = 'mixed'
+    }
+    if (patch.manufacturingMaterial !== undefined) {
+      const trimmed = (patch.manufacturingMaterial ?? '').trim()
+      if (!trimmed) delete entry.manufacturingMaterial
+      else entry.manufacturingMaterial = trimmed
+      fieldCounts.material = (fieldCounts.material || 0) + 1
+    }
+    all[filePath] = entry
+    touched++
+  }
+  await saveAllMeta(all)
+
+  const labelParts: string[] = []
+  if (fieldCounts.release) {
+    labelParts.push(uniformRelease === 'mixed' ? `release×${fieldCounts.release}` : `release=${uniformRelease}`)
+  }
+  if (fieldCounts.method) {
+    const m = uniformMethod === 'mixed' ? `method×${fieldCounts.method}` :
+      `method=${uniformMethod ?? 'cleared'}`
+    labelParts.push(m)
+  }
+  if (fieldCounts.material) labelParts.push(`material×${fieldCounts.material}`)
+  const msg = `[bulk-meta] ${touched} part${touched === 1 ? '' : 's'}: ${labelParts.join(', ')}`
+  await commitAndPushFile(metaRelPath(), msg)
+  return touched
 }
 
 /**

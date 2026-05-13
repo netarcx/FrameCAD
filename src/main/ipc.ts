@@ -435,6 +435,12 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     broadcastStatus(getMainWindow)
   })
 
+  ipcMain.handle('bulk-update-meta', async (_e, updates: Record<string, metaOps.BulkMetaPatch>) => {
+    const n = await metaOps.bulkUpdateMeta(updates)
+    broadcastStatus(getMainWindow)
+    return n
+  })
+
   ipcMain.handle('get-manufacturing-queue', async () => {
     return metaOps.getManufacturingQueue()
   })
