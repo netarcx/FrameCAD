@@ -16,6 +16,10 @@ const defGhOrg = JSON.stringify(process.env.TRENTCAD_DEFAULT_GITHUB_ORG || '')
 const defPrefix = JSON.stringify(process.env.TRENTCAD_DEFAULT_PROJECT_PREFIX || '')
 const defTeam = JSON.stringify(process.env.TRENTCAD_DEFAULT_TEAM_NAME || '')
 const defWelcome = JSON.stringify(process.env.TRENTCAD_DEFAULT_WELCOME_MESSAGE || '')
+// Forks point auto-bug-reports at their own repo via this var so
+// upstream isn't flooded with team-specific issues. Falls back to the
+// upstream tracker in app code when unset.
+const defIssueRepo = JSON.stringify(process.env.TRENTCAD_DEFAULT_ISSUE_REPO || '')
 
 export default defineConfig({
   main: {
@@ -30,7 +34,8 @@ export default defineConfig({
       __TRENTCAD_DEFAULT_GITHUB_ORG__: defGhOrg,
       __TRENTCAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
       __TRENTCAD_DEFAULT_TEAM_NAME__: defTeam,
-      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome
+      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome,
+      __TRENTCAD_DEFAULT_ISSUE_REPO__: defIssueRepo
     }
   },
   preload: {
@@ -63,7 +68,8 @@ export default defineConfig({
       __TRENTCAD_DEFAULT_GITHUB_ORG__: defGhOrg,
       __TRENTCAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
       __TRENTCAD_DEFAULT_TEAM_NAME__: defTeam,
-      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome
+      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome,
+      __TRENTCAD_DEFAULT_ISSUE_REPO__: defIssueRepo
     }
   }
 })

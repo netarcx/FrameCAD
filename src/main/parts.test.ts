@@ -12,6 +12,16 @@ vi.mock('./git', () => ({
   pushPartsJson: vi.fn().mockResolvedValue(undefined)
 }))
 
+// Pin the build-time team prefix so the part-numbering tests keep
+// asserting concrete strings instead of branching on the env-var
+// state of the host. Verifies the migration behaviour against the
+// historical 2129 team segment.
+vi.mock('./branding', () => ({
+  getBuildDefaultPrefix: () => '2129',
+  getBuildDefaultTeamName: () => null,
+  getBuildDefaultIssueRepo: () => null
+}))
+
 import * as parts from './parts'
 
 async function readManifest(dir: string): Promise<Record<string, unknown>> {

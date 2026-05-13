@@ -233,7 +233,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
           onClick={onLogoClick}
         />
         <h1>TrentCAD</h1>
-        <p className="subtitle">CAD collaboration for FRC Team 2129</p>
+        <p className="subtitle">{globalAdmin?.teamName ? `CAD collaboration for ${globalAdmin.teamName}` : 'CAD collaboration for FRC teams'}</p>
         {pinnedProjects.length > 0 && (
           <div className="pinned-projects">
             {pinnedProjects.map(p => (

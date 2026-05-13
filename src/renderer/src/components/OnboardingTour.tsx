@@ -15,7 +15,7 @@ const STEPS = [
   },
   {
     title: '+ Part / + Assembly',
-    body: 'Reserves a unique part number and creates a new SolidWorks document for you to edit. Saves you typing the filename — TrentCAD generates "26-2129-001" style numbers automatically.'
+    body: 'Reserves a unique part number and creates a new SolidWorks document for you to edit. Saves you typing the filename — TrentCAD generates year-team-subsystem-part numbers automatically based on your team\'s prefix.'
   },
   {
     title: 'Check Out, then Check In',

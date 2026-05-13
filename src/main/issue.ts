@@ -3,12 +3,15 @@ import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
 import { app } from 'electron'
+import { getBuildDefaultIssueRepo } from './branding'
 
 /**
  * Where bug reports go. TrentCAD's own repo, not the user's project repo —
- * project bugs and TrentCAD bugs are different things.
+ * project bugs and TrentCAD bugs are different things. Forks override
+ * the default via the TRENTCAD_DEFAULT_ISSUE_REPO env var at build time
+ * so their auto-reports land in their own tracker instead of upstream.
  */
-const ISSUE_REPO = 'netarcx/TrentCAD'
+const ISSUE_REPO = getBuildDefaultIssueRepo() || 'netarcx/TrentCAD'
 const ISSUE_LABEL = 'auto-report'
 
 export interface ReportIssueResult {

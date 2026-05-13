@@ -2,6 +2,7 @@ import path from 'path'
 import fs from 'fs/promises'
 import type { FileEntry, PartsManifest, PartEntry, PartType } from '@shared/types'
 import { getProjectPath, pullPartsJson, pushPartsJson } from './git'
+import { getBuildDefaultPrefix } from './branding'
 
 const MANIFEST_FILE = 'parts.json'
 const SOLIDWORKS_EXTS = new Set(['.sldprt', '.sldasm', '.slddrw'])
@@ -19,7 +20,14 @@ async function isCotsProject(): Promise<boolean> {
 }
 function defaultPrefix(): string {
   const yy = new Date().getFullYear().toString().slice(-2)
-  return `${yy}-2129`
+  // Build-time default first (forks set TRENTCAD_DEFAULT_PROJECT_PREFIX).
+  // If the baked-in value already has a year, take it as-is; if it's
+  // just the team segment (e.g. "1234"), prepend the current year.
+  // Falls back to a neutral placeholder when nothing's set — the user
+  // can rename via the admin panel.
+  const baked = getBuildDefaultPrefix()
+  if (baked) return /^\d{2}-/.test(baked) ? baked : `${yy}-${baked}`
+  return `${yy}-TEAM`
 }
 
 let manifestLock: Promise<void> = Promise.resolve()

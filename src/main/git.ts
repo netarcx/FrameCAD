@@ -6,6 +6,7 @@ import { getLocks, verifyLocks } from './locking'
 import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
 import { loadAllMeta, annotateMeta } from './meta'
 import { getGitHubToken } from './auth'
+import { getBuildDefaultPrefix, getBuildDefaultTeamName, getBuildDefaultIssueRepo } from './branding'
 
 // Large binary or text-based CAD files that go through Git LFS. `-text` keeps
 // git from running line-ending conversion on the file; `merge=lfs` uses the
@@ -86,9 +87,12 @@ and try again.
 `
     : ''
 
+  const teamName = getBuildDefaultTeamName() || 'an FRC team'
+  const issueRepo = getBuildDefaultIssueRepo() || 'netarcx/TrentCAD'
+
   return `# ${name}
 
-A TrentCAD project — CAD collaboration for FRC Team 2129. This repository
+A TrentCAD project — CAD collaboration for ${teamName}. This repository
 stores SolidWorks files via Git LFS and is managed end-to-end by the
 TrentCAD desktop app. You shouldn't need to use \`git\` directly.
 
@@ -156,7 +160,7 @@ prompt. Notable tabs:
 
 ## Need help?
 
-- TrentCAD bugs / requests: [github.com/netarcx/TrentCAD/issues](https://github.com/netarcx/TrentCAD/issues)
+- TrentCAD bugs / requests: [github.com/${issueRepo}/issues](https://github.com/${issueRepo}/issues)
 - Project-specific questions: ask the team lead.
 `
 }
@@ -238,8 +242,13 @@ export async function createProject(name: string, dirPath: string, remote: strin
   const partsPath = path.join(dirPath, 'parts.json')
   const partsExists = await fs.stat(partsPath).then(() => true).catch(() => false)
   if (!partsExists) {
+    const yy = new Date().getFullYear().toString().slice(-2)
+    const baked = getBuildDefaultPrefix()
+    const prefix = baked
+      ? (/^\d{2}-/.test(baked) ? baked : `${yy}-${baked}`)
+      : `${yy}-TEAM`
     const emptyManifest: PartsManifest = {
-      prefix: `${new Date().getFullYear().toString().slice(-2)}-2129`,
+      prefix,
       nextCounters: {},
       nextAssemblyCounters: {},
       entries: {},
