@@ -43,6 +43,11 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
 
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Per-project legacyMode flag, mirrored from parts.json. When true,
+  // new files take their filename as the part number instead of the
+  // YY-team-XX-YYY scheme. Toggling here saves + commits parts.json.
+  const [legacyMode, setLegacyMode] = useState(false)
+  const [legacyToggling, setLegacyToggling] = useState(false)
   const [syncingCots, setSyncingCots] = useState(false)
   const [taggingNow, setTaggingNow] = useState(false)
   const [tagName, setTagName] = useState(() => {
@@ -117,8 +122,30 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
       window.api.getMainRemoteUrl().then(url => {
         if (url) setConfig(prev => ({ ...prev, mainRepoUrl: prev.mainRepoUrl || url }))
       }).catch(() => {})
+      // Mirror parts.json's legacyMode flag into the toggle so the
+      // checkbox reflects current project state on open.
+      window.api.getPartsManifest()
+        .then(m => setLegacyMode(!!m?.legacyMode))
+        .catch(() => {})
     }
   }, [hasProject])
+
+  const handleToggleLegacy = async (next: boolean) => {
+    setLegacyToggling(true)
+    setError(null)
+    setStatus(null)
+    try {
+      await window.api.setLegacyMode(next)
+      setLegacyMode(next)
+      setStatus(next
+        ? 'Legacy mode on — new files will use their filename as the part number. Existing part numbers were not changed.'
+        : 'Legacy mode off — new files will use the auto-numbered scheme. Existing part numbers were not changed.')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLegacyToggling(false)
+    }
+  }
 
   const set = <K extends keyof AdminConfig>(key: K, value: AdminConfig[K]) => {
     setConfig(prev => ({ ...prev, [key]: value }))
@@ -754,6 +781,50 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
                   <p className="admin-hint">
                     Stays with this project. Used by the auto-numbering when creating
                     new parts and assemblies.
+                  </p>
+                  <label className="admin-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={legacyMode}
+                      onChange={e => handleToggleLegacy(e.target.checked)}
+                      disabled={legacyToggling}
+                    />
+                    <span>Legacy mode (use filenames as part numbers)</span>
+                  </label>
+                  <label className="admin-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={!!config.hideMass}
+                      onChange={e => set('hideMass', e.target.checked || undefined)}
+                    />
+                    <span>Hide robot weight / mass display</span>
+                  </label>
+                  <label className="admin-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={!!config.hideCost}
+                      onChange={e => set('hideCost', e.target.checked || undefined)}
+                    />
+                    <span>Hide robot cost display</span>
+                  </label>
+                  <p className="admin-hint">
+                    Hides the mass / cost rollups in the status bar and
+                    omits them from generated documents. The underlying
+                    per-part values stay in <code>parts-meta.json</code>;
+                    just turn the toggle back off to reveal them again.
+                  </p>
+                  <p className="admin-hint">
+                    Turn this on for an existing project that pre-dates
+                    TrentCAD's numbering scheme. New files keep their
+                    original filename (e.g. <code>Frame.sldprt</code>) as
+                    the displayed part number instead of getting a
+                    generated <code>26-2129-001</code>. <strong>Toggling
+                    doesn't rewrite existing part numbers</strong> — SolidWorks
+                    assembly references would break if it did, so once a
+                    file has a number it keeps that number for life. Only
+                    files added after the flip pick up the other behavior.
+                    TrentCAD auto-enables this when opening a non-TrentCAD
+                    project for the first time.
                   </p>
                 </div>
 

@@ -27,6 +27,7 @@ export default function useParts({ enabled }: UsePartsOptions) {
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [flushing, setFlushing] = useState(false)
+  const [legacyMode, setLegacyMode] = useState(false)
 
   const loadAllParts = useCallback(async () => {
     setLoading(true)
@@ -35,7 +36,8 @@ export default function useParts({ enabled }: UsePartsOptions) {
         window.api.getPartsManifest() as Promise<PartsManifest | null>,
         window.api.getAllPartsMeta() as Promise<Record<string, PartMeta>>
       ])
-      if (!manifest) { setAllParts([]); return }
+      if (!manifest) { setAllParts([]); setLegacyMode(false); return }
+      setLegacyMode(!!manifest.legacyMode)
       const rows: JoinedPart[] = Object.entries(manifest.entries).map(([p, e]) => ({
         path: p,
         partNumber: e.partNumber,
@@ -216,6 +218,7 @@ export default function useParts({ enabled }: UsePartsOptions) {
     loading,
     error,
     subsystemOptions,
+    legacyMode,
     filter, setFilter,
     subsystem, setSubsystem,
     stateFilter, setStateFilter,

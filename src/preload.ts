@@ -41,6 +41,9 @@ const api: IpcApi = {
   getRemoteAhead: () =>
     ipcRenderer.invoke('get-remote-ahead'),
 
+  setLegacyMode: (enabled) =>
+    ipcRenderer.invoke('set-legacy-mode', enabled),
+
   selectDirectory: () =>
     ipcRenderer.invoke('select-directory'),
 

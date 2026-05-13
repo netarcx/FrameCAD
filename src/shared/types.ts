@@ -136,6 +136,15 @@ export interface PartsManifest {
   nextAssemblyCounters: Record<string, number>
   entries: Record<string, PartEntry>
   assemblies: Record<string, string>
+  /** When true, partNumbers are the file's base name (without
+   *  extension) instead of a generated YY-team-XX-YYY number.
+   *  Auto-set when TrentCAD opens an existing project that has CAD
+   *  files but no prior parts.json — preserves the team's existing
+   *  naming so we don't rename or shadow files they've already built
+   *  around. Toggleable from Project Settings; the underlying numbers
+   *  are still tracked in `entries` so a future flip back to scheme
+   *  mode would only affect new files. */
+  legacyMode?: boolean
 }
 
 export interface DriveStatus {
@@ -189,6 +198,12 @@ export interface AdminConfig {
    * Auth is left to the user via .netrc / git credential.
    */
   lfsUrl?: string
+  /** Suppress the project-totals mass rollup (status bar, BOM summary).
+   *  Useful for projects without a meaningful weight target. Default
+   *  (undefined) = shown. */
+  hideMass?: boolean
+  /** As above for cost. */
+  hideCost?: boolean
 }
 
 /**
@@ -241,6 +256,7 @@ export interface IpcApi {
   forceCheckIn(filePath: string): Promise<void>
   getLocks(): Promise<LockInfo[]>
   getRemoteAhead(): Promise<number>
+  setLegacyMode(enabled: boolean): Promise<void>
   selectDirectory(): Promise<string | null>
   openFileExplorer(path: string): Promise<void>
   getProjectConfig(): Promise<ProjectConfig | null>

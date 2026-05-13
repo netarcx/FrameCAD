@@ -345,4 +345,206 @@ describe('meta module', () => {
     expect(a.comments).toHaveLength(1)
     expect(b.comments).toBeUndefined()
   })
+
+  // --- bulkUpdateMeta / cascade tests -------------------------------------
+  // The cascade helper dynamic-imports './parts' at runtime. Seeding
+  // parts.json at the project root lets the real loadManifest resolve.
+
+  async function seedManifest(entries: Record<string, { type: string }>): Promise<void> {
+    await fs.writeFile(
+      path.join(tempDir, 'parts.json'),
+      JSON.stringify({
+        prefix: '26-2129',
+        nextCounters: {},
+        nextAssemblyCounters: {},
+        entries: Object.fromEntries(
+          Object.entries(entries).map(([k, v]) => [k, {
+            partNumber: 'X',
+            type: v.type,
+            assignedAt: '2026-01-01T00:00:00Z'
+          }])
+        ),
+        assemblies: {}
+      })
+    )
+  }
+
+  describe('bulkUpdateMeta', () => {
+    it('applies a single-field patch to one path', async () => {
+      await meta.bulkUpdateMeta({
+        'foo.sldprt': { release: 'released' }
+      })
+      const m = await meta.getPartMeta('foo.sldprt')
+      expect(m.release?.state).toBe('released')
+      expect(m.release?.by).toBe('tfox')
+    })
+
+    it('applies multi-field patches in one go', async () => {
+      await meta.bulkUpdateMeta({
+        'foo.sldprt': {
+          release: 'released',
+          manufacturingMethod: 'cnc',
+          manufacturingMaterial: 'Aluminum 6061',
+          mass: 1.25,
+          cost: 9.99,
+          manufacturingNotes: 'mill the slot last'
+        }
+      })
+      const m = await meta.getPartMeta('foo.sldprt')
+      expect(m.release?.state).toBe('released')
+      expect(m.manufacturingMethod).toBe('cnc')
+      expect(m.manufacturingMaterial).toBe('Aluminum 6061')
+      expect(m.mass).toBe(1.25)
+      expect(m.cost).toBe(9.99)
+      expect(m.manufacturingNotes).toBe('mill the slot last')
+    })
+
+    it('applies the same patch to many paths', async () => {
+      await meta.bulkUpdateMeta({
+        'a.sldprt': { manufacturingMethod: 'print' },
+        'b.sldprt': { manufacturingMethod: 'print' },
+        'c.sldprt': { manufacturingMethod: 'print' }
+      })
+      expect((await meta.getPartMeta('a.sldprt')).manufacturingMethod).toBe('print')
+      expect((await meta.getPartMeta('b.sldprt')).manufacturingMethod).toBe('print')
+      expect((await meta.getPartMeta('c.sldprt')).manufacturingMethod).toBe('print')
+    })
+
+    it('clears a field when passed null (method, material, mass, cost)', async () => {
+      await meta.bulkUpdateMeta({
+        'foo.sldprt': {
+          manufacturingMethod: 'cnc',
+          manufacturingMaterial: 'Steel',
+          mass: 2,
+          cost: 5
+        }
+      })
+      await meta.bulkUpdateMeta({
+        'foo.sldprt': {
+          manufacturingMethod: null,
+          manufacturingMaterial: null,
+          mass: null,
+          cost: null
+        }
+      })
+      const m = await meta.getPartMeta('foo.sldprt')
+      expect(m.manufacturingMethod).toBeUndefined()
+      expect(m.manufacturingMaterial).toBeUndefined()
+      expect(m.mass).toBeUndefined()
+      expect(m.cost).toBeUndefined()
+    })
+
+    it('rejects negative or non-finite mass without erroring (silent skip)', async () => {
+      await meta.bulkUpdateMeta({
+        'foo.sldprt': { mass: 1.5 }
+      })
+      // Try to corrupt with a bad value — silently ignored, previous value stays
+      await meta.bulkUpdateMeta({
+        'foo.sldprt': { mass: -1 }
+      })
+      const m = await meta.getPartMeta('foo.sldprt')
+      expect(m.mass).toBe(1.5)
+    })
+
+    it('cascades in-review from .sldasm to all sibling/descendant files', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' },
+        'Drivetrain/Wheel.sldprt': { type: 'part' },
+        'Drivetrain/Sub/Bracket.sldprt': { type: 'part' },
+        'Climber/Hook.sldprt': { type: 'part' }
+      })
+      await meta.bulkUpdateMeta({
+        'Drivetrain/Drivetrain.sldasm': { release: 'in-review' }
+      })
+      expect((await meta.getPartMeta('Drivetrain/Drivetrain.sldasm')).release?.state).toBe('in-review')
+      expect((await meta.getPartMeta('Drivetrain/Frame.sldprt')).release?.state).toBe('in-review')
+      expect((await meta.getPartMeta('Drivetrain/Wheel.sldprt')).release?.state).toBe('in-review')
+      expect((await meta.getPartMeta('Drivetrain/Sub/Bracket.sldprt')).release?.state).toBe('in-review')
+      // Climber/Hook is in a sibling folder — not affected
+      expect((await meta.getPartMeta('Climber/Hook.sldprt')).release?.state).toBeUndefined()
+    })
+
+    it('cascade skips parts already in the manufactured state', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' },
+        'Drivetrain/Wheel.sldprt': { type: 'part' }
+      })
+      // Manufacture one part first
+      await meta.setReleaseState('Drivetrain/Wheel.sldprt', 'manufactured')
+      // Then cascade in-review from the assembly
+      await meta.bulkUpdateMeta({
+        'Drivetrain/Drivetrain.sldasm': { release: 'in-review' }
+      })
+      expect((await meta.getPartMeta('Drivetrain/Frame.sldprt')).release?.state).toBe('in-review')
+      // Wheel keeps its manufactured state — re-reviewing something the
+      // shop already made would be nonsense.
+      expect((await meta.getPartMeta('Drivetrain/Wheel.sldprt')).release?.state).toBe('manufactured')
+    })
+
+    it('does NOT cascade when the trigger is not a .sldasm', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' }
+      })
+      await meta.bulkUpdateMeta({
+        'Drivetrain/Frame.sldprt': { release: 'in-review' }
+      })
+      expect((await meta.getPartMeta('Drivetrain/Frame.sldprt')).release?.state).toBe('in-review')
+      // Sibling parts not touched
+      expect((await meta.getPartMeta('Drivetrain/Drivetrain.sldasm')).release?.state).toBeUndefined()
+    })
+
+    it('does NOT cascade when the assembly is moved to released/draft/manufactured', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' }
+      })
+      await meta.bulkUpdateMeta({
+        'Drivetrain/Drivetrain.sldasm': { release: 'released' }
+      })
+      expect((await meta.getPartMeta('Drivetrain/Drivetrain.sldasm')).release?.state).toBe('released')
+      expect((await meta.getPartMeta('Drivetrain/Frame.sldprt')).release?.state).toBeUndefined()
+    })
+  })
+
+  describe('setReleaseState cascade', () => {
+    it('cascades in-review on .sldasm', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' }
+      })
+      await meta.setReleaseState('Drivetrain/Drivetrain.sldasm', 'in-review')
+      expect((await meta.getPartMeta('Drivetrain/Frame.sldprt')).release?.state).toBe('in-review')
+    })
+
+    it('does NOT cascade for a .sldprt trigger', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' }
+      })
+      await meta.setReleaseState('Drivetrain/Frame.sldprt', 'in-review')
+      expect((await meta.getPartMeta('Drivetrain/Drivetrain.sldasm')).release?.state).toBeUndefined()
+    })
+
+    it('does NOT cascade for non-in-review states on .sldasm', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' }
+      })
+      await meta.setReleaseState('Drivetrain/Drivetrain.sldasm', 'released')
+      expect((await meta.getPartMeta('Drivetrain/Frame.sldprt')).release?.state).toBeUndefined()
+    })
+
+    it('attaches the release note to cascaded entries', async () => {
+      await seedManifest({
+        'Drivetrain/Drivetrain.sldasm': { type: 'assembly' },
+        'Drivetrain/Frame.sldprt': { type: 'part' }
+      })
+      await meta.setReleaseState('Drivetrain/Drivetrain.sldasm', 'in-review', 'mentor review window')
+      const frame = await meta.getPartMeta('Drivetrain/Frame.sldprt')
+      expect(frame.release?.note).toBe('mentor review window')
+    })
+  })
 })

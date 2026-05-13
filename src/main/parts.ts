@@ -215,6 +215,32 @@ export function assignPartNumber(manifest: PartsManifest, relPath: string): Part
   const type = classifyFile(filename)
   if (!type) return null
 
+  // Legacy mode: project pre-dates TrentCAD's numbering scheme. Use the
+  // filename (sans extension) as the "part number" so the existing
+  // folder structure and file names show up unchanged in the UI. Still
+  // store an entry so meta, drawings, and where-used lookups have
+  // something to key off.
+  if (manifest.legacyMode) {
+    const baseName = path.basename(filename, path.extname(filename))
+    const entry: PartEntry = {
+      partNumber: baseName,
+      assignedAt: new Date().toISOString(),
+      type
+    }
+    if (type === 'drawing') {
+      // Drawings still pair with the same-named part / assembly via the
+      // base-name match — that's how legacy projects keep drawings and
+      // models in sync. linkedTo is best-effort.
+      const linked = Object.entries(manifest.entries).find(([p, e]) => {
+        if (e.type === 'drawing') return false
+        return path.basename(p, path.extname(p)) === baseName
+      })
+      if (linked) entry.linkedTo = linked[0]
+    }
+    manifest.entries[relPath] = entry
+    return entry
+  }
+
   const scope = getScope(relPath)
   const topLevel = topLevelSegment(getScope(relPath))
 
@@ -350,6 +376,15 @@ async function syncManifestImpl(): Promise<PartsManifest> {
   const swFiles = await collectSolidWorksFiles(projectDir, projectDir)
   const currentPaths = new Set(swFiles)
 
+  // Legacy-mode auto-detect: this is a first-time open if the manifest
+  // has zero entries yet. If there are SolidWorks files on disk anyway,
+  // the project pre-dates TrentCAD and the team already has filenames
+  // they care about — switch to legacy mode so we don't rename anything.
+  // Explicit `legacyMode: false` (toggled by the user later) wins.
+  if (manifest.legacyMode === undefined && Object.keys(manifest.entries).length === 0 && swFiles.length > 0) {
+    manifest.legacyMode = true
+  }
+
   await handleFileMoves(manifest, currentPaths)
 
   // Assign assemblies first (folders with .sldasm), then parts, then drawings
@@ -363,6 +398,31 @@ async function syncManifestImpl(): Promise<PartsManifest> {
 
   await saveManifest(manifest)
   return manifest
+}
+
+/**
+ * Toggle the project's `legacyMode` flag. Flipping the bit doesn't
+ * rewrite existing entries — once a part has a number (filename or
+ * scheme), it keeps that number forever, because SolidWorks assembly
+ * references hash on the filename. Only NEW files added after the
+ * flip pick up the other side's behavior. Persists + commits parts.json
+ * the same way createNewPart does.
+ */
+export async function setLegacyMode(enabled: boolean): Promise<void> {
+  await pullPartsJson()
+  const projectDir = getProjectPath()
+  const snapshot = await fs.readFile(path.join(projectDir, MANIFEST_FILE), 'utf-8').catch(() => null)
+  const manifest = await loadManifest()
+  manifest.legacyMode = !!enabled
+  await saveManifest(manifest)
+  try {
+    await pushPartsJson(enabled ? 'legacy mode on' : 'legacy mode off')
+  } catch (err) {
+    if (snapshot !== null) {
+      await fs.writeFile(path.join(projectDir, MANIFEST_FILE), snapshot)
+    }
+    throw err
+  }
 }
 
 export function syncManifest(): Promise<PartsManifest> {

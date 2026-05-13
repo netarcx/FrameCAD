@@ -308,4 +308,180 @@ describe('parts module (with temp project dir)', () => {
       expect(drawing!.partNumber).toBe(r.partNumber)
     })
   })
+
+  describe('legacy mode', () => {
+    // Helper: drop existing CAD files into the temp project so syncManifest
+    // has something to enumerate via the on-disk walk.
+    async function seedSwFiles(rel: string[]): Promise<void> {
+      for (const r of rel) {
+        const full = path.join(tempDir, r)
+        await fs.mkdir(path.dirname(full), { recursive: true })
+        await fs.writeFile(full, '')
+      }
+    }
+
+    it('auto-detects legacy when opening a project with existing CAD files and no manifest', async () => {
+      await seedSwFiles(['Frame.sldprt', 'Drivetrain/Wheel.sldprt'])
+      const manifest = await parts.syncManifest()
+      expect(manifest.legacyMode).toBe(true)
+    })
+
+    it('does NOT auto-detect legacy on a fresh empty project', async () => {
+      const manifest = await parts.syncManifest()
+      expect(manifest.legacyMode).toBeFalsy()
+    })
+
+    it('does NOT flip an existing TrentCAD project into legacy mode', async () => {
+      // Pre-existing project with one TrentCAD-style entry already in
+      // the manifest — even if the user later adds non-scheme files,
+      // legacyMode stays off so we don't silently rename.
+      await fs.writeFile(
+        path.join(tempDir, 'parts.json'),
+        JSON.stringify({
+          prefix: '26-2129',
+          nextCounters: { '': 2 },
+          nextAssemblyCounters: {},
+          entries: {
+            '26-2129-001.sldprt': { partNumber: '26-2129-001', type: 'part', assignedAt: '2026-01-01T00:00:00Z' }
+          },
+          assemblies: {}
+        })
+      )
+      await seedSwFiles(['26-2129-001.sldprt', 'LegacyFile.sldprt'])
+      const manifest = await parts.syncManifest()
+      expect(manifest.legacyMode).toBeFalsy()
+    })
+
+    it('assignPartNumber uses the filename (sans extension) as partNumber in legacy mode', async () => {
+      const manifest: any = {
+        prefix: '26-2129',
+        nextCounters: {},
+        nextAssemblyCounters: {},
+        entries: {},
+        assemblies: {},
+        legacyMode: true
+      }
+      const e = parts.assignPartNumber(manifest, 'Drivetrain/Frame.sldprt')
+      expect(e?.partNumber).toBe('Frame')
+      expect(e?.type).toBe('part')
+      // Should NOT have generated a scheme-style number
+      expect(e?.partNumber).not.toMatch(/^\d{2}-/)
+    })
+
+    it('legacy mode links a drawing to a same-base-name part by linkedTo', async () => {
+      const manifest: any = {
+        prefix: '26-2129',
+        nextCounters: {},
+        nextAssemblyCounters: {},
+        entries: {
+          'Drivetrain/Frame.sldprt': { partNumber: 'Frame', type: 'part', assignedAt: '2026-01-01T00:00:00Z' }
+        },
+        assemblies: {},
+        legacyMode: true
+      }
+      const e = parts.assignPartNumber(manifest, 'Drivetrain/Frame.slddrw')
+      expect(e?.partNumber).toBe('Frame')
+      expect(e?.type).toBe('drawing')
+      expect(e?.linkedTo).toBe('Drivetrain/Frame.sldprt')
+    })
+
+    it('legacy mode survives a syncManifest round-trip', async () => {
+      await seedSwFiles(['Frame.sldprt'])
+      const first = await parts.syncManifest()
+      expect(first.legacyMode).toBe(true)
+      // Add a second file and re-sync — legacy stays on
+      await fs.writeFile(path.join(tempDir, 'Wheel.sldprt'), '')
+      const second = await parts.syncManifest()
+      expect(second.legacyMode).toBe(true)
+      // And the new file gets a filename-based partNumber
+      expect(second.entries['Wheel.sldprt']?.partNumber).toBe('Wheel')
+    })
+  })
+
+  describe('findWhereUsed', () => {
+    async function writeManifest(entries: Record<string, { partNumber: string; type: string }>): Promise<void> {
+      await fs.writeFile(
+        path.join(tempDir, 'parts.json'),
+        JSON.stringify({
+          prefix: '26-2129',
+          nextCounters: {},
+          nextAssemblyCounters: {},
+          entries: Object.fromEntries(
+            Object.entries(entries).map(([k, v]) => [k, { ...v, assignedAt: '2026-01-01T00:00:00Z' }])
+          ),
+          assemblies: {}
+        })
+      )
+    }
+
+    it('returns assemblies in the part\'s containing folder', async () => {
+      await writeManifest({
+        'Drivetrain/Frame.sldprt': { partNumber: '26-2129-01-001', type: 'part' },
+        'Drivetrain/Drivetrain.sldasm': { partNumber: '26-2129-01', type: 'assembly' }
+      })
+      const out = await parts.findWhereUsed('Drivetrain/Frame.sldprt')
+      expect(out).toEqual(['Drivetrain/Drivetrain.sldasm'])
+    })
+
+    it('includes ancestor-folder assemblies, closest first', async () => {
+      await writeManifest({
+        'Robot/Robot.sldasm': { partNumber: 'R', type: 'assembly' },
+        'Robot/Drivetrain/Drivetrain.sldasm': { partNumber: 'D', type: 'assembly' },
+        'Robot/Drivetrain/Frame.sldprt': { partNumber: 'F', type: 'part' }
+      })
+      const out = await parts.findWhereUsed('Robot/Drivetrain/Frame.sldprt')
+      expect(out).toEqual([
+        'Robot/Drivetrain/Drivetrain.sldasm',
+        'Robot/Robot.sldasm'
+      ])
+    })
+
+    it('excludes the file itself when asking about an .sldasm', async () => {
+      await writeManifest({
+        'Drivetrain/Drivetrain.sldasm': { partNumber: 'D', type: 'assembly' },
+        'Drivetrain/Sub.sldasm': { partNumber: 'S', type: 'assembly' }
+      })
+      const out = await parts.findWhereUsed('Drivetrain/Sub.sldasm')
+      // Sub.sldasm belongs to Drivetrain.sldasm but Sub itself shouldn't appear
+      expect(out).toContain('Drivetrain/Drivetrain.sldasm')
+      expect(out).not.toContain('Drivetrain/Sub.sldasm')
+    })
+
+    it('returns empty for a root-level file', async () => {
+      await writeManifest({
+        'RootPart.sldprt': { partNumber: 'R', type: 'part' }
+      })
+      const out = await parts.findWhereUsed('RootPart.sldprt')
+      expect(out).toEqual([])
+    })
+
+    it('ignores non-.sldasm siblings (parts, drawings)', async () => {
+      await writeManifest({
+        'Drivetrain/Frame.sldprt': { partNumber: 'F', type: 'part' },
+        'Drivetrain/Frame.slddrw': { partNumber: 'F', type: 'drawing' },
+        'Drivetrain/SideBracket.sldprt': { partNumber: 'B', type: 'part' },
+        'Drivetrain/Drivetrain.sldasm': { partNumber: 'D', type: 'assembly' }
+      })
+      const out = await parts.findWhereUsed('Drivetrain/Frame.sldprt')
+      expect(out).toEqual(['Drivetrain/Drivetrain.sldasm'])
+    })
+
+    it('does not bubble through nested folders (direct-child .sldasm only at each ancestor)', async () => {
+      // Robot/Drivetrain/Sub/Sub.sldasm sits two levels under Robot —
+      // when asking about Robot's direct ancestors of a deep part, the
+      // intermediate ancestor (Drivetrain) shouldn't see Sub's sldasm
+      // when Sub.sldasm lives deeper.
+      await writeManifest({
+        'Robot/Drivetrain/Sub/Sub.sldasm': { partNumber: 'S', type: 'assembly' },
+        'Robot/Drivetrain/Drivetrain.sldasm': { partNumber: 'D', type: 'assembly' },
+        'Robot/Drivetrain/Sub/Bracket.sldprt': { partNumber: 'B', type: 'part' }
+      })
+      const out = await parts.findWhereUsed('Robot/Drivetrain/Sub/Bracket.sldprt')
+      // Sub.sldasm first (closest), then Drivetrain.sldasm (one up)
+      expect(out).toEqual([
+        'Robot/Drivetrain/Sub/Sub.sldasm',
+        'Robot/Drivetrain/Drivetrain.sldasm'
+      ])
+    })
+  })
 })

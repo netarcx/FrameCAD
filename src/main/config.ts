@@ -18,7 +18,7 @@ const CONFIG_FILE = 'trentcad-app.json'
  * - On Windows, uppercases the drive letter so "c:\" and "C:\" match,
  *   matching how Windows itself treats them.
  */
-function canonPath(p: string): string {
+export function canonPath(p: string): string {
   if (!p) return p
   let norm = path.normalize(p)
   // Trim trailing separators except for roots

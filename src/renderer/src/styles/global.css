@@ -288,6 +288,24 @@ input {
   flex: 1;
 }
 
+/* Inline checkbox + label row used for binary admin toggles
+   (legacy mode, weight/cost display, etc). Sits between an input
+   and its hint text without forcing the standard label/input
+   stacking. */
+.admin-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-checkbox-row input[type="checkbox"] {
+  cursor: pointer;
+  margin: 0;
+}
+
 .admin-hint {
   font-size: 11px;
   color: var(--text-muted);

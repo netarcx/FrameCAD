@@ -1200,7 +1200,7 @@ export async function commitAndPushFile(relPath: string, message: string): Promi
  * commits we don't. Triggers our rebase-and-retry path. Other push
  * failures (auth, network) shouldn't fall through here.
  */
-function isNonFastForward(msg: string): boolean {
+export function isNonFastForward(msg: string): boolean {
   return /rejected|non-fast-forward|fetch first|tip of your current branch is behind/i.test(msg)
 }
 

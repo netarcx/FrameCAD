@@ -19,6 +19,11 @@ interface Props {
   /** Count of commits on origin ahead of local. > 0 highlights the Sync
    *  button so the user knows there's something to pull. */
   remoteAhead?: number
+  /** When true, this project pre-dates TrentCAD's part-numbering and
+   *  uses filenames as the de-facto part numbers. The auto-numbered
+   *  New Part / New Assembly buttons are hidden so we don't impose
+   *  the YY-team-XX-YYY scheme on a project that has its own. */
+  legacyMode?: boolean
 }
 
 function getSelectedFolder(file: FileEntry | null): string {
@@ -31,7 +36,8 @@ export default function Toolbar({
   onSync, onPublish, onNewPart, onNewAssembly, onNewSubsystem,
   selectedFile, isLoading, hasProject, isCotsProject,
   activeSection, inspectorOpen, onToggleInspector,
-  remoteAhead = 0
+  remoteAhead = 0,
+  legacyMode = false
 }: Props) {
   const [showPublish, setShowPublish] = useState(false)
   const [message, setMessage] = useState('')
@@ -147,13 +153,20 @@ export default function Toolbar({
                 </button>
                 {showCreateMenu && (
                   <div className="create-dropdown-menu" onMouseLeave={() => setShowCreateMenu(false)}>
-                    <button onClick={() => { setShowCreateMenu(false); setShowNewPart(true) }}>
-                      New Part
-                    </button>
-                    <button onClick={() => { setShowCreateMenu(false); setShowNewAssembly(true) }}>
-                      New Assembly
-                    </button>
-                    <div className="create-dropdown-sep" />
+                    {/* Hide auto-numbered creators in legacy mode — the
+                        project pre-dates TrentCAD's numbering scheme and
+                        the team names files themselves in SolidWorks. */}
+                    {!legacyMode && (
+                      <>
+                        <button onClick={() => { setShowCreateMenu(false); setShowNewPart(true) }}>
+                          New Part
+                        </button>
+                        <button onClick={() => { setShowCreateMenu(false); setShowNewAssembly(true) }}>
+                          New Assembly
+                        </button>
+                        <div className="create-dropdown-sep" />
+                      </>
+                    )}
                     <button onClick={() => { setShowCreateMenu(false); setShowNewSubsystem(true) }}>
                       New Folder
                     </button>

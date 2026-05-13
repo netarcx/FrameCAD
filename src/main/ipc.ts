@@ -210,6 +210,11 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     return gitOps.getRemoteAhead()
   })
 
+  ipcMain.handle('set-legacy-mode', async (_e, enabled: boolean) => {
+    await partsOps.setLegacyMode(enabled)
+    broadcastStatus(getMainWindow)
+  })
+
   ipcMain.handle('select-directory', async () => {
     const win = getMainWindow()
     if (!win) return null

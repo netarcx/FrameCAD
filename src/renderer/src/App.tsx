@@ -834,6 +834,7 @@ export default function App() {
         inspectorOpen={inspectorOpen}
         onToggleInspector={() => setInspectorOpen(o => !o)}
         remoteAhead={remoteAhead}
+        legacyMode={parts.legacyMode}
       />
 
       <div className="app-main">
@@ -1001,14 +1002,18 @@ export default function App() {
       {depsModal}
 
       <div className="status-bar">
-        {projectTotals && projectTotals.totalParts > 0 && (
+        {projectTotals && projectTotals.totalParts > 0 && (!adminConfig.hideMass || !adminConfig.hideCost) && (
           <>
-            <span className="status-item robot-totals" title={`From ${projectTotals.partsWithMass} of ${projectTotals.totalParts} parts`}>
-              <strong>Robot:</strong> {projectTotals.mass.toFixed(1)} lb
-            </span>
-            <span className="status-item robot-totals" title={`From ${projectTotals.partsWithCost} of ${projectTotals.totalParts} parts`}>
-              <strong>$</strong>{projectTotals.cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </span>
+            {!adminConfig.hideMass && (
+              <span className="status-item robot-totals" title={`From ${projectTotals.partsWithMass} of ${projectTotals.totalParts} parts`}>
+                <strong>Robot:</strong> {projectTotals.mass.toFixed(1)} lb
+              </span>
+            )}
+            {!adminConfig.hideCost && (
+              <span className="status-item robot-totals" title={`From ${projectTotals.partsWithCost} of ${projectTotals.totalParts} parts`}>
+                <strong>$</strong>{projectTotals.cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </span>
+            )}
             <span className="status-sep" />
           </>
         )}
