@@ -5,6 +5,7 @@ import type { FileEntry, FileState, HistoryEntry, PartsManifest, PublishProgress
 import { getLocks, verifyLocks } from './locking'
 import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
 import { loadAllMeta, annotateMeta } from './meta'
+import { getGitHubToken } from './auth'
 
 // Large binary or text-based CAD files that go through Git LFS. `-text` keeps
 // git from running line-ending conversion on the file; `merge=lfs` uses the
@@ -215,18 +216,62 @@ async function runJoinClone(
     })
     cloneGit.env('GIT_CLONE_PROTECTION_ACTIVE', 'false')
 
+    // Inject the GitHub token directly into the clone URL. Packaged
+    // Linux builds launched from a .desktop file can't reliably reach
+    // the system keyring, so the gh credential helper fails and git
+    // tries to prompt on /dev/tty which doesn't exist. Embedding the
+    // token in the URL bypasses credentials entirely. After the clone
+    // succeeds we reset the remote URL so the token doesn't persist
+    // in .git/config.
+    let cloneUrl = url
+    let tokenUsed = false
+    if (/^https:\/\/github\.com\//i.test(url)) {
+      const token = await getGitHubToken()
+      if (token) {
+        cloneUrl = url.replace(
+          /^https:\/\/github\.com\//i,
+          `https://x-access-token:${token}@github.com/`
+        )
+        tokenUsed = true
+      }
+    }
+
     cloneGit.outputHandler((_bin, _stdout, stderr) => {
       stderr.on('data', (chunk: Buffer) => {
         if (!onProgress) return
         const text = chunk.toString()
-        // Git LFS smudge emits lines like "Downloading LFS objects: 50% (1/2)..."
-        const lfs = text.match(/Downloading LFS objects:\s+(\d+)%\s+\((\d+)\/(\d+)\)/)
+        // Git LFS download — lines look like:
+        // "Downloading LFS objects: 50% (1/2), 12.3 MB | 4.5 MB/s"
+        const lfs = text.match(
+          /Downloading LFS objects:\s+(\d+)%\s+\((\d+)\/(\d+)\)(?:,\s+([\d.]+\s*\w+))?(?:\s*\|\s*([\d.]+\s*\w+\/s))?/
+        )
         if (lfs) {
+          const [, pct, done, total, transferred, speed] = lfs
+          const parts = [`${done} of ${total} files`]
+          if (transferred) parts.push(transferred.trim())
+          if (speed) parts.push(`${speed.trim()}`)
           onProgress({
             phase: 'uploading',
             files: [],
-            percent: parseInt(lfs[1], 10),
-            detail: `Downloading LFS files (${lfs[2]} of ${lfs[3]})`
+            percent: parseInt(pct, 10),
+            detail: `Downloading LFS — ${parts.join(' · ')}`
+          })
+          return
+        }
+        // After download, git-lfs writes files to the working tree:
+        // "Filtering content: 50% (1/2), 12.3 MB | 4.5 MB/s"
+        const filter = text.match(
+          /Filtering content:\s+(\d+)%\s+\((\d+)\/(\d+)\)(?:,\s+([\d.]+\s*\w+))?(?:\s*\|\s*([\d.]+\s*\w+\/s))?/
+        )
+        if (filter) {
+          const [, pct, done, total, , speed] = filter
+          const parts = [`${done} of ${total} files`]
+          if (speed) parts.push(speed.trim())
+          onProgress({
+            phase: 'uploading',
+            files: [],
+            percent: parseInt(pct, 10),
+            detail: `Extracting CAD files — ${parts.join(' · ')}`
           })
         }
       })
@@ -238,7 +283,7 @@ async function runJoinClone(
     // buffer / timeouts from the FIRST object download, not git's
     // defaults. `applyUploadTunings()` after the clone would write the
     // same config too late: the smudge has already run.
-    await cloneGit.clone(url, dirPath, [
+    await cloneGit.clone(cloneUrl, dirPath, [
       '--config', 'lfs.concurrenttransfers=12',
       '--config', 'http.postBuffer=524288000',
       '--config', 'lfs.activitytimeout=600',
@@ -246,6 +291,12 @@ async function runJoinClone(
     ])
     git = simpleGit(dirPath)
     projectPath = dirPath
+    if (tokenUsed) {
+      // Reset the stored remote URL so the token isn't persisted
+      // in .git/config. Future push/pull will get credentials via
+      // GIT_ASKPASS (set by cacheGhToken in auth.ts) instead.
+      await git.remote(['set-url', 'origin', url])
+    }
   })
   // applyUploadTunings is still useful as a no-op safety net (and to
   // persist the values if the --config form ever stops working in a

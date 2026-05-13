@@ -3,6 +3,9 @@ export interface ProjectConfig {
   path: string
   remote: string
   partPrefix?: string
+  /** When true, kept in the recent-projects list permanently and shown
+   *  before unpinned entries on the Open Project picker. */
+  pinned?: boolean
 }
 
 export type FileState = 'synced' | 'modified' | 'untracked' | 'locked-by-you' | 'locked-by-other'
@@ -230,6 +233,8 @@ export interface IpcApi {
   getDriveStatus(): Promise<DriveStatus>
   syncToDrive(): Promise<DriveSyncResult>
   getRecentProjects(): Promise<ProjectConfig[]>
+  setProjectPinned(projectPath: string, pinned: boolean): Promise<void>
+  removeRecentProject(projectPath: string): Promise<void>
   createSubsystem(parentFolder: string, name: string): Promise<{ folderPath: string }>
   getGitIdentity(): Promise<{ name: string; email: string }>
   setGitIdentity(name: string, email: string): Promise<void>
@@ -246,6 +251,7 @@ export interface IpcApi {
   openExternal(url: string): Promise<void>
   githubAuthStatus(): Promise<GitHubAuthStatus>
   githubLogin(): Promise<{ launched: boolean; error?: string }>
+  githubLogout(): Promise<{ success: boolean; error?: string }>
   reportIssue(errorMessage: string): Promise<{ success: boolean; url?: string; number?: number; error?: string }>
   generateDocument(type: 'bom' | 'manufacturing' | 'summary' | 'bom-by-subsystem'): Promise<{ success: boolean; filePath?: string; relPath?: string; pdfFilePath?: string; pdfRelPath?: string; pdfError?: string; error?: string }>
   openPath(absPath: string): Promise<{ success: boolean; error?: string }>

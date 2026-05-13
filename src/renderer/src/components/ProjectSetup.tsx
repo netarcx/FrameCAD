@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { FilePlus2, Search, Download, FolderOpen, Factory, Pin, PinOff, X, ShieldCheck } from 'lucide-react'
 import logoUrl from '../assets/logo.png'
 import BrowseProjects from './BrowseProjects'
 import type { GitHubAuthStatus, GlobalAdminConfig, ProjectConfig } from '@shared/types'
@@ -11,6 +12,9 @@ interface Props {
    *  Manufacturing View (shop-floor mode). Disabled when there are no
    *  recent projects to open. */
   onEnterManufacturingView?: () => void
+  /** Triggered by the unlocked Admin Panel button (9-click easter egg).
+   *  Parent runs the existing PIN prompt → admin overlay flow. */
+  onOpenAdmin?: () => void
   isLoading: boolean
   /**
    * Install-wide admin settings (Team + Browse). Used to enable the
@@ -21,7 +25,7 @@ interface Props {
 
 type Mode = 'select' | 'create' | 'join' | 'open'
 
-export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, onEnterManufacturingView, isLoading, globalAdmin }: Props) {
+export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, onEnterManufacturingView, onOpenAdmin, isLoading, globalAdmin }: Props) {
   const [mode, setMode] = useState<Mode>('select')
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
@@ -105,15 +109,130 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     if (dir) setPath(dir)
   }
 
+  const refreshRecents = useCallback(() => {
+    window.api.getRecentProjects().then(setRecentProjects).catch(() => {})
+  }, [])
+
+  const handleBrowseAndOpen = async () => {
+    const dir = await window.api.selectDirectory()
+    if (dir) onOpenProject(dir)
+  }
+
+  const togglePin = useCallback(async (p: ProjectConfig) => {
+    try {
+      await window.api.setProjectPinned(p.path, !p.pinned)
+      refreshRecents()
+    } catch (err) {
+      setResetupMsg(`Could not ${p.pinned ? 'unpin' : 'pin'} project: ${(err as Error).message}`)
+    }
+  }, [refreshRecents])
+
+  const removeFromRecent = useCallback(async (p: ProjectConfig) => {
+    try {
+      await window.api.removeRecentProject(p.path)
+      refreshRecents()
+    } catch (err) {
+      setResetupMsg(`Could not remove project: ${(err as Error).message}`)
+    }
+  }, [refreshRecents])
+
+  const pinnedProjects = recentProjects.filter(p => p.pinned)
+  const unpinnedProjects = recentProjects.filter(p => !p.pinned)
+
+  // Easter-egg unlock: persisted in localStorage by AdminPage's
+  // 9-click corner sequence. Once unlocked, the welcome screen shows
+  // a permanent Admin Panel button.
+  const [adminUnlocked, setAdminUnlocked] = useState(
+    () => localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1'
+  )
+  useEffect(() => {
+    const recheck = () =>
+      setAdminUnlocked(localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1')
+    // Same-window unlock (admin overlay closes back into the welcome
+    // screen). storage events only fire cross-window, so AdminPage
+    // dispatches a custom event we listen for here.
+    window.addEventListener('admin-shortcut-unlocked', recheck)
+    // Cross-window or external edit (rare).
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'trentcad-admin-shortcut-unlocked') recheck()
+    }
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('focus', recheck)
+    return () => {
+      window.removeEventListener('admin-shortcut-unlocked', recheck)
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [])
+
+  // Logo double-click easter egg
+  const logoRef = useRef<HTMLImageElement | null>(null)
+  const spinLogo = () => {
+    const el = logoRef.current
+    if (!el) return
+    // Already spinning — let it finish, ignore the extra click. Avoids
+    // the visual glitch of class-toggling mid-animation.
+    if (el.classList.contains('spinning')) return
+    el.classList.add('spinning')
+    const onEnd = () => {
+      el.classList.remove('spinning')
+      el.removeEventListener('animationend', onEnd)
+    }
+    el.addEventListener('animationend', onEnd)
+  }
+
   if (mode === 'select') {
     return (
       <div className="setup-screen">
-        <img className="setup-logo" src={logoUrl} alt="TrentCAD" />
+        {adminUnlocked && onOpenAdmin && (
+          <button
+            className="welcome-admin-btn"
+            onClick={onOpenAdmin}
+            title="Open the admin panel"
+          >
+            <ShieldCheck size={14} strokeWidth={1.75} />
+            <span>Admin Panel</span>
+          </button>
+        )}
+        <img
+          ref={logoRef}
+          className="setup-logo"
+          src={logoUrl}
+          alt="TrentCAD"
+          onDoubleClick={spinLogo}
+        />
         <h1>TrentCAD</h1>
         <p className="subtitle">CAD collaboration for FRC Team 2129</p>
+        {pinnedProjects.length > 0 && (
+          <div className="pinned-projects">
+            {pinnedProjects.map(p => (
+              <div key={p.path} className="pinned-project-card" title={p.path}>
+                <button
+                  type="button"
+                  className="pinned-project-open"
+                  onClick={() => onOpenProject(p.path)}
+                  disabled={isLoading}
+                >
+                  <Pin size={18} strokeWidth={1.75} className="pinned-project-pin" />
+                  <span className="pinned-project-name">{p.name}</span>
+                  <span className="pinned-project-path">{p.path}</span>
+                </button>
+                <button
+                  type="button"
+                  className="pinned-project-unpin"
+                  onClick={() => togglePin(p)}
+                  title="Unpin from welcome screen"
+                  aria-label="Unpin"
+                >
+                  <PinOff size={14} strokeWidth={1.75} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="setup-cards">
           <button className="setup-card" onClick={() => setMode('create')}>
-            <span className="card-icon">+</span>
+            <span className="card-icon"><FilePlus2 size={32} strokeWidth={1.5} /></span>
             <span className="card-title">Create Project</span>
             <span className="card-desc">Start a new CAD project<br />with version control</span>
           </button>
@@ -127,14 +246,18 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
                 ? 'Admin hasn\'t configured a GitHub organisation — paste a URL instead'
                 : 'Sign in to GitHub to browse team projects'}
           >
-            <span className="card-icon">{'⌕'}</span>
+            <span className="card-icon">
+              {canBrowse
+                ? <Search size={32} strokeWidth={1.5} />
+                : <Download size={32} strokeWidth={1.5} />}
+            </span>
             <span className="card-title">{canBrowse ? 'Browse Projects' : 'Join Project'}</span>
             <span className="card-desc">{canBrowse
               ? <>List repos from<br />the {orgConfigured} org</>
               : <>Download a team project<br />from GitHub</>}</span>
           </button>
           <button className="setup-card" onClick={() => setMode('open')}>
-            <span className="card-icon">{'⊞'}</span>
+            <span className="card-icon"><FolderOpen size={32} strokeWidth={1.5} /></span>
             <span className="card-title">Open Project</span>
             <span className="card-desc">Open an existing<br />project folder</span>
           </button>
@@ -146,7 +269,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
               ? 'Open or create a project first — the manufacturing queue lives inside a project'
               : 'Shop-floor view: just what needs to be made'}
           >
-            <span className="card-icon">{'⚙'}</span>
+            <span className="card-icon"><Factory size={32} strokeWidth={1.5} /></span>
             <span className="card-title">Manufacturing View</span>
             <span className="card-desc">Shop-floor queue<br />grouped by method</span>
           </button>
@@ -168,10 +291,27 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
         <div className="setup-toolbar">
           <div className="setup-auth">
             {authStatus?.loggedIn ? (
-              // Already signed in — just show the badge, no buttons
-              <span className="setup-auth-status">
-                ✓ Signed in to GitHub as <strong>{authStatus.username}</strong>
-              </span>
+              <>
+                <span className="setup-auth-status">
+                  ✓ Signed in to GitHub as <strong>{authStatus.username}</strong>
+                </span>
+                <button
+                  className="toolbar-btn"
+                  onClick={async () => {
+                    setResetupMsg(null)
+                    const r = await window.api.githubLogout()
+                    if (r.success) {
+                      setResetupMsg('Signed out of GitHub.')
+                      refreshAuth()
+                    } else {
+                      setResetupMsg(r.error || 'Could not sign out.')
+                    }
+                  }}
+                  title="Sign out of GitHub on this computer"
+                >
+                  Sign out
+                </button>
+              </>
             ) : signInPending ? (
               // Sign-in launched, waiting for the user to finish in the
               // browser/terminal. We auto-poll every 3s; the manual refresh
@@ -360,25 +500,95 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   return (
     <div className="setup-screen">
       <h1>Open Project</h1>
-      <div className="setup-form">
-        <div className="form-group">
-          <label>Project Folder</label>
-          <div className="path-input">
-            <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\team2129\Documents\2026-Robot" />
-            <button className="browse-btn" onClick={handleBrowse}>Browse</button>
+      <p className="subtitle">Pick a recent project, or browse for a folder.</p>
+      <div className="open-projects">
+        {pinnedProjects.length > 0 && (
+          <div className="open-projects-section">
+            <div className="open-projects-section-label">Pinned</div>
+            {pinnedProjects.map(p => (
+              <ProjectRow
+                key={p.path}
+                project={p}
+                disabled={isLoading}
+                onOpen={() => onOpenProject(p.path)}
+                onTogglePin={() => togglePin(p)}
+                onRemove={() => removeFromRecent(p)}
+              />
+            ))}
           </div>
-        </div>
-        <div className="form-actions">
-          <button className="toolbar-btn" onClick={() => setMode('select')}>Back</button>
-          <button
-            className="toolbar-btn primary"
-            disabled={!path || isLoading}
-            onClick={() => onOpenProject(path)}
-          >
-            {isLoading ? <span className="loading-spinner" /> : 'Open'}
-          </button>
-        </div>
+        )}
+        {unpinnedProjects.length > 0 && (
+          <div className="open-projects-section">
+            <div className="open-projects-section-label">Recent</div>
+            {unpinnedProjects.map(p => (
+              <ProjectRow
+                key={p.path}
+                project={p}
+                disabled={isLoading}
+                onOpen={() => onOpenProject(p.path)}
+                onTogglePin={() => togglePin(p)}
+                onRemove={() => removeFromRecent(p)}
+              />
+            ))}
+          </div>
+        )}
+        {recentProjects.length === 0 && (
+          <div className="open-projects-empty">
+            No recent projects yet. Browse for a folder below to open one.
+          </div>
+        )}
+        <button
+          className="open-projects-browse"
+          onClick={handleBrowseAndOpen}
+          disabled={isLoading}
+        >
+          <FolderOpen size={18} strokeWidth={1.75} />
+          <span>Browse for a project folder…</span>
+        </button>
       </div>
+      <div className="form-actions">
+        <button className="toolbar-btn" onClick={() => setMode('select')}>Back</button>
+      </div>
+    </div>
+  )
+}
+
+interface ProjectRowProps {
+  project: ProjectConfig
+  disabled: boolean
+  onOpen: () => void
+  onTogglePin: () => void
+  onRemove: () => void
+}
+
+function ProjectRow({ project, disabled, onOpen, onTogglePin, onRemove }: ProjectRowProps) {
+  return (
+    <div className="open-project-row">
+      <button
+        className="open-project-main"
+        onClick={onOpen}
+        disabled={disabled}
+        title={project.path}
+      >
+        <span className="open-project-name">{project.name}</span>
+        <span className="open-project-path">{project.path}</span>
+      </button>
+      <button
+        className="open-project-action"
+        onClick={onTogglePin}
+        title={project.pinned ? 'Unpin' : 'Pin to top'}
+      >
+        {project.pinned
+          ? <PinOff size={14} strokeWidth={1.75} />
+          : <Pin size={14} strokeWidth={1.75} />}
+      </button>
+      <button
+        className="open-project-action"
+        onClick={onRemove}
+        title="Remove from list"
+      >
+        <X size={14} strokeWidth={1.75} />
+      </button>
     </div>
   )
 }

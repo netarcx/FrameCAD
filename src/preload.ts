@@ -68,6 +68,12 @@ const api: IpcApi = {
   getRecentProjects: () =>
     ipcRenderer.invoke('get-recent-projects'),
 
+  setProjectPinned: (projectPath, pinned) =>
+    ipcRenderer.invoke('set-project-pinned', projectPath, pinned),
+
+  removeRecentProject: (projectPath) =>
+    ipcRenderer.invoke('remove-recent-project', projectPath),
+
   createSubsystem: (parentFolder, name) =>
     ipcRenderer.invoke('create-subsystem', parentFolder, name),
 
@@ -97,6 +103,9 @@ const api: IpcApi = {
 
   githubLogin: () =>
     ipcRenderer.invoke('github-login'),
+
+  githubLogout: () =>
+    ipcRenderer.invoke('github-logout'),
 
   reportIssue: (errorMessage) =>
     ipcRenderer.invoke('report-issue', errorMessage),

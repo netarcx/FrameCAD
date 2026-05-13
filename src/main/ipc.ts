@@ -19,7 +19,7 @@ import {
   resetGlobalAdmin,
   migrateFromCachedBrowseConfig
 } from './global-admin'
-import { addRecentProject, getRecentProjects, getCachedBrowseConfig } from './config'
+import { addRecentProject, getRecentProjects, getCachedBrowseConfig, setProjectPinned, removeRecentProject } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate, setRestMainWindow } from './rest'
 import * as driveOps from './drive'
 import type { ProjectConfig } from '@shared/types'
@@ -262,6 +262,14 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     return getRecentProjects()
   })
 
+  ipcMain.handle('set-project-pinned', async (_e, projectPath: string, pinned: boolean) => {
+    await setProjectPinned(projectPath, pinned)
+  })
+
+  ipcMain.handle('remove-recent-project', async (_e, projectPath: string) => {
+    await removeRecentProject(projectPath)
+  })
+
   ipcMain.handle('get-git-identity', async () => {
     return gitOps.getGitIdentity()
   })
@@ -281,6 +289,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle('check-dependencies', async () => depsOps.checkDependencies())
   ipcMain.handle('github-auth-status', async () => authOps.githubAuthStatus())
   ipcMain.handle('github-login', async () => authOps.githubLogin())
+  ipcMain.handle('github-logout', async () => authOps.githubLogout())
 
   ipcMain.handle('report-issue', async (_e, errorMessage: string) => {
     return reportIssue(errorMessage || '')

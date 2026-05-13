@@ -42,8 +42,13 @@ linux:
     - target: AppImage
       arch:
         - x64
+    - target: deb
+      arch:
+        - x64
   artifactName: ${name}-${version}.${ext}
   category: Development
+  executableArgs:
+    - "--no-sandbox"
 publish:
   provider: github
   owner: netarcx

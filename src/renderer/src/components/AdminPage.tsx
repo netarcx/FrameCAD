@@ -435,6 +435,30 @@ export default function AdminPage({ hasProject, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Hidden 9-click sequence in the bottom-right corner. Once triggered,
+  // the welcome screen permanently shows an Admin Panel button. Reset
+  // the counter if the user pauses for more than 3s between clicks so
+  // accidental drags don't half-fill it.
+  // NB: must be declared before any conditional return (e.g. !loaded)
+  // or React will complain that hook order changed between renders.
+  const [cornerClicks, setCornerClicks] = useState(0)
+  const [shortcutToast, setShortcutToast] = useState<string | null>(null)
+  useEffect(() => {
+    if (cornerClicks === 0) return
+    if (cornerClicks >= 9) {
+      localStorage.setItem('trentcad-admin-shortcut-unlocked', '1')
+      // Notify any listening welcome-screen instance in the same window
+      // (storage events only fire across windows, not within one).
+      window.dispatchEvent(new CustomEvent('admin-shortcut-unlocked'))
+      setShortcutToast('Admin shortcut unlocked — look for the button on the welcome screen.')
+      setCornerClicks(0)
+      const t = setTimeout(() => setShortcutToast(null), 4000)
+      return () => clearTimeout(t)
+    }
+    const t = setTimeout(() => setCornerClicks(0), 3000)
+    return () => clearTimeout(t)
+  }, [cornerClicks])
+
   if (!loaded) return null
 
   const overrideStatusLine = globalState && globalState.hasLocalOverride
@@ -459,6 +483,12 @@ export default function AdminPage({ hasProject, onClose }: Props) {
           <button className="toolbar-btn" onClick={onClose}>Close (Esc)</button>
         </div>
       </div>
+      {shortcutToast && <div className="admin-shortcut-toast">{shortcutToast}</div>}
+      <div
+        className="admin-corner-tap"
+        onClick={() => setCornerClicks(c => c + 1)}
+        aria-hidden="true"
+      />
       <div className="admin-layout">
         <nav className="admin-sidebar">
           {visibleTabs.map(t => (
@@ -952,6 +982,7 @@ function PartsTab(props: PartsTabProps) {
                     <td>
                       <input
                         type="text"
+                        list="default-materials"
                         defaultValue={p.meta.manufacturingMaterial ?? ''}
                         onBlur={e => {
                           const v = e.target.value.trim()

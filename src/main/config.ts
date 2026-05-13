@@ -37,9 +37,29 @@ async function writeConfig(config: AppConfig): Promise<void> {
 
 export async function addRecentProject(project: ProjectConfig): Promise<void> {
   const config = await readConfig()
+  const existing = config.recentProjects.find(p => p.path === project.path)
+  const merged: ProjectConfig = { ...project, pinned: existing?.pinned ?? project.pinned }
   config.recentProjects = config.recentProjects.filter(p => p.path !== project.path)
-  config.recentProjects.unshift(project)
-  config.recentProjects = config.recentProjects.slice(0, 10)
+  config.recentProjects.unshift(merged)
+  // Cap unpinned entries at 10. Pinned entries are kept regardless so
+  // the team's go-to projects don't age out.
+  const pinned = config.recentProjects.filter(p => p.pinned)
+  const unpinned = config.recentProjects.filter(p => !p.pinned).slice(0, 10)
+  config.recentProjects = [...pinned, ...unpinned]
+  await writeConfig(config)
+}
+
+export async function setProjectPinned(targetPath: string, pinned: boolean): Promise<void> {
+  const config = await readConfig()
+  const entry = config.recentProjects.find(p => p.path === targetPath)
+  if (!entry) return
+  entry.pinned = pinned || undefined
+  await writeConfig(config)
+}
+
+export async function removeRecentProject(targetPath: string): Promise<void> {
+  const config = await readConfig()
+  config.recentProjects = config.recentProjects.filter(p => p.path !== targetPath)
   await writeConfig(config)
 }
 

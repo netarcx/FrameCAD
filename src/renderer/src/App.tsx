@@ -1,16 +1,23 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
+import { ChevronLeft, Sun, Moon, X } from 'lucide-react'
 import { useGit } from './hooks/useGit'
+import { DEFAULT_MATERIALS, DEFAULT_MATERIALS_DATALIST_ID } from './constants'
+import useParts from './hooks/useParts'
 import ProfileSetup from './components/ProfileSetup'
 import ProjectSetup from './components/ProjectSetup'
 import ProjectBrowser from './components/ProjectBrowser'
 import Toolbar from './components/Toolbar'
-import ActivityFeed from './components/ActivityFeed'
 import DetailsPanel from './components/DetailsPanel'
 import AdminPage from './components/AdminPage'
 import AdminPinPrompt from './components/AdminPinPrompt'
 import ManufacturingQueue from './components/ManufacturingQueue'
 import ManufacturingModeShell from './components/ManufacturingModeShell'
 import OnboardingTour from './components/OnboardingTour'
+import Sidebar, { type SidebarSection } from './components/Sidebar'
+import SettingsView from './components/SettingsView'
+import ActivityView from './components/ActivityView'
+import PartsManager from './components/PartsManager'
+import ApprovalsPanel from './components/ApprovalsPanel'
 import logoUrl from './assets/logo.png'
 import type { AdminConfig, DependencyStatus, FileEntry, GlobalAdminConfig, ProjectTotals, PublishProgress, UpdateInfo } from '@shared/types'
 
@@ -67,35 +74,51 @@ export default function App() {
       .then(state => setGlobalAdmin(state.effective))
       .catch(() => {})
   }, [])
+
+  // Welcome-screen admin (kept for when no project is open)
   const [showAdmin, setShowAdmin] = useState(false)
   const [adminPinPromptOpen, setAdminPinPromptOpen] = useState(false)
-  const [showMfgQueue, setShowMfgQueue] = useState(false)
-  // Shop-floor mode triggered from the welcome screen. When true AND a
-  // project is open, App renders a stripped-down full-screen layout
-  // (just the queue + an Exit button) instead of the regular file
-  // browser / toolbar / details panel. Distinct from `showMfgQueue` so
-  // the existing "Shop" toolbar button (inside the project view) keeps
-  // working as a modal overlay.
+  // What the PIN prompt is gating — so onSuccess can route correctly
+  // (Admin overlay vs Settings view). Default 'settings' preserves the
+  // historical Ctrl+Shift+A welcome-screen behaviour.
+  const [pinPromptReason, setPinPromptReason] = useState<'admin' | 'settings'>('settings')
+  // Easter-egg: 9-click bottom-right corner of admin overlay flips this
+  // on permanently. Renders an Admin button on the welcome screen AND
+  // an Admin item in the project sidebar.
+  const [adminShortcutUnlocked, setAdminShortcutUnlocked] = useState(
+    () => localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1'
+  )
+  useEffect(() => {
+    const recheck = () =>
+      setAdminShortcutUnlocked(localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1')
+    window.addEventListener('admin-shortcut-unlocked', recheck)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'trentcad-admin-shortcut-unlocked') recheck()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.removeEventListener('admin-shortcut-unlocked', recheck)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
+
+  // Sidebar navigation (project view)
+  const [activeSection, setActiveSection] = useState<SidebarSection>('files')
+  const [inspectorOpen, setInspectorOpen] = useState(true)
+  const [adminUnlocked, setAdminUnlocked] = useState(false)
+
   const [manufacturingView, setManufacturingView] = useState(false)
 
-  // Bail out of manufacturing mode if we somehow lose the project
-  // (switch failure, project deleted on disk, etc.). Done in an effect
-  // rather than during render to avoid the "setState in render" React
-  // warning + the infinite re-render risk it creates.
   useEffect(() => {
     if (manufacturingView && !project) {
       setManufacturingView(false)
     }
   }, [manufacturingView, project])
+
   const [ghLoggedIn, setGhLoggedIn] = useState(false)
-  // Error-banner report state: 'idle' → 'confirm' → 'sending' → 'sent' | 'failed'
   const [reportState, setReportState] = useState<'idle' | 'confirm' | 'sending' | 'sent' | 'failed'>('idle')
   const [reportResult, setReportResult] = useState<{ url?: string; number?: number; error?: string }>({})
 
-  // Refresh on every error so a stale logged-out state doesn't hide the
-  // button. Always reset report state on error change (including
-  // non-null -> non-null transitions) so a previous "sent" status from a
-  // different error never leaks into the new banner.
   useEffect(() => {
     setReportState('idle')
     setReportResult({})
@@ -122,6 +145,7 @@ export default function App() {
       setReportState('failed')
     }
   }, [error])
+
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine)
 
@@ -137,7 +161,6 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    // Show the tour once per user (gate via localStorage)
     if (!localStorage.getItem('trentcad-onboarding-seen')) {
       setShowOnboarding(true)
     }
@@ -147,17 +170,11 @@ export default function App() {
     localStorage.setItem('trentcad-onboarding-seen', '1')
     setShowOnboarding(false)
   }, [])
+
   const [missingDeps, setMissingDeps] = useState<DependencyStatus | null>(null)
   const [checkingDeps, setCheckingDeps] = useState(false)
   const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null)
   const [progressHidden, setProgressHidden] = useState(false)
-  // Tracks which long-running git operation drove the current progress
-  // modal. Using `project` to derive this is wrong: a join completes
-  // by opening the new project, which flips `project` from null to set
-  // BEFORE the "done" event fires, so the final label would flicker
-  // from "Downloading" to "Upload complete". This state is set when
-  // each subscription receives its first event and stays stable
-  // through the run.
   const [progressKind, setProgressKind] = useState<'publish' | 'join'>('publish')
   const [projectTotals, setProjectTotals] = useState<ProjectTotals | null>(null)
 
@@ -165,10 +182,6 @@ export default function App() {
     const cleanupPublish = window.api.onPublishProgress((p) => {
       setProgressKind('publish')
       setPublishProgress(p)
-      // On error, force the full modal back open even if it was hidden —
-      // the user needs to see what went wrong, not a thin strip at the
-      // bottom. On a fresh upload starting (preparing), reset hidden so
-      // the next publish opens its modal cleanly.
       if (p.phase === 'error' || p.phase === 'preparing') {
         setProgressHidden(false)
       }
@@ -179,9 +192,6 @@ export default function App() {
         }, 2000)
       }
     })
-    // Join (Download a teammate's project) reuses the same progress
-    // modal — same shape (PublishProgress), same UI, just driven by a
-    // different IPC channel.
     const cleanupJoin = window.api.onJoinProgress((p) => {
       setProgressKind('join')
       setPublishProgress(p)
@@ -210,7 +220,7 @@ export default function App() {
     recheckDeps()
   }, [recheckDeps])
 
-  useEffect(() => {
+  const refreshAdminConfig = useCallback(() => {
     if (!project) {
       setAdminConfig({})
       return
@@ -219,9 +229,10 @@ export default function App() {
   }, [project])
 
   useEffect(() => {
-    // Global admin (Team + Browse) is loaded at startup and refreshed
-    // whenever the admin page closes. It applies to both the welcome
-    // screen and the in-project view.
+    refreshAdminConfig()
+  }, [refreshAdminConfig])
+
+  useEffect(() => {
     refreshGlobalAdmin()
   }, [refreshGlobalAdmin])
 
@@ -233,19 +244,59 @@ export default function App() {
     const refresh = () =>
       window.api.getProjectTotals().then(setProjectTotals).catch(() => setProjectTotals(null))
     refresh()
-    // Files state changes whenever the watcher fires, but mass/cost lives in
-    // the meta file the watcher doesn't follow; re-fetch every 5s while a
-    // project is open so totals stay current after team uploads
     const id = setInterval(refresh, 5000)
     return () => clearInterval(id)
-  }, [project, files])
+  }, [project])
 
+  // Settings navigation with PIN gate
+  const handleSettingsNav = useCallback(() => {
+    if (adminUnlocked) {
+      setActiveSection('settings')
+      return
+    }
+    window.api.adminPinRequired().then(required => {
+      if (required) {
+        setPinPromptReason('settings')
+        setAdminPinPromptOpen(true)
+      } else {
+        setAdminUnlocked(true)
+        setActiveSection('settings')
+      }
+    }).catch(() => {
+      setPinPromptReason('settings')
+      setAdminPinPromptOpen(true)
+    })
+  }, [adminUnlocked])
+
+  const openAdminOverlay = useCallback(() => {
+    if (showAdmin) return
+    if (adminPinPromptOpen) return
+    window.api.adminPinRequired().then(required => {
+      if (required) {
+        setPinPromptReason('admin')
+        setAdminPinPromptOpen(true)
+      } else {
+        setShowAdmin(true)
+      }
+    }).catch(() => {
+      setPinPromptReason('admin')
+      setAdminPinPromptOpen(true)
+    })
+  }, [showAdmin, adminPinPromptOpen])
+
+  const handleSidebarSelect = useCallback((section: SidebarSection) => {
+    if (section === 'settings') {
+      handleSettingsNav()
+    } else if (section === 'admin') {
+      openAdminOverlay()
+    } else {
+      setActiveSection(section)
+    }
+  }, [handleSettingsNav, openAdminOverlay])
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ctrl+Shift+R = manual "check for updates now". Independent of
-      // the every-launch auto-check; useful when the user knows a
-      // newer build just shipped and doesn't want to wait for the
-      // scheduled poll.
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'r') {
         e.preventDefault()
         ;(async () => {
@@ -254,9 +305,6 @@ export default function App() {
             if (!r.success) {
               alert(`Could not check for updates: ${r.error || 'unknown error'}`)
             } else if (r.updateAvailable) {
-              // Auto-update will fire its 'update-available' event and the
-              // existing banner shows the download progress. Just confirm
-              // the user that an update was found.
               alert(`Update available — v${r.latestVersion} is downloading in the background.`)
             } else {
               alert(`You're on the latest version (v${r.currentVersion}).`)
@@ -267,28 +315,39 @@ export default function App() {
         })()
         return
       }
+      // Ctrl+Shift+A: toggle settings (works in both welcome and project views)
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault()
-        if (showAdmin) {
-          setShowAdmin(false)
-          return
-        }
-        if (adminPinPromptOpen) return
-        window.api.adminPinRequired().then(required => {
-          if (required) {
-            setAdminPinPromptOpen(true)
+        if (project) {
+          // In project view, navigate to settings via sidebar
+          if (activeSection === 'settings') {
+            setActiveSection('files')
           } else {
-            setShowAdmin(true)
+            handleSettingsNav()
           }
-        }).catch(() => {
-          // If we can't determine, fail closed and require the PIN
-          setAdminPinPromptOpen(true)
-        })
+        } else {
+          // Welcome screen: use the old admin overlay
+          if (showAdmin) {
+            setShowAdmin(false)
+            return
+          }
+          if (adminPinPromptOpen) return
+          window.api.adminPinRequired().then(required => {
+            if (required) {
+              setAdminPinPromptOpen(true)
+            } else {
+              setShowAdmin(true)
+            }
+          }).catch(() => {
+            setAdminPinPromptOpen(true)
+          })
+        }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [showAdmin, adminPinPromptOpen])
+  }, [showAdmin, adminPinPromptOpen, project, activeSection, adminUnlocked, handleSettingsNav])
+
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('trentcad-theme')
     return stored === 'light' ? 'light' : 'dark'
@@ -333,12 +392,23 @@ export default function App() {
     })
   }, [])
 
+  // Parts data for the sidebar badge + Parts/Approvals views
+  const parts = useParts({ enabled: !!project })
+
   const stats = useMemo(() => ({
     modified: countByState(files, 'modified'),
     untracked: countByState(files, 'untracked'),
     lockedByYou: countByState(files, 'locked-by-you'),
     lockedByOther: countByState(files, 'locked-by-other')
   }), [files])
+
+  const sidebarBadges = useMemo(() => {
+    const filesBadge = stats.modified + stats.untracked
+    return {
+      files: filesBadge > 0 ? filesBadge : undefined,
+      parts: parts.inReviewParts.length > 0 ? parts.inReviewParts.length : undefined
+    }
+  }, [stats, parts.inReviewParts.length])
 
   const copyError = () => {
     if (error) navigator.clipboard.writeText(error)
@@ -372,20 +442,22 @@ export default function App() {
                 onClick={() => reportResult.url && window.api.openExternal(reportResult.url)}
                 title={reportResult.url}
               >
-                ✓ Issue #{reportResult.number ?? '?'} →
+                Issue #{reportResult.number ?? '?'}
               </button>
-            : <span className="error-banner-prompt">✓ Reported</span>
+            : <span className="error-banner-prompt">Reported</span>
         )}
         {reportState === 'failed' && (
           <span
             className="error-banner-prompt"
             title={reportResult.error}
           >
-            ✗ Report failed
+            Report failed
           </span>
         )}
         <button onClick={copyError} title="Copy error">Copy</button>
-        <button onClick={dismissError}>{'×'}</button>
+        <button onClick={dismissError} className="error-banner-close" title="Dismiss">
+          <X size={14} strokeWidth={2} />
+        </button>
       </div>
     </div>
   )
@@ -463,6 +535,63 @@ export default function App() {
     </div>
   )
 
+  const progressModal = publishProgress && !progressHidden && (
+    <div className="modal-overlay">
+      <div className="modal publish-progress-modal">
+        <h2>
+          {publishProgress.phase === 'preparing' && (progressKind === 'join' ? 'Preparing download…' : 'Preparing upload...')}
+          {publishProgress.phase === 'uploading' && (progressKind === 'join' ? 'Downloading from GitHub' : 'Uploading to GitHub')}
+          {publishProgress.phase === 'done' && (progressKind === 'join' ? 'Download complete' : 'Upload complete')}
+          {publishProgress.phase === 'error' && (progressKind === 'join' ? 'Download failed' : 'Upload failed')}
+        </h2>
+        {publishProgress.detail && <p className="publish-detail">{publishProgress.detail}</p>}
+        {typeof publishProgress.percent === 'number' && (
+          <div className="publish-progress-bar">
+            <div className="publish-progress-fill" style={{ width: `${publishProgress.percent}%` }} />
+            <span className="publish-progress-pct">{publishProgress.percent}%</span>
+          </div>
+        )}
+        {publishProgress.files && publishProgress.files.length > 0 && (
+          <div className="publish-file-list">
+            <div className="publish-file-list-header">
+              {publishProgress.files.length} file{publishProgress.files.length === 1 ? '' : 's'} in this upload
+            </div>
+            <ul>
+              {publishProgress.files.slice(0, 30).map(f => (
+                <li key={f}>{f}</li>
+              ))}
+              {publishProgress.files.length > 30 && (
+                <li className="publish-file-more">+ {publishProgress.files.length - 30} more</li>
+              )}
+            </ul>
+          </div>
+        )}
+        {publishProgress.phase === 'error' && (
+          <div className="admin-error">{publishProgress.error || 'Unknown error'}</div>
+        )}
+        <div className="actions">
+          {publishProgress.phase === 'error' || publishProgress.phase === 'done' ? (
+            <button
+              className="toolbar-btn primary"
+              onClick={() => { setPublishProgress(null); setProgressHidden(false) }}
+            >
+              Close
+            </button>
+          ) : (
+            <button
+              className="toolbar-btn"
+              onClick={() => setProgressHidden(true)}
+              title="Move this dialog to a strip at the bottom of the window. Upload keeps running."
+            >
+              Hide
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── Profile setup (first launch) ──
   if (needsProfile || showProfileEdit) {
     return (
       <div className="app">
@@ -481,9 +610,13 @@ export default function App() {
     )
   }
 
+  // ── Welcome screen (no project open) ──
   if (!project) {
     return (
       <div className="app">
+        <datalist id={DEFAULT_MATERIALS_DATALIST_ID}>
+          {DEFAULT_MATERIALS.map(m => <option key={m} value={m} />)}
+        </datalist>
         {updateBanner}
         {errorBanner}
         <ProjectSetup
@@ -491,17 +624,16 @@ export default function App() {
           onJoinProject={joinProject}
           onOpenProject={openProject}
           onEnterManufacturingView={async () => {
-            // Most recent project from recents; opens it then flips the
-            // app into shop-floor mode where the rest of the UI hides
             try {
               const recents = await window.api.getRecentProjects()
               if (recents.length === 0) return
               await openProject(recents[0].path)
               setManufacturingView(true)
             } catch {
-              // openProject already surfaces errors via the standard error banner
+              // openProject surfaces errors via the error banner
             }
           }}
+          onOpenAdmin={openAdminOverlay}
           isLoading={isLoading}
           globalAdmin={globalAdmin}
         />
@@ -526,31 +658,22 @@ export default function App() {
         {depsModal}
         {offlineBanner}
         {onboardingModal}
+        {progressModal}
         {versionCorner}
       </div>
     )
   }
 
-  // Shop-floor mode: when entered from the welcome screen, render a
-  // dedicated stripped-down layout — just a slim header (logo, project
-  // name, exit) and the manufacturing queue full-screen. No file
-  // browser, no toolbar, no details panel.
+  // ── Shop-floor kiosk mode ──
   if (manufacturingView && project) {
     return (
       <ManufacturingModeShell
         project={project}
         onSwitchProject={async (targetPath) => {
-          // Close current, open the picked project, stay in manufacturing
-          // mode the whole time so the UI doesn't flash through the
-          // regular project view
           try {
             await closeProject()
             await openProject(targetPath)
           } catch {
-            // Switch failed (probably the target was deleted/moved).
-            // Drop out of manufacturing mode so we don't end up rendering
-            // with a null project; the welcome screen + error banner
-            // take over from here.
             setManufacturingView(false)
           }
         }}
@@ -559,23 +682,34 @@ export default function App() {
     )
   }
 
+  // ── Main project view (sidebar layout) ──
+  const showInspector = (activeSection === 'files' || activeSection === 'parts') && inspectorOpen
+
+  const materialDatalist = (
+    <datalist id={DEFAULT_MATERIALS_DATALIST_ID}>
+      {DEFAULT_MATERIALS.map(m => <option key={m} value={m} />)}
+    </datalist>
+  )
+
   return (
     <div className="app">
+      {materialDatalist}
       {updateBanner}
       {errorBanner}
 
       <div className="app-header">
         <img className="logo-img" src={logoUrl} alt="TrentCAD" />
         <span className="logo">TrentCAD</span>
-        {appVersion && <span className="version">v{appVersion}</span>}
         <span className="divider" />
         <button
-          className="project-name-btn"
-          onClick={closeProject}
+          className="back-btn"
+          onClick={() => { setActiveSection('files'); closeProject() }}
           title="Close this project and go back to the project picker"
         >
-          {'←'} {project.name}
+          <ChevronLeft size={16} strokeWidth={2} />
+          <span>Back</span>
         </button>
+        <span className="project-name-label" title={project.path}>{project.name}</span>
         <span className="spacer" />
         {driveStatus.configured && (
           <button
@@ -589,18 +723,13 @@ export default function App() {
           </button>
         )}
         <button
-          className="header-mfg-btn"
-          onClick={() => setShowMfgQueue(true)}
-          title="Manufacturing queue: see released parts ready for the shop"
-        >
-          Shop
-        </button>
-        <button
           className="theme-toggle"
           onClick={toggleTheme}
           title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         >
-          {theme === 'dark' ? 'Light' : 'Dark'}
+          {theme === 'dark'
+            ? <Sun size={16} strokeWidth={1.75} />
+            : <Moon size={16} strokeWidth={1.75} />}
         </button>
         <button
           className="user-badge"
@@ -609,14 +738,11 @@ export default function App() {
         >
           {gitName}
         </button>
-        <span className="team-badge">{globalAdmin.teamName || 'FRC 2129'}</span>
       </div>
 
       <Toolbar
         onSync={sync}
         onPublish={publish}
-        onCheckOut={checkOut}
-        onCheckIn={checkIn}
         onNewPart={createNewPart}
         onNewAssembly={createNewAssembly}
         onNewSubsystem={createSubsystem}
@@ -624,24 +750,107 @@ export default function App() {
         isLoading={isLoading}
         hasProject={true}
         isCotsProject={adminConfig.isCotsProject}
+        activeSection={activeSection}
+        inspectorOpen={inspectorOpen}
+        onToggleInspector={() => setInspectorOpen(o => !o)}
       />
 
-      <div className="app-body">
-        <div className="file-panel">
-          <ProjectBrowser
-            files={files}
-            selectedFile={selectedFile}
-            onSelect={setSelectedFile}
+      <div className="app-main">
+        <Sidebar
+          active={activeSection}
+          onSelect={handleSidebarSelect}
+          badges={sidebarBadges}
+          adminShortcutUnlocked={adminShortcutUnlocked}
+        />
+
+        <div className="app-content">
+          {activeSection === 'files' && (
+            <ProjectBrowser
+              files={files}
+              selectedFile={selectedFile}
+              onSelect={setSelectedFile}
+              onCheckOut={checkOut}
+              onCheckIn={checkIn}
+            />
+          )}
+
+          {activeSection === 'parts' && (
+            <div className="parts-content">
+              {parts.error && <div className="admin-error" style={{ margin: '8px 16px' }}>{parts.error}</div>}
+              <div className="parts-content-tabs">
+                <button
+                  className={`parts-tab${parts.stateFilter !== 'in-review' ? ' active' : ''}`}
+                  onClick={() => parts.setStateFilter('all')}
+                >
+                  All Parts
+                </button>
+                <button
+                  className={`parts-tab${parts.stateFilter === 'in-review' ? ' active' : ''}`}
+                  onClick={() => parts.setStateFilter('in-review')}
+                >
+                  Needs Review {parts.inReviewCount > 0 && <span className="parts-tab-badge">{parts.inReviewCount}</span>}
+                </button>
+              </div>
+              <div className="parts-panel">
+                {parts.stateFilter === 'in-review' ? (
+                  <ApprovalsPanel
+                    parts={parts.inReviewParts}
+                    rowSaving={parts.rowSaving}
+                    onApprove={(p) => parts.setReleaseState(p, 'released')}
+                    onReject={(p) => parts.setReleaseState(p, 'draft')}
+                    onRefresh={parts.loadAllParts}
+                  />
+                ) : (
+                  <PartsManager
+                    loading={parts.loading}
+                    parts={parts.filteredParts}
+                    allParts={parts.allParts}
+                    filter={parts.filter}
+                    setFilter={parts.setFilter}
+                    subsystem={parts.subsystem}
+                    setSubsystem={parts.setSubsystem}
+                    subsystemOptions={parts.subsystemOptions}
+                    state={parts.stateFilter}
+                    setState={parts.setStateFilter}
+                    rowSaving={parts.rowSaving}
+                    onRefresh={parts.loadAllParts}
+                    onSetRelease={parts.setReleaseState}
+                    onSetMethod={parts.setMethod}
+                    onSetMaterial={parts.setMaterial}
+                    onSetMass={parts.setMass}
+                    onSetCost={parts.setCost}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'activity' && (
+            <ActivityView history={history} />
+          )}
+
+          {activeSection === 'shop' && (
+            <ManufacturingQueue embedded onClose={() => setActiveSection('files')} />
+          )}
+
+          {activeSection === 'settings' && (
+            <SettingsView
+              hasProject={!!project}
+              appVersion={appVersion}
+              gitName={gitName}
+              gitEmail={gitEmail}
+              onProfileUpdate={handleProfileComplete}
+            />
+          )}
+        </div>
+
+        {showInspector && (
+          <DetailsPanel
+            file={selectedFile}
             onCheckOut={checkOut}
             onCheckIn={checkIn}
           />
-          <ActivityFeed history={history} />
-        </div>
-        <DetailsPanel
-          file={selectedFile}
-          onCheckOut={checkOut}
-          onCheckIn={checkIn}
-        />
+        )}
       </div>
 
       {adminPinPromptOpen && (
@@ -649,86 +858,33 @@ export default function App() {
           onClose={() => setAdminPinPromptOpen(false)}
           onSuccess={() => {
             setAdminPinPromptOpen(false)
-            setShowAdmin(true)
+            setAdminUnlocked(true)
+            if (pinPromptReason === 'admin') {
+              setShowAdmin(true)
+            } else {
+              setActiveSection('settings')
+            }
           }}
         />
       )}
 
       {showAdmin && (
         <AdminPage
-          hasProject={!!project}
+          hasProject={true}
           onClose={() => {
             setShowAdmin(false)
             refreshGlobalAdmin()
-            if (project) {
-              window.api.getAdminConfig().then(c => setAdminConfig(c || {})).catch(() => {})
-            }
+            // Pick up any per-project AdminConfig changes (e.g. COTS
+            // toggle, mainRepoUrl) that the user just edited.
+            refreshAdminConfig()
           }}
         />
-      )}
-
-      {showMfgQueue && (
-        <ManufacturingQueue onClose={() => setShowMfgQueue(false)} />
       )}
 
       {offlineBanner}
       {onboardingModal}
 
-      {publishProgress && !progressHidden && (
-        <div className="modal-overlay">
-          <div className="modal publish-progress-modal">
-            <h2>
-              {publishProgress.phase === 'preparing' && (progressKind === 'join' ? 'Preparing download…' : 'Preparing upload...')}
-              {publishProgress.phase === 'uploading' && (progressKind === 'join' ? 'Downloading from GitHub' : 'Uploading to GitHub')}
-              {publishProgress.phase === 'done' && (progressKind === 'join' ? 'Download complete' : 'Upload complete')}
-              {publishProgress.phase === 'error' && (progressKind === 'join' ? 'Download failed' : 'Upload failed')}
-            </h2>
-            {publishProgress.detail && <p className="publish-detail">{publishProgress.detail}</p>}
-            {typeof publishProgress.percent === 'number' && (
-              <div className="publish-progress-bar">
-                <div className="publish-progress-fill" style={{ width: `${publishProgress.percent}%` }} />
-                <span className="publish-progress-pct">{publishProgress.percent}%</span>
-              </div>
-            )}
-            {publishProgress.files && publishProgress.files.length > 0 && (
-              <div className="publish-file-list">
-                <div className="publish-file-list-header">
-                  {publishProgress.files.length} file{publishProgress.files.length === 1 ? '' : 's'} in this upload
-                </div>
-                <ul>
-                  {publishProgress.files.slice(0, 30).map(f => (
-                    <li key={f}>{f}</li>
-                  ))}
-                  {publishProgress.files.length > 30 && (
-                    <li className="publish-file-more">+ {publishProgress.files.length - 30} more</li>
-                  )}
-                </ul>
-              </div>
-            )}
-            {publishProgress.phase === 'error' && (
-              <div className="admin-error">{publishProgress.error || 'Unknown error'}</div>
-            )}
-            <div className="actions">
-              {publishProgress.phase === 'error' || publishProgress.phase === 'done' ? (
-                <button
-                  className="toolbar-btn primary"
-                  onClick={() => { setPublishProgress(null); setProgressHidden(false) }}
-                >
-                  Close
-                </button>
-              ) : (
-                <button
-                  className="toolbar-btn"
-                  onClick={() => setProgressHidden(true)}
-                  title="Move this dialog to a strip at the bottom of the window. Upload keeps running."
-                >
-                  Hide
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {progressModal}
 
       {publishProgress && progressHidden && (
         <button

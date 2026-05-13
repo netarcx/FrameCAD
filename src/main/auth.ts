@@ -76,8 +76,78 @@ export async function githubAuthStatus(): Promise<GitHubAuthStatus> {
 
   const status = await run(`${quoteForCmd(gh)} auth status`)
   const match = status?.match(/Logged in to github\.com\s+(?:as|account)\s+(\S+)/i)
-  if (match) return { ghCliAvailable: true, loggedIn: true, username: match[1] }
+  if (match) {
+    await ensureGhCredentialHelper(gh)
+    await cacheGhToken(gh)
+    return { ghCliAvailable: true, loggedIn: true, username: match[1] }
+  }
   return { ghCliAvailable: true, loggedIn: false }
+}
+
+/**
+ * Run `gh auth setup-git` so git uses `gh` as its credential helper for
+ * GitHub HTTPS URLs. Idempotent — safe to call on every launch.
+ */
+async function ensureGhCredentialHelper(gh: string): Promise<void> {
+  await run(`${quoteForCmd(gh)} auth setup-git`)
+}
+
+/**
+ * Write a GIT_ASKPASS script for `token` so git calls it instead of
+ * prompting on /dev/tty (which doesn't exist for packaged Linux builds
+ * launched from a .desktop file). The script handles both Username and
+ * Password prompts that git sends during HTTPS auth.
+ */
+async function installAskpass(token: string): Promise<void> {
+  const scriptPath = path.join(os.tmpdir(), 'trentcad-git-askpass.sh')
+  const script =
+    '#!/bin/sh\n' +
+    'case "$1" in\n' +
+    '  Username*) echo "x-access-token" ;;\n' +
+    `  Password*) echo "${token}" ;;\n` +
+    'esac\n'
+  await fs.writeFile(scriptPath, script, { mode: 0o700 })
+  process.env.GIT_ASKPASS = scriptPath
+  process.env.GIT_TERMINAL_PROMPT = '0'
+}
+
+async function cacheGhToken(gh: string): Promise<void> {
+  const token = await run(`${quoteForCmd(gh)} auth token`)
+  if (token) await installAskpass(token)
+}
+
+/**
+ * Get the current GitHub token from any available source AND ensure
+ * GIT_ASKPASS is installed for future git operations. Used as a
+ * defensive fallback at clone/push/pull time so we always have a
+ * working credential path even if auth status polling hasn't completed.
+ * Returns null if no token is available anywhere.
+ */
+export async function getGitHubToken(): Promise<string | null> {
+  if (process.env.GH_TOKEN) return process.env.GH_TOKEN
+  if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN
+  const gh = await locateGh()
+  if (!gh) return null
+  const token = await run(`${quoteForCmd(gh)} auth token`)
+  if (!token) return null
+  await installAskpass(token)
+  return token
+}
+
+/**
+ * Sign out of GitHub via `gh auth logout`. Non-interactive (uses
+ * `--hostname` and `-y`) so it just works without spawning a console.
+ */
+export async function githubLogout(): Promise<{ success: boolean; error?: string }> {
+  const gh = await locateGh()
+  if (!gh) {
+    return { success: false, error: 'GitHub CLI not found.' }
+  }
+  const out = await run(`${quoteForCmd(gh)} auth logout --hostname github.com -y`)
+  if (out === null) {
+    return { success: false, error: 'gh auth logout failed.' }
+  }
+  return { success: true }
 }
 
 /**

@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Download, Upload, Plus, ChevronDown, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import type { FileEntry } from '@shared/types'
+import type { SidebarSection } from './Sidebar'
 
 interface Props {
   onSync: () => void
   onPublish: (message: string) => void
-  onCheckOut: (path: string) => void
-  onCheckIn: (path: string) => void
   onNewPart: (folder: string, description?: string) => Promise<{ partNumber: string; filePath: string } | null>
   onNewAssembly: (parentFolder: string, name: string, description?: string) => Promise<{ partNumber: string; filePath: string } | null>
   onNewSubsystem: (parentFolder: string, name: string) => Promise<{ folderPath: string } | null>
@@ -13,6 +13,9 @@ interface Props {
   isLoading: boolean
   hasProject: boolean
   isCotsProject?: boolean
+  activeSection: SidebarSection
+  inspectorOpen: boolean
+  onToggleInspector: () => void
 }
 
 function getSelectedFolder(file: FileEntry | null): string {
@@ -21,7 +24,11 @@ function getSelectedFolder(file: FileEntry | null): string {
   return file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : ''
 }
 
-export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNewPart, onNewAssembly, onNewSubsystem, selectedFile, isLoading, hasProject, isCotsProject }: Props) {
+export default function Toolbar({
+  onSync, onPublish, onNewPart, onNewAssembly, onNewSubsystem,
+  selectedFile, isLoading, hasProject, isCotsProject,
+  activeSection, inspectorOpen, onToggleInspector
+}: Props) {
   const [showPublish, setShowPublish] = useState(false)
   const [message, setMessage] = useState('')
   const [showNewPart, setShowNewPart] = useState(false)
@@ -33,9 +40,21 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
   const [subsystemName, setSubsystemName] = useState('')
   const [createdInfo, setCreatedInfo] = useState<{ partNumber: string; filePath: string } | null>(null)
   const [createdFolder, setCreatedFolder] = useState<string | null>(null)
+  const [showCreateMenu, setShowCreateMenu] = useState(false)
+  const createMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showCreateMenu) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (createMenuRef.current && !createMenuRef.current.contains(e.target as Node)) {
+        setShowCreateMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCreateMenu])
 
   const handlePublish = () => {
-    // Empty message is OK — the backend will generate a random 3-word label
     onPublish(message.trim())
     setMessage('')
     setShowPublish(false)
@@ -79,12 +98,8 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
     }
   }
 
-  const canCheckOut = selectedFile && !selectedFile.isDirectory &&
-    selectedFile.state !== 'locked-by-you' && selectedFile.state !== 'locked-by-other'
-
-  const canCheckIn = selectedFile?.state === 'locked-by-you'
-
   const currentFolder = getSelectedFolder(selectedFile)
+  const showInspectorToggle = activeSection === 'files' || activeSection === 'parts'
 
   return (
     <>
@@ -96,7 +111,7 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
             disabled={!hasProject || isLoading}
             title="Get the latest files from your team"
           >
-            {isLoading ? <span className="loading-spinner" /> : '↓'} Download
+            {isLoading ? <span className="loading-spinner" /> : <Download size={14} strokeWidth={1.75} />} Sync
           </button>
           <button
             className="toolbar-btn primary"
@@ -104,65 +119,71 @@ export default function Toolbar({ onSync, onPublish, onCheckOut, onCheckIn, onNe
             disabled={!hasProject || isLoading}
             title="Send your changes to the team"
           >
-            {'↑'} Upload
+            <Upload size={14} strokeWidth={1.75} /> Publish
           </button>
         </div>
 
-        <div className="toolbar-sep" />
+        {activeSection === 'files' && !isCotsProject && (
+          <>
+            <div className="toolbar-sep" />
+            <div className="toolbar-group">
+              <div className="create-dropdown-wrap" ref={createMenuRef}>
+                <button
+                  className="toolbar-btn"
+                  onClick={() => setShowCreateMenu(!showCreateMenu)}
+                  disabled={!hasProject || isLoading}
+                  title="Create a new part, assembly, or folder"
+                >
+                  <Plus size={14} strokeWidth={1.75} /> New <ChevronDown size={12} strokeWidth={1.75} />
+                </button>
+                {showCreateMenu && (
+                  <div className="create-dropdown-menu" onMouseLeave={() => setShowCreateMenu(false)}>
+                    <button onClick={() => { setShowCreateMenu(false); setShowNewPart(true) }}>
+                      New Part
+                    </button>
+                    <button onClick={() => { setShowCreateMenu(false); setShowNewAssembly(true) }}>
+                      New Assembly
+                    </button>
+                    <div className="create-dropdown-sep" />
+                    <button onClick={() => { setShowCreateMenu(false); setShowNewSubsystem(true) }}>
+                      New Folder
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
-        <div className="toolbar-group">
-          <button
-            className="toolbar-btn"
-            onClick={() => selectedFile && onCheckOut(selectedFile.path)}
-            disabled={!canCheckOut || isLoading}
-            title="Lock this file so only you can edit it"
-          >
-            Check Out
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => selectedFile && onCheckIn(selectedFile.path)}
-            disabled={!canCheckIn || isLoading}
-            title="Unlock this file so others can edit it"
-          >
-            Check In
-          </button>
-        </div>
-
-        <div className="toolbar-sep" />
-
-        <div className="toolbar-group">
-          {!isCotsProject && (
-            <>
+        {activeSection === 'files' && isCotsProject && (
+          <>
+            <div className="toolbar-sep" />
+            <div className="toolbar-group">
               <button
                 className="toolbar-btn"
-                onClick={() => setShowNewPart(true)}
+                onClick={() => setShowNewSubsystem(true)}
                 disabled={!hasProject || isLoading}
-                title="Create a new part file with an assigned part number"
+                title="Create a new folder to organize files"
               >
-                + Part
+                <Plus size={14} strokeWidth={1.75} /> Folder
               </button>
-              <button
-                className="toolbar-btn"
-                onClick={() => setShowNewAssembly(true)}
-                disabled={!hasProject || isLoading}
-                title="Create a new assembly folder with an assigned part number"
-              >
-                + Assembly
-              </button>
-            </>
-          )}
-          <button
-            className="toolbar-btn"
-            onClick={() => setShowNewSubsystem(true)}
-            disabled={!hasProject || isLoading}
-            title="Create a new folder to organize files"
-          >
-            + Folder
-          </button>
-        </div>
+            </div>
+          </>
+        )}
 
         <div className="toolbar-spacer" />
+
+        {showInspectorToggle && (
+          <button
+            className={`toolbar-btn toolbar-btn-icon${inspectorOpen ? ' active' : ''}`}
+            onClick={onToggleInspector}
+            title={inspectorOpen ? 'Hide inspector' : 'Show inspector'}
+          >
+            {inspectorOpen
+              ? <PanelRightClose size={16} strokeWidth={1.75} />
+              : <PanelRightOpen size={16} strokeWidth={1.75} />}
+          </button>
+        )}
       </div>
 
       {showPublish && (

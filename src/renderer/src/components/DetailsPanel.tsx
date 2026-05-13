@@ -340,7 +340,8 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
             </div>
             <input
               className="mfg-material-input"
-              placeholder="Material (e.g. 6061, PLA, polycarb)"
+              list="default-materials"
+              placeholder="Material (e.g. 6061-T6 Aluminum, Polycarb, N/A)"
               value={mfgMaterial}
               onChange={e => setMfgMaterial(e.target.value)}
               disabled={savingMeta}
