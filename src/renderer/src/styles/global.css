@@ -590,6 +590,49 @@ input {
 .toolbar-btn.primary { background: var(--accent); color: var(--bg-primary); }
 .toolbar-btn.primary:hover { background: var(--accent-hover); }
 
+/* "There's something on origin you haven't pulled yet" Sync-button
+   state. Soft pulsing ring + accent border, plus a count badge piggy-
+   backed onto the button. Disabled and reduced motion preferences
+   knock the animation out so it doesn't distract during sync itself. */
+.toolbar-btn.has-remote-updates {
+  position: relative;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 0 0 var(--accent-tint);
+  animation: toolbar-btn-pulse 2s ease-in-out infinite;
+}
+
+.toolbar-btn.has-remote-updates:disabled {
+  animation: none;
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-btn.has-remote-updates { animation: none; }
+}
+
+@keyframes toolbar-btn-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+.toolbar-btn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  margin-left: 4px;
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  line-height: 1;
+}
+
 .toolbar-spacer { flex: 1; }
 
 /* ─── Main Layout ─── */
@@ -1148,6 +1191,50 @@ input {
 .file-table-header .col-partnum { width: 130px; }
 .file-table-header .col-status { width: 100px; }
 .file-table-header .col-lock { width: 160px; }
+.file-table-header .col-select,
+.file-row .col-select {
+  width: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.file-row .col-select input[type="checkbox"] {
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Tinted highlight on bulk-selected rows. Distinct from .selected
+   (the single-click focus highlight) so users can hold both states. */
+.file-row.bulk-selected {
+  background: var(--accent-tint);
+}
+.file-row.bulk-selected.selected {
+  background: color-mix(in srgb, var(--accent-tint) 60%, var(--bg-selected));
+}
+
+/* Bulk-action bar above the file tree — same layout as the Parts
+   Manager bar so the two views feel identical. */
+.file-tree-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+  border-top: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  flex-wrap: wrap;
+}
+
+.file-tree-bulk-bar select,
+.file-tree-bulk-bar input[type="text"] {
+  padding: 4px 8px;
+  background: var(--bg-input, var(--bg-surface));
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  min-width: 130px;
+}
 
 .file-table-header .sortable {
   cursor: pointer;

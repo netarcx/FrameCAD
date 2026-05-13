@@ -275,6 +275,34 @@ export default function App() {
     return () => clearInterval(id)
   }, [project])
 
+  // How many commits exist on origin/<branch> ahead of our local HEAD.
+  // Drives the Sync button's "pull me" highlight in the toolbar. Polled
+  // every 60s (git fetch overhead) and refreshed immediately after the
+  // user runs Sync or Publish so the badge clears the moment the gap
+  // closes. Failures (offline, auth, no remote) are silently treated
+  // as zero by the IPC.
+  const [remoteAhead, setRemoteAhead] = useState(0)
+  useEffect(() => {
+    if (!project) { setRemoteAhead(0); return }
+    let cancelled = false
+    const refresh = () => {
+      window.api.getRemoteAhead()
+        .then(n => { if (!cancelled) setRemoteAhead(n) })
+        .catch(() => { if (!cancelled) setRemoteAhead(0) })
+    }
+    refresh()
+    const id = setInterval(refresh, 60000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [project])
+
+  // Re-check the moment Sync or Publish finishes so the badge clears
+  // without waiting for the next 60s tick. files changes is the closest
+  // signal we have for "git state moved" on the local side.
+  useEffect(() => {
+    if (!project) return
+    window.api.getRemoteAhead().then(setRemoteAhead).catch(() => {})
+  }, [files, project])
+
   const openAdminOverlay = useCallback(() => {
     if (showAdmin) return
     if (adminPinPromptOpen) return
@@ -805,6 +833,7 @@ export default function App() {
         activeSection={activeSection}
         inspectorOpen={inspectorOpen}
         onToggleInspector={() => setInspectorOpen(o => !o)}
+        remoteAhead={remoteAhead}
       />
 
       <div className="app-main">
@@ -822,6 +851,7 @@ export default function App() {
               onSelect={setSelectedFile}
               onCheckOut={checkOut}
               onCheckIn={checkIn}
+              onBulkApply={parts.bulkApply}
             />
           )}
 

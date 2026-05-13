@@ -37,6 +37,12 @@ export interface BulkMetaPatch {
   release?: ReleaseState
   manufacturingMethod?: ManufacturingMethod | null
   manufacturingMaterial?: string | null
+  /** Per-part mass in pounds. null clears the value. */
+  mass?: number | null
+  /** Per-part cost in dollars. null clears the value. */
+  cost?: number | null
+  /** Manufacturing notes — overwrites the existing notes string. */
+  manufacturingNotes?: string
 }
 
 export interface PartMeta {
@@ -234,6 +240,7 @@ export interface IpcApi {
   checkIn(filePath: string): Promise<void>
   forceCheckIn(filePath: string): Promise<void>
   getLocks(): Promise<LockInfo[]>
+  getRemoteAhead(): Promise<number>
   selectDirectory(): Promise<string | null>
   openFileExplorer(path: string): Promise<void>
   getProjectConfig(): Promise<ProjectConfig | null>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo, type ReactNode } from 'react'
-import type { FileEntry, FileState, ReleaseState } from '@shared/types'
+import type { BulkMetaPatch, FileEntry, FileState, ManufacturingMethod, ReleaseState } from '@shared/types'
 import FileThumbnail from './FileThumbnail'
 
 interface Props {
@@ -8,6 +8,10 @@ interface Props {
   onSelect: (file: FileEntry) => void
   onCheckOut: (path: string) => void
   onCheckIn: (path: string) => void
+  /** Bulk-apply a metadata patch across many files in a single commit.
+   *  Wired to the same useParts.bulkApply path that the Parts Manager
+   *  uses, so file-tree bulk edits stack onto the team queue identically. */
+  onBulkApply?: (paths: string[], patch: BulkMetaPatch) => Promise<void>
 }
 
 interface ContextMenuState {
@@ -98,6 +102,14 @@ interface FileRowProps {
    *  to remind the user there are unpublished changes inside even when
    *  the folder is collapsed. Undefined or 0 = no indicator. */
   dirtyDescendants?: number
+  /** Multi-select bulk-edit state. `checked` is true when this row is
+   *  ticked; `indeterminate` is true for folders where some-but-not-all
+   *  descendants are ticked. `showCheckbox` is true when bulk-edit is
+   *  wired (parent supplied onBulkApply). */
+  showCheckbox: boolean
+  checked: boolean
+  indeterminate: boolean
+  onToggleSelect: (path: string) => void
   onClick: (path: string) => void
   onContextMenu: (e: React.MouseEvent, path: string) => void
 }
@@ -105,14 +117,28 @@ interface FileRowProps {
 const FileRow = memo(function FileRow({
   path, name, isDirectory, depth, selected, collapsed,
   state, partNumber, releaseState, commentCount, lockedBy,
-  iconChar, iconTitle, dirtyDescendants, onClick, onContextMenu
+  iconChar, iconTitle, dirtyDescendants,
+  showCheckbox, checked, indeterminate, onToggleSelect,
+  onClick, onContextMenu
 }: FileRowProps) {
   return (
     <div
-      className={`file-row${selected ? ' selected' : ''}`}
+      className={`file-row${selected ? ' selected' : ''}${checked ? ' bulk-selected' : ''}`}
       onClick={() => onClick(path)}
       onContextMenu={e => onContextMenu(e, path)}
     >
+      {showCheckbox && (
+        <div className="col-select" onClick={e => { e.stopPropagation(); onToggleSelect(path) }}>
+          <input
+            type="checkbox"
+            checked={checked}
+            ref={el => { if (el) el.indeterminate = indeterminate && !checked }}
+            onChange={() => onToggleSelect(path)}
+            onClick={e => e.stopPropagation()}
+            aria-label={`Select ${name}`}
+          />
+        </div>
+      )}
       <div className="col-name">
         <span className="indent" style={{ width: depth * 20 }} />
         {isDirectory ? (
@@ -240,8 +266,18 @@ function filterTree(entries: FileEntry[], query: string): FileEntry[] {
   return out
 }
 
-export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckOut, onCheckIn }: Props) {
+export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckOut, onCheckIn, onBulkApply }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // Multi-select state for bulk metadata edits. Stored as a Set of
+  // every checked path — file or folder. The "what to apply patches
+  // to" resolution happens at apply-time so a folder check expands
+  // to its descendant files lazily.
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
+  const [bulkRelease, setBulkRelease] = useState<ReleaseState | ''>('')
+  const [bulkMethod, setBulkMethod] = useState<ManufacturingMethod | '' | 'clear'>('')
+  const [bulkMaterial, setBulkMaterial] = useState('')
+  const [bulkApplying, setBulkApplying] = useState(false)
+  const bulkEnabled = !!onBulkApply
   const didInitialCollapse = useRef(false)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('name')
@@ -315,6 +351,91 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, file: entry })
   }, [entryByPath])
+
+  // Map every folder path to the recursive set of file (non-directory)
+  // descendants underneath it. Used both for the toggle-folder selection
+  // logic and for the indeterminate-state computation. Recomputed only
+  // when the file tree changes.
+  const fileDescendants = useMemo(() => {
+    const map = new Map<string, string[]>()
+    const collect = (entries: FileEntry[]): string[] => {
+      const out: string[] = []
+      for (const e of entries) {
+        if (e.isDirectory) {
+          const kids = collect(e.children || [])
+          map.set(e.path, kids)
+          out.push(...kids)
+        } else {
+          out.push(e.path)
+        }
+      }
+      return out
+    }
+    collect(files)
+    return map
+  }, [files])
+
+  const toggleBulkSelect = useCallback((path: string) => {
+    setBulkSelected(prev => {
+      const next = new Set(prev)
+      const entry = entryByPath.get(path)
+      if (!entry) return prev
+      if (entry.isDirectory) {
+        // Selecting a folder = selecting every file under it. Toggling
+        // collapses to "all on" → "all off" based on whether every
+        // descendant is already in the set.
+        const descs = fileDescendants.get(path) || []
+        const allOn = descs.length > 0 && descs.every(d => next.has(d))
+        if (allOn) {
+          descs.forEach(d => next.delete(d))
+          next.delete(path)
+        } else {
+          descs.forEach(d => next.add(d))
+          next.add(path)
+        }
+      } else {
+        if (next.has(path)) next.delete(path); else next.add(path)
+      }
+      return next
+    })
+  }, [entryByPath, fileDescendants])
+
+  const clearBulkSelection = useCallback(() => setBulkSelected(new Set()), [])
+
+  // Final list of file paths to apply patches to. Folders in the
+  // selection are dropped here — only file leaves carry metadata.
+  const selectedFilePaths = useMemo(() => {
+    const out: string[] = []
+    for (const p of bulkSelected) {
+      const entry = entryByPath.get(p)
+      if (entry && !entry.isDirectory) out.push(p)
+    }
+    return out
+  }, [bulkSelected, entryByPath])
+
+  const applyBulk = async () => {
+    if (!onBulkApply || selectedFilePaths.length === 0) return
+    const patch: BulkMetaPatch = {}
+    if (bulkRelease) patch.release = bulkRelease
+    if (bulkMethod === 'clear') patch.manufacturingMethod = null
+    else if (bulkMethod) patch.manufacturingMethod = bulkMethod
+    if (bulkMaterial.trim()) patch.manufacturingMaterial = bulkMaterial.trim()
+    if (Object.keys(patch).length === 0) return
+    setBulkApplying(true)
+    try {
+      await onBulkApply(selectedFilePaths, patch)
+      setBulkRelease('')
+      setBulkMethod('')
+      setBulkMaterial('')
+      clearBulkSelection()
+    } catch {
+      // useParts surfaces errors via the parts.error banner
+    } finally {
+      setBulkApplying(false)
+    }
+  }
+
+  const bulkNothingChosen = !bulkRelease && !bulkMethod && !bulkMaterial.trim()
 
   // Count unpublished files (modified or untracked) per folder so we
   // can badge collapsed folders that are hiding pending changes.
@@ -402,7 +523,58 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
           Expand all
         </button>
       </div>
+      {bulkEnabled && selectedFilePaths.length > 0 && (
+        <div className="file-tree-bulk-bar">
+          <span className="parts-bulk-count">
+            {selectedFilePaths.length} file{selectedFilePaths.length === 1 ? '' : 's'} selected
+          </span>
+          <select
+            value={bulkRelease}
+            onChange={e => setBulkRelease(e.target.value as ReleaseState | '')}
+            disabled={bulkApplying}
+            title="Release state"
+          >
+            <option value="">Release…</option>
+            <option value="draft">draft</option>
+            <option value="in-review">in-review</option>
+            <option value="released">released</option>
+            <option value="manufactured">manufactured</option>
+          </select>
+          <select
+            value={bulkMethod}
+            onChange={e => setBulkMethod(e.target.value as ManufacturingMethod | '' | 'clear')}
+            disabled={bulkApplying}
+            title="Manufacturing method"
+          >
+            <option value="">Method…</option>
+            <option value="print">3D Print</option>
+            <option value="cnc">CNC</option>
+            <option value="manual">Hand</option>
+            <option value="other">Other</option>
+            <option value="clear">(clear)</option>
+          </select>
+          <input
+            type="text"
+            list="default-materials"
+            value={bulkMaterial}
+            onChange={e => setBulkMaterial(e.target.value)}
+            placeholder="Material…"
+            disabled={bulkApplying}
+          />
+          <button
+            className="toolbar-btn primary"
+            onClick={applyBulk}
+            disabled={bulkApplying || bulkNothingChosen}
+          >
+            {bulkApplying ? 'Saving…' : `Apply to ${selectedFilePaths.length}`}
+          </button>
+          <button className="toolbar-btn" onClick={clearBulkSelection} disabled={bulkApplying}>
+            Clear
+          </button>
+        </div>
+      )}
       <div className="file-table-header">
+        {bulkEnabled && <span className="col-select" />}
         <span className="col-name sortable" onClick={() => setSort('name')}>Name{sortArrow('name')}</span>
         <span className="col-partnum sortable" onClick={() => setSort('partnum')}>Part #{sortArrow('partnum')}</span>
         <span className="col-status sortable" onClick={() => setSort('status')}>Status{sortArrow('status')}</span>
@@ -415,27 +587,43 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
             <p>Add SolidWorks files to your project folder</p>
           </div>
         ) : (
-          rows.map(({ entry, depth }) => (
-            <FileRow
-              key={entry.path}
-              path={entry.path}
-              name={entry.name}
-              isDirectory={entry.isDirectory}
-              depth={depth}
-              selected={selectedPath === entry.path}
-              collapsed={collapsed.has(entry.path)}
-              state={entry.state}
-              partNumber={entry.partNumber}
-              releaseState={entry.releaseState}
-              commentCount={entry.commentCount}
-              lockedBy={entry.lockedBy}
-              iconChar={fileIcon(entry)}
-              iconTitle={fileIconTitle(entry)}
-              dirtyDescendants={entry.isDirectory ? dirtyByFolder.get(entry.path) : undefined}
-              onClick={handleRowClick}
-              onContextMenu={handleRowContext}
-            />
-          ))
+          rows.map(({ entry, depth }) => {
+            // Folder rows show indeterminate when SOME (but not all)
+            // descendants are checked. Files just track their own bit.
+            let checked = bulkSelected.has(entry.path)
+            let indeterminate = false
+            if (entry.isDirectory) {
+              const descs = fileDescendants.get(entry.path) || []
+              const checkedKids = descs.filter(d => bulkSelected.has(d)).length
+              checked = descs.length > 0 && checkedKids === descs.length
+              indeterminate = checkedKids > 0 && checkedKids < descs.length
+            }
+            return (
+              <FileRow
+                key={entry.path}
+                path={entry.path}
+                name={entry.name}
+                isDirectory={entry.isDirectory}
+                depth={depth}
+                selected={selectedPath === entry.path}
+                collapsed={collapsed.has(entry.path)}
+                state={entry.state}
+                partNumber={entry.partNumber}
+                releaseState={entry.releaseState}
+                commentCount={entry.commentCount}
+                lockedBy={entry.lockedBy}
+                iconChar={fileIcon(entry)}
+                iconTitle={fileIconTitle(entry)}
+                dirtyDescendants={entry.isDirectory ? dirtyByFolder.get(entry.path) : undefined}
+                showCheckbox={bulkEnabled}
+                checked={checked}
+                indeterminate={indeterminate}
+                onToggleSelect={toggleBulkSelect}
+                onClick={handleRowClick}
+                onContextMenu={handleRowContext}
+              />
+            )
+          })
         )}
       </div>
 

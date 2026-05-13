@@ -38,6 +38,9 @@ const api: IpcApi = {
   getLocks: () =>
     ipcRenderer.invoke('get-locks'),
 
+  getRemoteAhead: () =>
+    ipcRenderer.invoke('get-remote-ahead'),
+
   selectDirectory: () =>
     ipcRenderer.invoke('select-directory'),
 

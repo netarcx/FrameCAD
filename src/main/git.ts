@@ -73,22 +73,28 @@ function buildProjectReadme(name: string, remote: string): string {
   const cleanRemote = (remote || '').trim()
   const joinHttpsUrl = cleanRemote || '<paste this repo URL>'
   const deepLink = cleanRemote ? `trentcad://join?url=${encodeURIComponent(cleanRemote)}` : ''
+  const teamName = getBuildDefaultTeamName() || 'an FRC team'
+  const issueRepo = getBuildDefaultIssueRepo() || 'netarcx/TrentCAD'
+
+  // shields.io renders a badge image GitHub-side that looks like a
+  // button, so the deep link reads as an obvious call-to-action
+  // instead of a plain hyperlink. `for-the-badge` is the tall pill
+  // style; the message text after the dash is what shows on the
+  // right side of the badge. Color matches the app accent.
+  const badgeUrl = 'https://img.shields.io/badge/Open%20in-TrentCAD-2563eb?style=for-the-badge'
   const deepLinkBlock = deepLink
     ? `## Quick add to TrentCAD
 
-**[➜ Open this project in TrentCAD](${deepLink})**
+[![Open in TrentCAD](${badgeUrl})](${deepLink})
 
-Clicking that link from this README opens the TrentCAD desktop app and
-jumps straight into the Join Project flow with the URL prefilled. If
-nothing happens, you don't have TrentCAD installed yet — download the
-latest release from [TrentCAD releases](https://github.com/netarcx/TrentCAD/releases)
+Clicking that button from this README opens the TrentCAD desktop app
+and jumps straight into the Join Project flow with the URL prefilled.
+If nothing happens, you don't have TrentCAD installed yet — download
+the latest release from [TrentCAD releases](https://github.com/${issueRepo}/releases)
 and try again.
 
 `
     : ''
-
-  const teamName = getBuildDefaultTeamName() || 'an FRC team'
-  const issueRepo = getBuildDefaultIssueRepo() || 'netarcx/TrentCAD'
 
   return `# ${name}
 
@@ -536,6 +542,31 @@ export async function isFileNewerOnRemote(relPath: string): Promise<boolean> {
     return commits.trim().length > 0
   } catch {
     return false
+  }
+}
+
+/**
+ * How many commits exist on origin/<branch> that aren't in our local
+ * HEAD. Returns 0 on any failure (offline, no remote, no upstream
+ * tracking, auth not yet wired) so the UI just shows the no-updates
+ * state instead of an error. Fetches before counting so the answer
+ * reflects what GitHub actually has.
+ */
+export async function getRemoteAhead(): Promise<number> {
+  if (!git) return 0
+  try {
+    const remotes = await git.getRemotes(false)
+    if (remotes.length === 0) return 0
+    await git.fetch(['origin'])
+    const branchSummary = await git.branchLocal()
+    const branch = branchSummary.current || 'main'
+    const remoteRef = `origin/${branch}`
+    await git.raw(['rev-parse', '--verify', remoteRef])
+    const out = (await git.raw(['rev-list', '--count', `HEAD..${remoteRef}`])).trim()
+    const n = parseInt(out, 10)
+    return Number.isFinite(n) && n > 0 ? n : 0
+  } catch {
+    return 0
   }
 }
 
@@ -1071,9 +1102,17 @@ export async function pullRemoteFile(relPath: string): Promise<void> {
 
 /**
  * Stage a single file, commit it with the given message, and push. If the
- * push fails the commit is unwound so the working tree is clean and the
- * caller can retry. Throws on push failure so the caller can surface the
- * error.
+ * push fails because someone else pushed in between (non-fast-forward),
+ * stash any unrelated dirty files, rebase our commit on top of origin,
+ * and retry the push once. If the push fails for any other reason — or
+ * the rebase conflicts — unwind the commit so the working tree is clean
+ * and surface a clear error to the caller.
+ *
+ * Why this matters for metadata: the modifyAndSync pattern pulls just
+ * the meta file before mutating, but doesn't advance the local branch
+ * pointer. A teammate publishing a CAD file between our pull and our
+ * push would otherwise reject our metadata commit until the user
+ * manually Sync'd.
  */
 export async function commitAndPushFile(relPath: string, message: string): Promise<void> {
   const g = getGit()
@@ -1083,13 +1122,86 @@ export async function commitAndPushFile(relPath: string, message: string): Promi
   if (!status.files.some(f => f.path === relPath)) return
   await g.commit(message)
   if (remotes.length === 0) return
-  try {
-    await g.push()
-  } catch (err) {
+
+  const undoCommit = async () => {
     await g.raw(['reset', '--soft', 'HEAD~1'])
     await g.raw(['reset', '--', relPath])
-    throw new Error('Could not sync to team — ' + (err as Error).message)
   }
+
+  let firstErr: Error
+  try {
+    await g.push()
+    return
+  } catch (err) {
+    firstErr = err as Error
+    if (!isNonFastForward(firstErr.message)) {
+      await undoCommit()
+      throw new Error('Could not sync to team — ' + firstErr.message)
+    }
+  }
+
+  // Non-fast-forward — rebase on top of origin and retry. Stash unrelated
+  // dirty files so the rebase can run cleanly.
+  const stashLabel = `trentcad-meta-${Date.now()}`
+  let stashed = false
+  const dirtyStatus = await g.status()
+  if (dirtyStatus.files.length > 0) {
+    try {
+      await g.raw(['stash', 'push', '--include-untracked', '-m', stashLabel])
+      stashed = true
+    } catch {
+      // Couldn't stash — unwind and let the user resolve manually
+      await undoCommit()
+      throw new Error('Could not sync to team — teammate pushed first and local has unstashable changes')
+    }
+  }
+
+  try {
+    await g.pull(['--rebase'])
+  } catch (rebaseErr) {
+    // Conflict during rebase — abort the rebase, pop the stash, unwind
+    try { await g.raw(['rebase', '--abort']) } catch { /* not in a rebase */ }
+    if (stashed) {
+      try { await g.raw(['stash', 'pop']) } catch { /* stash stays in list */ }
+    }
+    await undoCommit()
+    throw new Error(
+      'Could not sync to team — rebase on top of origin conflicted: ' +
+      (rebaseErr as Error).message
+    )
+  }
+
+  try {
+    await g.push()
+  } catch (retryErr) {
+    if (stashed) {
+      try { await g.raw(['stash', 'pop']) } catch { /* stash stays */ }
+    }
+    await undoCommit()
+    throw new Error('Could not sync to team — ' + (retryErr as Error).message)
+  }
+
+  if (stashed) {
+    try {
+      await g.raw(['stash', 'pop'])
+    } catch {
+      // Stash pop conflict — leave the stash for manual resolution
+      throw new Error(
+        `Metadata change pushed, but restoring your other local edits ` +
+        `from stash "${stashLabel}" conflicted. Run \`git stash pop\` ` +
+        `manually to recover.`
+      )
+    }
+  }
+}
+
+/**
+ * Heuristic for the specific git push failure where the remote has
+ * commits we don't. Triggers our rebase-and-retry path. Other push
+ * failures (auth, network) shouldn't fall through here.
+ */
+function isNonFastForward(msg: string): boolean {
+  return /rejected|non-fast-forward|fetch first|tip of your current branch is behind/i.test(msg)
 }
 
 export async function pullPartsJson(): Promise<void> {

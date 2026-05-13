@@ -206,6 +206,10 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     return lockOps.getLocks()
   })
 
+  ipcMain.handle('get-remote-ahead', async () => {
+    return gitOps.getRemoteAhead()
+  })
+
   ipcMain.handle('select-directory', async () => {
     const win = getMainWindow()
     if (!win) return null

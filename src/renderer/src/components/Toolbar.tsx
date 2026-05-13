@@ -16,6 +16,9 @@ interface Props {
   activeSection: SidebarSection
   inspectorOpen: boolean
   onToggleInspector: () => void
+  /** Count of commits on origin ahead of local. > 0 highlights the Sync
+   *  button so the user knows there's something to pull. */
+  remoteAhead?: number
 }
 
 function getSelectedFolder(file: FileEntry | null): string {
@@ -27,7 +30,8 @@ function getSelectedFolder(file: FileEntry | null): string {
 export default function Toolbar({
   onSync, onPublish, onNewPart, onNewAssembly, onNewSubsystem,
   selectedFile, isLoading, hasProject, isCotsProject,
-  activeSection, inspectorOpen, onToggleInspector
+  activeSection, inspectorOpen, onToggleInspector,
+  remoteAhead = 0
 }: Props) {
   const [showPublish, setShowPublish] = useState(false)
   const [message, setMessage] = useState('')
@@ -106,12 +110,17 @@ export default function Toolbar({
       <div className="toolbar">
         <div className="toolbar-group">
           <button
-            className="toolbar-btn"
+            className={`toolbar-btn${remoteAhead > 0 ? ' has-remote-updates' : ''}`}
             onClick={onSync}
             disabled={!hasProject || isLoading}
-            title="Get the latest files from your team"
+            title={remoteAhead > 0
+              ? `${remoteAhead} new commit${remoteAhead === 1 ? '' : 's'} from the team — click to pull`
+              : 'Get the latest files from your team'}
           >
             {isLoading ? <span className="loading-spinner" /> : <Download size={14} strokeWidth={1.75} />} Sync
+            {remoteAhead > 0 && (
+              <span className="toolbar-btn-badge">{remoteAhead}</span>
+            )}
           </button>
           <button
             className="toolbar-btn primary"

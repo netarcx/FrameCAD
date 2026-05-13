@@ -310,6 +310,22 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
       else entry.manufacturingMaterial = trimmed
       fieldCounts.material = (fieldCounts.material || 0) + 1
     }
+    if (patch.mass !== undefined) {
+      if (patch.mass === null) delete entry.mass
+      else if (isFinite(patch.mass) && patch.mass >= 0) entry.mass = patch.mass
+      fieldCounts.mass = (fieldCounts.mass || 0) + 1
+    }
+    if (patch.cost !== undefined) {
+      if (patch.cost === null) delete entry.cost
+      else if (isFinite(patch.cost) && patch.cost >= 0) entry.cost = patch.cost
+      fieldCounts.cost = (fieldCounts.cost || 0) + 1
+    }
+    if (patch.manufacturingNotes !== undefined) {
+      const trimmed = (patch.manufacturingNotes ?? '').trim()
+      if (!trimmed) delete entry.manufacturingNotes
+      else entry.manufacturingNotes = trimmed
+      fieldCounts.notes = (fieldCounts.notes || 0) + 1
+    }
     all[filePath] = entry
     touched++
   }
@@ -329,6 +345,9 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
     labelParts.push(m)
   }
   if (fieldCounts.material) labelParts.push(`material×${fieldCounts.material}`)
+  if (fieldCounts.mass) labelParts.push(`mass×${fieldCounts.mass}`)
+  if (fieldCounts.cost) labelParts.push(`cost×${fieldCounts.cost}`)
+  if (fieldCounts.notes) labelParts.push(`notes×${fieldCounts.notes}`)
   if (cascadeCount > 0) labelParts.push(`+${cascadeCount} cascaded`)
   const msg = `[bulk-meta] ${touched} part${touched === 1 ? '' : 's'}: ${labelParts.join(', ')}`
   await commitAndPushFile(metaRelPath(), msg)

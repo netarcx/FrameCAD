@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { X } from 'lucide-react'
-import type { FileEntry, FileState, ManufacturingMethod, PartMeta, ReleaseState } from '@shared/types'
+import type { BulkMetaPatch, FileEntry, FileState, ManufacturingMethod, PartMeta, ReleaseState } from '@shared/types'
 import FileThumbnail from './FileThumbnail'
 
 interface Props {
@@ -204,11 +204,18 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose, onN
     setSaveStatus(null)
     setSavingMeta(true)
     try {
-      if (massDirty && massParsed.ok) await window.api.setPartMass(file.path, massParsed.value)
-      if (costDirty && costParsed.ok) await window.api.setPartCost(file.path, costParsed.value)
-      if (materialDirty) await window.api.setManufacturingMaterial(file.path, mfgMaterial)
-      if (methodDirty) await window.api.setManufacturingMethod(file.path, mfgMethod)
-      if (notesDirty) await window.api.setManufacturingNotes(file.path, mfgNotes)
+      // Build one patch covering every dirty field and ship it through
+      // bulkUpdateMeta so we get exactly one git commit + push for the
+      // whole Save click instead of one per field.
+      const patch: BulkMetaPatch = {}
+      if (massDirty && massParsed.ok) patch.mass = massParsed.value
+      if (costDirty && costParsed.ok) patch.cost = costParsed.value
+      if (materialDirty) patch.manufacturingMaterial = mfgMaterial
+      if (methodDirty) patch.manufacturingMethod = mfgMethod
+      if (notesDirty) patch.manufacturingNotes = mfgNotes
+      if (Object.keys(patch).length > 0) {
+        await window.api.bulkUpdateMeta({ [file.path]: patch })
+      }
       await refreshMeta(file.path)
       setSaveStatus('Saved')
       setTimeout(() => setSaveStatus(s => (s === 'Saved' ? null : s)), 2000)

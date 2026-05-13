@@ -148,32 +148,17 @@ export default function useParts({ enabled }: UsePartsOptions) {
     queueEdit(path, { manufacturingMaterial: material }, { manufacturingMaterial: material })
   }, [queueEdit])
 
-  // Mass/cost are per-part numerical fields not in the bulk path. Keep
-  // them on the single-call path so existing callers (DetailsPanel etc.)
-  // and per-cell editing both still work, just without blocking the UI.
-  const setMass = useCallback(async (path: string, mass: number | null) => {
-    setAllParts(prev => prev.map(r =>
-      r.path === path ? { ...r, meta: { ...r.meta, mass: mass ?? undefined } } : r
-    ))
-    try {
-      await window.api.setPartMass(path, mass)
-    } catch (err) {
-      setError((err as Error).message)
-      loadAllParts()
-    }
-  }, [loadAllParts])
+  // Mass/cost go through the same debounced queue as release/method/material
+  // so a Parts Manager bulk-edit session collapses into one commit instead
+  // of N. Per-cell edits feel exactly the same to the user — the queue
+  // flushes 1.2s after the last keystroke.
+  const setMass = useCallback((path: string, mass: number | null) => {
+    queueEdit(path, { mass }, { mass: mass ?? undefined })
+  }, [queueEdit])
 
-  const setCost = useCallback(async (path: string, cost: number | null) => {
-    setAllParts(prev => prev.map(r =>
-      r.path === path ? { ...r, meta: { ...r.meta, cost: cost ?? undefined } } : r
-    ))
-    try {
-      await window.api.setPartCost(path, cost)
-    } catch (err) {
-      setError((err as Error).message)
-      loadAllParts()
-    }
-  }, [loadAllParts])
+  const setCost = useCallback((path: string, cost: number | null) => {
+    queueEdit(path, { cost }, { cost: cost ?? undefined })
+  }, [queueEdit])
 
   // Bulk-select Apply path: same queue, but flush immediately so the
   // user sees the commit happen right after they clicked the button.
