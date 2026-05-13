@@ -1,5 +1,9 @@
 appId: com.trentcad.app
 productName: TrentCAD
+protocols:
+  - name: TrentCAD Project
+    schemes:
+      - trentcad
 directories:
   buildResources: build
   output: dist

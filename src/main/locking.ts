@@ -1,14 +1,62 @@
 import type { LockInfo } from '@shared/types'
 import { getGit } from './git'
 
+/**
+ * Acquire a Git LFS lock on `filePath`. Idempotent when we already own
+ * the lock; surfaces a clear "already checked out by <name>" error
+ * when someone else holds it. Without this wrapper the LFS CLI's raw
+ * "Lock exists" message lands in the UI verbatim — which auto-reported
+ * as issue #1 (https://github.com/netarcx/TrentCAD/issues/1).
+ */
 export async function checkOut(filePath: string): Promise<void> {
   const g = getGit()
-  await g.raw(['lfs', 'lock', filePath])
+  try {
+    await g.raw(['lfs', 'lock', filePath])
+  } catch (err) {
+    const msg = (err as Error).message || ''
+    if (!/lock exists/i.test(msg)) throw err
+    // LFS refused because a lock is already on file. Figure out whose.
+    const { ours, theirs } = await verifyLocks()
+    if (ours.some(l => l.path === filePath)) {
+      // We already own it — make the operation idempotent.
+      return
+    }
+    const stolen = theirs.find(l => l.path === filePath)
+    if (stolen) {
+      throw new Error(`Already checked out by ${stolen.owner}.`)
+    }
+    // Lock exists but neither ours nor theirs lists know it (likely
+    // stale local state). Suggest a sync — that refreshes lock cache.
+    throw new Error('Already locked — run Sync to refresh lock state, then try again.')
+  }
 }
 
+/**
+ * Force-release a Git LFS lock, even when it was acquired by someone
+ * else. Used by the Admin panel's Locks tab to recover from a teammate
+ * forgetting to check a file back in. Logs nothing locally — the LFS
+ * server records the unlock against the caller's identity.
+ */
+export async function forceCheckIn(filePath: string): Promise<void> {
+  const g = getGit()
+  await g.raw(['lfs', 'unlock', '--force', filePath])
+}
+
+/**
+ * Release a Git LFS lock on `filePath`. Idempotent when we don't hold
+ * the lock; surfaces a clear message instead of LFS's raw error when
+ * the file isn't locked or is locked by someone else.
+ */
 export async function checkIn(filePath: string): Promise<void> {
   const g = getGit()
-  await g.raw(['lfs', 'unlock', filePath])
+  try {
+    await g.raw(['lfs', 'unlock', filePath])
+  } catch (err) {
+    const msg = (err as Error).message || ''
+    if (!/not locked|no matching|unable to find/i.test(msg) && !/lock.*does not exist/i.test(msg)) throw err
+    // No lock to release — treat as a no-op so the UI doesn't bark
+    // when the user double-clicks Check In.
+  }
 }
 
 export async function getLocks(): Promise<LockInfo[]> {

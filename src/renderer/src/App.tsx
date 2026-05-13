@@ -90,6 +90,28 @@ export default function App() {
     }
   }, [manufacturingView, project])
 
+  // trentcad:// deep-link → prefill the Join Project URL field. Bumped
+  // by sequence number so the same URL can re-trigger after the user
+  // dismisses it. Pulled once on mount (cold launch) and on every
+  // subsequent deep-link event (warm app).
+  const [deepLinkJoinUrl, setDeepLinkJoinUrl] = useState<string | null>(null)
+  const [deepLinkSeq, setDeepLinkSeq] = useState(0)
+  useEffect(() => {
+    window.api.consumePendingDeepLink().then(payload => {
+      if (payload?.action === 'join' && payload.url) {
+        setDeepLinkJoinUrl(payload.url)
+        setDeepLinkSeq(s => s + 1)
+      }
+    }).catch(() => {})
+    const cleanup = window.api.onDeepLink(payload => {
+      if (payload?.action === 'join' && payload.url) {
+        setDeepLinkJoinUrl(payload.url)
+        setDeepLinkSeq(s => s + 1)
+      }
+    })
+    return cleanup
+  }, [])
+
   const [ghLoggedIn, setGhLoggedIn] = useState(false)
   const [reportState, setReportState] = useState<'idle' | 'confirm' | 'sending' | 'sent' | 'failed'>('idle')
   const [reportResult, setReportResult] = useState<{ url?: string; number?: number; error?: string }>({})
@@ -555,6 +577,8 @@ export default function App() {
           onCreateProject={createProject}
           onJoinProject={joinProject}
           onOpenProject={openProject}
+          prefilledJoinUrl={deepLinkJoinUrl}
+          prefilledJoinSeq={deepLinkSeq}
           onEnterManufacturingView={async () => {
             try {
               const recents = await window.api.getRecentProjects()

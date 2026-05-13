@@ -28,6 +28,11 @@ export interface PartReleaseInfo {
 
 export type ManufacturingMethod = 'print' | 'cnc' | 'manual' | 'other'
 
+export interface DeepLinkPayload {
+  action: 'join'
+  url: string
+}
+
 export interface BulkMetaPatch {
   release?: ReleaseState
   manufacturingMethod?: ManufacturingMethod | null
@@ -227,6 +232,7 @@ export interface IpcApi {
   getHistory(limit?: number): Promise<HistoryEntry[]>
   checkOut(filePath: string): Promise<void>
   checkIn(filePath: string): Promise<void>
+  forceCheckIn(filePath: string): Promise<void>
   getLocks(): Promise<LockInfo[]>
   selectDirectory(): Promise<string | null>
   openFileExplorer(path: string): Promise<void>
@@ -308,6 +314,8 @@ export interface IpcApi {
   }>
   renormalizeAll(): Promise<{ success: boolean; error?: string }>
   onFileChange(callback: (files: FileEntry[]) => void): () => void
+  consumePendingDeepLink(): Promise<DeepLinkPayload | null>
+  onDeepLink(callback: (payload: DeepLinkPayload) => void): () => void
   onError(callback: (error: string) => void): () => void
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void
   onUpdateDownloadProgress(callback: (progress: { percent: number }) => void): () => void

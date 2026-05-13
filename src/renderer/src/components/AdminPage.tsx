@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type {
-  AdminConfig, BulkMetaPatch, GlobalAdminConfig, GlobalAdminState,
+  AdminConfig, BulkMetaPatch, GlobalAdminConfig, GlobalAdminState, LockInfo,
   PartsManifest, PartMeta, ReleaseState, ManufacturingMethod
 } from '@shared/types'
 import ProfileSetup from './ProfileSetup'
 import PartsManager from './PartsManager'
 import ApprovalsPanel from './ApprovalsPanel'
 
-type AdminTab = 'settings' | 'parts' | 'approvals' | 'documents' | 'health' | 'tools' | 'profile' | 'about'
+type AdminTab = 'settings' | 'parts' | 'approvals' | 'documents' | 'locks' | 'health' | 'tools' | 'profile' | 'about'
 
 interface JoinedPart {
   path: string
@@ -78,6 +78,13 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [flushing, setFlushing] = useState(false)
+
+  // Locks (admin tab) — list of every active LFS lock with a force
+  // release control. Used by mentors to recover files a teammate
+  // forgot to check back in.
+  const [locks, setLocks] = useState<LockInfo[] | null>(null)
+  const [locksLoading, setLocksLoading] = useState(false)
+  const [lockReleasing, setLockReleasing] = useState<string | null>(null)
 
   // Tools
   const [integrity, setIntegrity] = useState<null | {
@@ -457,6 +464,49 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
     }
   }
 
+  const loadLocks = useCallback(async () => {
+    setLocksLoading(true)
+    setError(null)
+    try {
+      const list = await window.api.getLocks()
+      list.sort((a, b) => a.path.localeCompare(b.path))
+      setLocks(list)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLocksLoading(false)
+    }
+  }, [])
+
+  const handleForceRelease = async (lock: LockInfo) => {
+    const ok = window.confirm(
+      `Force-release ${lock.path}?\n\n` +
+      `Currently checked out by ${lock.owner}. They will lose any unpublished ` +
+      `edits to this file. Only do this if they're done or unreachable.`
+    )
+    if (!ok) return
+    setLockReleasing(lock.path)
+    setError(null)
+    setStatus(null)
+    try {
+      await window.api.forceCheckIn(lock.path)
+      setStatus(`✓ Released ${lock.path} (was held by ${lock.owner})`)
+      await loadLocks()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLockReleasing(null)
+    }
+  }
+
+  // Auto-load locks the first time the user switches into the Locks
+  // tab so they don't have to click Refresh.
+  useEffect(() => {
+    if (tab === 'locks' && hasProject && locks === null && !locksLoading) {
+      loadLocks()
+    }
+  }, [tab, hasProject, locks, locksLoading, loadLocks])
+
   const handleRenormalize = async () => {
     setRenormRunning(true)
     setError(null)
@@ -543,6 +593,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
     { id: 'parts', label: 'Parts Manager', projectOnly: true },
     { id: 'approvals', label: 'Approvals', projectOnly: true },
     { id: 'documents', label: 'Documents', projectOnly: true },
+    { id: 'locks', label: 'Locks', projectOnly: true },
     { id: 'health', label: 'Repository Health', projectOnly: true },
     { id: 'tools', label: 'Tools', projectOnly: true },
     { id: 'profile', label: 'Profile' },
@@ -873,6 +924,53 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {tab === 'locks' && hasProject && (
+          <div className="admin-section">
+            <h3>Active Check-outs</h3>
+            <p className="admin-hint">
+              Every file currently checked out (LFS-locked) on the team's repo.
+              Use <strong>Force release</strong> to undo someone else's check-out
+              when they've forgotten to check it back in — they will lose any
+              unpublished edits to that file, so use sparingly and only after
+              confirming with them when possible.
+            </p>
+            <div className="admin-section-actions" style={{ justifyContent: 'flex-start' }}>
+              <button className="toolbar-btn" onClick={loadLocks} disabled={locksLoading}>
+                {locksLoading ? 'Loading…' : 'Refresh'}
+              </button>
+              <span className="parts-count">
+                {locks === null ? '' : `${locks.length} active`}
+              </span>
+            </div>
+            {locks && locks.length === 0 && (
+              <div className="admin-status">✓ Nobody has anything checked out right now.</div>
+            )}
+            {locks && locks.length > 0 && (
+              <div className="approvals-list">
+                {locks.map(l => (
+                  <div key={l.id || l.path} className="approval-row">
+                    <div className="approval-main">
+                      <div className="approval-pn">{l.owner}</div>
+                      <div className="approval-meta">
+                        <strong>{l.path}</strong>
+                      </div>
+                    </div>
+                    <div className="approval-actions">
+                      <button
+                        className="toolbar-btn"
+                        onClick={() => handleForceRelease(l)}
+                        disabled={lockReleasing === l.path}
+                      >
+                        {lockReleasing === l.path ? 'Releasing…' : 'Force release'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

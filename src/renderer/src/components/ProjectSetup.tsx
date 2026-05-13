@@ -21,16 +21,34 @@ interface Props {
    * welcome-screen Browse button and the org-aware Create flow.
    */
   globalAdmin?: GlobalAdminConfig
+  /** When set, jump straight into the Join Project flow with this URL
+   *  prefilled. Used by the trentcad:// deep-link handler so README
+   *  "Open in TrentCAD" links land on a ready-to-go join form. */
+  prefilledJoinUrl?: string | null
+  /** Monotonic counter bumped on every deep-link arrival so the same
+   *  URL can re-trigger the prefill (e.g. user backs out then clicks
+   *  the link again). */
+  prefilledJoinSeq?: number
 }
 
 type Mode = 'select' | 'create' | 'join' | 'open'
 
-export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, onEnterManufacturingView, onOpenAdmin, isLoading, globalAdmin }: Props) {
+export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, onEnterManufacturingView, onOpenAdmin, isLoading, globalAdmin, prefilledJoinUrl, prefilledJoinSeq }: Props) {
   const [mode, setMode] = useState<Mode>('select')
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [remote, setRemote] = useState('')
   const [url, setUrl] = useState('')
+  // React to deep-link arrivals: prefill the join URL field and snap to
+  // the join mode. Keyed on the seq counter so re-clicking the same
+  // link still re-routes the user.
+  useEffect(() => {
+    if (prefilledJoinUrl) {
+      setUrl(prefilledJoinUrl)
+      setMode('join')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefilledJoinSeq, prefilledJoinUrl])
   const [isCotsProject, setIsCotsProject] = useState(false)
   const [recentProjects, setRecentProjects] = useState<ProjectConfig[]>([])
   const [authStatus, setAuthStatus] = useState<GitHubAuthStatus | null>(null)

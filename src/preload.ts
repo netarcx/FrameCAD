@@ -32,6 +32,9 @@ const api: IpcApi = {
   checkIn: (filePath) =>
     ipcRenderer.invoke('check-in', filePath),
 
+  forceCheckIn: (filePath) =>
+    ipcRenderer.invoke('force-check-in', filePath),
+
   getLocks: () =>
     ipcRenderer.invoke('get-locks'),
 
@@ -208,6 +211,16 @@ const api: IpcApi = {
       callback(files as Parameters<typeof callback>[0])
     ipcRenderer.on('file-change', handler)
     return () => ipcRenderer.removeListener('file-change', handler)
+  },
+
+  consumePendingDeepLink: () =>
+    ipcRenderer.invoke('consume-pending-deep-link'),
+
+  onDeepLink: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown) =>
+      callback(payload as Parameters<typeof callback>[0])
+    ipcRenderer.on('deep-link', handler)
+    return () => ipcRenderer.removeListener('deep-link', handler)
   },
 
   onError: (callback) => {

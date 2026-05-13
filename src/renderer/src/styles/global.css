@@ -1179,6 +1179,23 @@ input {
   color: var(--text-muted);
 }
 
+.folder-dirty-badge {
+  flex-shrink: 0;
+  margin-left: 8px;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--yellow, #d97706);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  line-height: 1;
+}
+
 .file-row .col-partnum {
   width: 130px;
   flex-shrink: 0;

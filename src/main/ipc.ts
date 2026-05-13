@@ -196,6 +196,11 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     await lockOps.checkIn(filePath)
   })
 
+  ipcMain.handle('force-check-in', async (_e, filePath: string) => {
+    await lockOps.forceCheckIn(filePath)
+    broadcastStatus(getMainWindow)
+  })
+
   ipcMain.handle('get-locks', async () => {
     return lockOps.getLocks()
   })

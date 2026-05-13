@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog } from 'electron'
+import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron'
 import path from 'path'
 import { is } from '@electron-toolkit/utils'
 import { setupIpc, stopWatching, stopRestServer, isPublishing } from './ipc'
@@ -10,6 +10,72 @@ app.commandLine.appendSwitch('disable-gpu')
 app.commandLine.appendSwitch('disable-software-rasterizer')
 
 let mainWindow: BrowserWindow | null = null
+
+// Holds a deep-link URL that arrived before the renderer was ready to
+// receive it. Flushed by the renderer via `consume-pending-deep-link`
+// once it has mounted.
+let pendingDeepLink: string | null = null
+
+function parseTrentCADUrl(rawUrl: string): { action: 'join'; url: string } | null {
+  try {
+    const u = new URL(rawUrl)
+    if (u.protocol !== 'trentcad:') return null
+    // Both `trentcad://join?url=...` (host=join) and `trentcad:join?url=...`
+    // (pathname=join) are valid depending on the platform's URL parser.
+    const action = u.hostname || u.pathname.replace(/^\/+/, '').split('/')[0]
+    if (action === 'join') {
+      const target = u.searchParams.get('url')
+      if (!target) return null
+      return { action: 'join', url: target }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function handleDeepLink(rawUrl: string | undefined): void {
+  if (!rawUrl) return
+  const parsed = parseTrentCADUrl(rawUrl)
+  if (!parsed) return
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+    mainWindow.webContents.send('deep-link', parsed)
+  } else {
+    // Renderer not ready yet — stash and let it pull on mount.
+    pendingDeepLink = rawUrl
+  }
+}
+
+// Register the trentcad:// scheme so README "Open in TrentCAD" links
+// route back to the app. On Windows this writes to the registry on first
+// run; on macOS it relies on Info.plist (set via electron-builder).
+if (!app.isDefaultProtocolClient('trentcad')) {
+  if (process.platform === 'win32' && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('trentcad', process.execPath, [path.resolve(process.argv[1])])
+  } else {
+    app.setAsDefaultProtocolClient('trentcad')
+  }
+}
+
+// Single-instance lock: a second launch (typically from a trentcad:// URL
+// on Windows/Linux) shovels its argv into the existing instance.
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const url = argv.find(a => a.startsWith('trentcad://'))
+    handleDeepLink(url)
+  })
+}
+
+// macOS delivers the URL via this event.
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  handleDeepLink(url)
+})
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -73,7 +139,21 @@ function createWindow(): void {
 
 setupIpc(() => mainWindow)
 
+ipcMain.handle('consume-pending-deep-link', () => {
+  if (!pendingDeepLink) return null
+  const parsed = parseTrentCADUrl(pendingDeepLink)
+  pendingDeepLink = null
+  return parsed
+})
+
 app.whenReady().then(() => {
+  // Cold launch from a deep link (Windows/Linux): URL arrives in argv.
+  // Capture before createWindow so handleDeepLink can stash it for the
+  // renderer to consume once mounted.
+  if (process.platform !== 'darwin') {
+    const url = process.argv.find(a => a.startsWith('trentcad://'))
+    if (url) pendingDeepLink = url
+  }
   createWindow()
   startRestServer()
   initAutoUpdater(() => mainWindow)

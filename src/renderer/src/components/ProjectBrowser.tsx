@@ -78,6 +78,10 @@ interface FileRowProps {
   lockedBy: string | undefined
   iconChar: string
   iconTitle: string
+  /** For folder rows: count of modified/untracked descendants — used
+   *  to remind the user there are unpublished changes inside even when
+   *  the folder is collapsed. Undefined or 0 = no indicator. */
+  dirtyDescendants?: number
   onClick: (path: string) => void
   onContextMenu: (e: React.MouseEvent, path: string) => void
 }
@@ -85,7 +89,7 @@ interface FileRowProps {
 const FileRow = memo(function FileRow({
   path, name, isDirectory, depth, selected, collapsed,
   state, partNumber, releaseState, commentCount, lockedBy,
-  iconChar, iconTitle, onClick, onContextMenu
+  iconChar, iconTitle, dirtyDescendants, onClick, onContextMenu
 }: FileRowProps) {
   return (
     <div
@@ -102,6 +106,14 @@ const FileRow = memo(function FileRow({
         )}
         <span className="icon" title={iconTitle}>{iconChar}</span>
         <span className="name">{name}</span>
+        {isDirectory && dirtyDescendants && dirtyDescendants > 0 ? (
+          <span
+            className="folder-dirty-badge"
+            title={`${dirtyDescendants} unpublished change${dirtyDescendants === 1 ? '' : 's'} inside — remember to Publish`}
+          >
+            {dirtyDescendants}
+          </span>
+        ) : null}
       </div>
       <div className="col-partnum">
         {!isDirectory && partNumber && (
@@ -276,6 +288,29 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
     setContextMenu({ x: e.clientX, y: e.clientY, file: entry })
   }, [entryByPath])
 
+  // Count unpublished files (modified or untracked) per folder so we
+  // can badge collapsed folders that are hiding pending changes.
+  // Each folder's count = number of dirty leaves anywhere in its subtree.
+  const dirtyByFolder = useMemo(() => {
+    const counts = new Map<string, number>()
+    const isDirty = (s: FileState) => s === 'modified' || s === 'untracked'
+    const walk = (entries: FileEntry[]): number => {
+      let subtreeDirty = 0
+      for (const e of entries) {
+        if (e.isDirectory) {
+          const childDirty = walk(e.children || [])
+          if (childDirty > 0) counts.set(e.path, childDirty)
+          subtreeDirty += childDirty
+        } else if (isDirty(e.state)) {
+          subtreeDirty += 1
+        }
+      }
+      return subtreeDirty
+    }
+    walk(files)
+    return counts
+  }, [files])
+
   const allFolderPaths = useMemo(() => {
     const out: string[] = []
     const walk = (entries: FileEntry[]) => {
@@ -369,6 +404,7 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
               lockedBy={entry.lockedBy}
               iconChar={fileIcon(entry)}
               iconTitle={fileIconTitle(entry)}
+              dirtyDescendants={entry.isDirectory ? dirtyByFolder.get(entry.path) : undefined}
               onClick={handleRowClick}
               onContextMenu={handleRowContext}
             />

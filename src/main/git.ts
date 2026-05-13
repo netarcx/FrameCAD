@@ -59,6 +59,108 @@ const NEVER_MERGE_PATTERNS = [
   '*.gcode', '*.GCODE'
 ]
 
+/**
+ * Compose the initial README.md for a fresh TrentCAD project. The
+ * GitHub repo page is the first thing teammates see, so this should
+ * orient a brand-new user without making them read external docs.
+ *
+ * The `trentcad://join?url=<remote>` link opens TrentCAD straight into
+ * the Join Project flow with the URL prefilled (see `app.setAsDefault\
+ * ProtocolClient('trentcad')` in main/index.ts).
+ */
+function buildProjectReadme(name: string, remote: string): string {
+  const cleanRemote = (remote || '').trim()
+  const joinHttpsUrl = cleanRemote || '<paste this repo URL>'
+  const deepLink = cleanRemote ? `trentcad://join?url=${encodeURIComponent(cleanRemote)}` : ''
+  const deepLinkBlock = deepLink
+    ? `## Quick add to TrentCAD
+
+**[➜ Open this project in TrentCAD](${deepLink})**
+
+Clicking that link from this README opens the TrentCAD desktop app and
+jumps straight into the Join Project flow with the URL prefilled. If
+nothing happens, you don't have TrentCAD installed yet — download the
+latest release from [TrentCAD releases](https://github.com/netarcx/TrentCAD/releases)
+and try again.
+
+`
+    : ''
+
+  return `# ${name}
+
+A TrentCAD project — CAD collaboration for FRC Team 2129. This repository
+stores SolidWorks files via Git LFS and is managed end-to-end by the
+TrentCAD desktop app. You shouldn't need to use \`git\` directly.
+
+${deepLinkBlock}## Joining manually
+
+If the quick-add link doesn't work, open TrentCAD and click
+**Join Project**, then paste:
+
+\`\`\`
+${joinHttpsUrl}
+\`\`\`
+
+TrentCAD will clone the repo, install Git LFS hooks, and surface every
+part in the browser table.
+
+## How collaboration works
+
+TrentCAD wraps Git LFS with a check-out / check-in lock model so two
+people never edit the same SolidWorks file at once.
+
+- **Sync** — pull everyone else's latest work into your copy.
+- **Publish** — commit your changes and push them up. Other teammates
+  will see them after their next sync.
+- **Check Out** — lock a file before editing it. Nobody else can check
+  it out while it's yours.
+- **Check In** — release the lock and publish your edits in one step.
+- **New Part / New Assembly** — create a SolidWorks file pre-numbered
+  with the team's part-numbering scheme.
+
+If you've used GrabCAD Workbench before, this is the same mental model.
+The Git terminology lives below the surface; the UI never uses it.
+
+## Project metadata
+
+Two files at the project root are managed by TrentCAD and committed to
+git so the team shares one source of truth:
+
+- \`parts.json\` — the part-numbering manifest. Tracks the assigned
+  number for every part / assembly / drawing, plus the next-counter
+  state. Never edit this by hand.
+- \`.trentcad/parts-meta.json\` — per-part metadata: release state
+  (draft / in-review / released / manufactured), manufacturing method
+  (3D Print / CNC / Hand / Other), material, mass, cost, comments.
+  Edited through the TrentCAD UI; commits are batched so rapid edits
+  collapse into one push.
+
+## Settings inside TrentCAD
+
+The **Settings** entry in the sidebar opens the Admin panel after a PIN
+prompt. Notable tabs:
+
+- **Settings** — project-level config (main repo URL, part-numbering
+  prefix, self-hosted LFS, COTS library, weekly progress tag).
+- **Parts Manager** — bulk-edit metadata across many parts in one go;
+  tick rows then apply release / method / material to all of them.
+- **Approvals** — mentor-only view of parts marked "in-review".
+- **Documents** — generate the BOM, manufacturing cut list, and project
+  summary as PDF + CSV. Auto-saved into the project tree.
+- **Repository Health** — scan for files too large for git, find
+  blockers before they break a clone.
+- **Tools** — manifest integrity check and LFS filter re-apply.
+- **Profile** — set your git name and email (used as the author on
+  every commit and check-in).
+- **About** — version info. \`Ctrl+Shift+R\` checks for updates manually.
+
+## Need help?
+
+- TrentCAD bugs / requests: [github.com/netarcx/TrentCAD/issues](https://github.com/netarcx/TrentCAD/issues)
+- Project-specific questions: ask the team lead.
+`
+}
+
 function buildGitAttributes(): string {
   const lines: string[] = ['# Managed by TrentCAD — adds run by openProject if missing.']
   for (const p of LFS_PATTERNS) lines.push(`${p} filter=lfs diff=lfs merge=lfs -text`)
@@ -146,8 +248,17 @@ export async function createProject(name: string, dirPath: string, remote: strin
     await fs.writeFile(partsPath, JSON.stringify(emptyManifest, null, 2) + '\n')
   }
 
+  // Drop a README the first time around so the GitHub repo page has
+  // useful onboarding for new teammates — including a one-click
+  // `trentcad://` link that opens TrentCAD straight into the Join flow.
+  const readmePath = path.join(dirPath, 'README.md')
+  const readmeExists = await fs.stat(readmePath).then(() => true).catch(() => false)
+  if (!readmeExists) {
+    await fs.writeFile(readmePath, buildProjectReadme(name, remote))
+  }
+
   await withDubiousOwnershipRecovery(async () => {
-    await git.add(['.gitattributes', '.gitignore', 'parts.json'])
+    await git.add(['.gitattributes', '.gitignore', 'parts.json', 'README.md'])
     // Commit may throw "nothing to commit" if create-project is re-run on an
     // already-initialised repo — treat that as success
     try {
