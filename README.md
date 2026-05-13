@@ -67,10 +67,16 @@ For a student-friendly walkthrough, see [docs/STUDENT_SETUP.md](docs/STUDENT_SET
 
 - **125 lb weight tracking** with live headroom callout on the status bar and in the auto-generated project summary
 - **Per-part release workflow** (draft → in-review → released → manufactured) so mentors can sign off on parts before the shop cuts them
+- **Cascade in-review** — marking an `.sldasm` as in-review automatically sweeps every part under that folder into the same state in one commit
+- **Per-part thumbnails** rendered from the OS shell preview, plus a 200px preview in the details panel
+- **Where Used** view shows every assembly a part belongs to, with one-click navigation to the parent
+- **Bulk metadata editing** — multi-select parts in the Parts Manager and apply release / method / material to all of them at once
 - **Mass + cost rollups** by subsystem and by manufacturing method, refreshed every five seconds while you work
 - **Comments** thread per part — note your manufacturing tolerances, gotchas, or "do not edit until we settle the gear ratio"
-- **Cascading check-out** for assemblies — checking out an `.sldasm` automatically locks every component it references
+- **Folder dirty badge** — collapsed folders show a count of unpublished files inside so changes can't hide
 - **Weekly progress tags** for snapshotting CAD state at design-review milestones
+- **`trentcad://join?url=…` deep links** in auto-generated project README so new teammates one-click into the Join Project flow
+- **Accessibility**: OpenDyslexic UI font toggle (`Ctrl+Shift+D`), responsive layout that adapts down to 960×600, dark and light themes
 
 ## Documentation
 
