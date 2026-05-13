@@ -256,6 +256,10 @@ export interface IpcApi {
     currentVersion?: string
     latestVersion?: string
     updateAvailable?: boolean
+    /** True when the check succeeded but no GitHub release exists yet
+     *  (typical for a fresh repo / first build pre-publish). Lets the
+     *  UI show a calm "no releases yet" message instead of an error. */
+    noReleasesYet?: boolean
     error?: string
   }>
   getAppVersion(): Promise<string>

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, Sun, Moon, X } from 'lucide-react'
 import { useGit } from './hooks/useGit'
 import { DEFAULT_MATERIALS, DEFAULT_MATERIALS_DATALIST_ID } from './constants'
@@ -84,10 +84,18 @@ export default function App() {
 
   const [manufacturingView, setManufacturingView] = useState(false)
 
+  // Reset manufacturingView only when an *open* project gets closed
+  // (project transitions truthy → falsy). NOT on the transient null→set
+  // case where the user just clicked "Enter Manufacturing View" — there
+  // manufacturingView is set first so the kiosk shell takes over the
+  // moment openProject resolves, without flashing the regular project
+  // view in between.
+  const prevProjectRef = useRef(project)
   useEffect(() => {
-    if (manufacturingView && !project) {
+    if (manufacturingView && prevProjectRef.current && !project) {
       setManufacturingView(false)
     }
+    prevProjectRef.current = project
   }, [manufacturingView, project])
 
   // trentcad:// deep-link → prefill the Join Project URL field. Bumped
@@ -277,6 +285,8 @@ export default function App() {
             const r = await window.api.checkForUpdate()
             if (!r.success) {
               alert(`Could not check for updates: ${r.error || 'unknown error'}`)
+            } else if (r.noReleasesYet) {
+              alert(`You're on v${r.currentVersion}. No published releases to compare against yet.`)
             } else if (r.updateAvailable) {
               alert(`Update available — v${r.latestVersion} is downloading in the background.`)
             } else {
@@ -583,10 +593,18 @@ export default function App() {
             try {
               const recents = await window.api.getRecentProjects()
               if (recents.length === 0) return
-              await openProject(recents[0].path)
+              // Flip into manufacturing mode BEFORE awaiting openProject —
+              // otherwise the regular project view (with the sidebar)
+              // renders for the duration of the open, which the user
+              // sees as a sidebar that mysteriously hides a few seconds
+              // later when the kiosk shell finally takes over. The
+              // `manufacturingView && project` gate keeps the welcome
+              // screen up until project actually arrives.
               setManufacturingView(true)
+              await openProject(recents[0].path)
             } catch {
               // openProject surfaces errors via the error banner
+              setManufacturingView(false)
             }
           }}
           onOpenAdmin={openAdminOverlay}

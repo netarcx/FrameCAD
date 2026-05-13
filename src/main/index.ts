@@ -66,6 +66,12 @@ if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', (_event, argv) => {
+    // Focus the existing window even when there's no deep link — a user
+    // double-clicking the icon expects the running app to come forward.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
     const url = argv.find(a => a.startsWith('trentcad://'))
     handleDeepLink(url)
   })
@@ -81,8 +87,13 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    minWidth: 800,
-    minHeight: 600,
+    // Layout floor: 180 (sidebar) + ~570 (file table + toolbar room)
+    // + 320 (DetailsPanel) ≈ 1070. Bumped to 1100 to leave a comfort
+    // margin so the toolbar buttons (Sync / Publish / + New) and the
+    // file-table columns never collide. Height covers toolbar +
+    // header + status bar with several visible rows.
+    minWidth: 1100,
+    minHeight: 720,
     title: 'TrentCAD',
     autoHideMenuBar: true,
     webPreferences: {

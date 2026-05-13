@@ -5,6 +5,33 @@ import type { ProjectConfig } from '@shared/types'
 
 const CONFIG_FILE = 'trentcad-app.json'
 
+/**
+ * Collapse a project path to a single canonical form so we can compare
+ * and dedupe entries without slash-style or trailing-separator skew.
+ * Same path opened from a backslash dialog vs a forward-slash URL vs a
+ * trailing-slash join now collapses to one entry.
+ *
+ * - Replaces all separators with the OS-native style via path.normalize
+ *   (on win32 this also converts forward slashes to backslashes).
+ * - Strips trailing separators except when the path is a Windows drive
+ *   root ("C:\") or POSIX root ("/").
+ * - On Windows, uppercases the drive letter so "c:\" and "C:\" match,
+ *   matching how Windows itself treats them.
+ */
+function canonPath(p: string): string {
+  if (!p) return p
+  let norm = path.normalize(p)
+  // Trim trailing separators except for roots
+  while (norm.length > 1 && (norm.endsWith(path.sep) || norm.endsWith('/'))) {
+    if (process.platform === 'win32' && /^[A-Za-z]:\\$/.test(norm)) break
+    norm = norm.slice(0, -1)
+  }
+  if (process.platform === 'win32' && /^[a-z]:/.test(norm)) {
+    norm = norm[0].toUpperCase() + norm.slice(1)
+  }
+  return norm
+}
+
 interface AppConfig {
   recentProjects: ProjectConfig[]
   /**
@@ -25,7 +52,25 @@ function getConfigPath(): string {
 async function readConfig(): Promise<AppConfig> {
   try {
     const data = await fs.readFile(getConfigPath(), 'utf-8')
-    return JSON.parse(data)
+    const parsed = JSON.parse(data) as AppConfig
+    // Migrate-on-read: canonicalize every recent path and merge any
+    // duplicates that the old comparator missed (e.g. forward-slash and
+    // backslash variants of the same project). First occurrence wins
+    // since recentProjects is ordered most-recent-first.
+    if (Array.isArray(parsed.recentProjects)) {
+      const seen = new Set<string>()
+      const cleaned: ProjectConfig[] = []
+      for (const p of parsed.recentProjects) {
+        const canon = canonPath(p.path)
+        if (seen.has(canon)) continue
+        seen.add(canon)
+        cleaned.push({ ...p, path: canon })
+      }
+      parsed.recentProjects = cleaned
+    } else {
+      parsed.recentProjects = []
+    }
+    return parsed
   } catch {
     return { recentProjects: [] }
   }
@@ -37,9 +82,10 @@ async function writeConfig(config: AppConfig): Promise<void> {
 
 export async function addRecentProject(project: ProjectConfig): Promise<void> {
   const config = await readConfig()
-  const existing = config.recentProjects.find(p => p.path === project.path)
-  const merged: ProjectConfig = { ...project, pinned: existing?.pinned ?? project.pinned }
-  config.recentProjects = config.recentProjects.filter(p => p.path !== project.path)
+  const canonProject: ProjectConfig = { ...project, path: canonPath(project.path) }
+  const existing = config.recentProjects.find(p => p.path === canonProject.path)
+  const merged: ProjectConfig = { ...canonProject, pinned: existing?.pinned ?? canonProject.pinned }
+  config.recentProjects = config.recentProjects.filter(p => p.path !== canonProject.path)
   config.recentProjects.unshift(merged)
   // Cap unpinned entries at 10. Pinned entries are kept regardless so
   // the team's go-to projects don't age out.
@@ -51,7 +97,8 @@ export async function addRecentProject(project: ProjectConfig): Promise<void> {
 
 export async function setProjectPinned(targetPath: string, pinned: boolean): Promise<void> {
   const config = await readConfig()
-  const entry = config.recentProjects.find(p => p.path === targetPath)
+  const canon = canonPath(targetPath)
+  const entry = config.recentProjects.find(p => p.path === canon)
   if (!entry) return
   entry.pinned = pinned || undefined
   await writeConfig(config)
@@ -59,7 +106,8 @@ export async function setProjectPinned(targetPath: string, pinned: boolean): Pro
 
 export async function removeRecentProject(targetPath: string): Promise<void> {
   const config = await readConfig()
-  config.recentProjects = config.recentProjects.filter(p => p.path !== targetPath)
+  const canon = canonPath(targetPath)
+  config.recentProjects = config.recentProjects.filter(p => p.path !== canon)
   await writeConfig(config)
 }
 

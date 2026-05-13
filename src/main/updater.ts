@@ -44,8 +44,6 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
   ipcMain.handle('check-for-update', async () => {
     try {
       const result = await autoUpdater.checkForUpdates()
-      // result is UpdateCheckResult; .updateInfo.version is the available
-      // version (which may equal the current version if up-to-date)
       const currentVersion = autoUpdater.currentVersion?.version || ''
       const latestVersion = result?.updateInfo?.version || ''
       const updateAvailable = !!latestVersion && latestVersion !== currentVersion
@@ -56,7 +54,22 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
         updateAvailable
       }
     } catch (err) {
-      return { success: false, error: (err as Error).message }
+      const msg = (err as Error).message || ''
+      // Common case: no GitHub release exists yet (fresh project / first
+      // build that hasn't been published). electron-updater fails when
+      // latest.yml / latest-mac.yml / latest-linux.yml can't be fetched.
+      // Report it as a successful "no updates" check so the alert
+      // doesn't scare the user.
+      if (/404|not found|cannot find|latest.*yml|enotfound/i.test(msg)) {
+        return {
+          success: true,
+          currentVersion: autoUpdater.currentVersion?.version || '',
+          latestVersion: '',
+          updateAvailable: false,
+          noReleasesYet: true
+        }
+      }
+      return { success: false, error: msg }
     }
   })
 
