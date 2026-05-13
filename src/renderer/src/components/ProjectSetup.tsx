@@ -167,18 +167,31 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
 
   // Logo double-click easter egg
   const logoRef = useRef<HTMLImageElement | null>(null)
-  const spinLogo = () => {
+  const spinLogo = (cls: 'spinning' | 'flipping') => {
     const el = logoRef.current
     if (!el) return
-    // Already spinning — let it finish, ignore the extra click. Avoids
+    // Already animating — let it finish, ignore the extra click. Avoids
     // the visual glitch of class-toggling mid-animation.
-    if (el.classList.contains('spinning')) return
-    el.classList.add('spinning')
+    if (el.classList.contains('spinning') || el.classList.contains('flipping')) return
+    el.classList.add(cls)
     const onEnd = () => {
-      el.classList.remove('spinning')
+      el.classList.remove(cls)
       el.removeEventListener('animationend', onEnd)
     }
     el.addEventListener('animationend', onEnd)
+  }
+  const clickCountRef = useRef(0)
+  const clickTimerRef = useRef<number | null>(null)
+  const onLogoClick = () => {
+    clickCountRef.current += 1
+    if (clickTimerRef.current !== null) window.clearTimeout(clickTimerRef.current)
+    clickTimerRef.current = window.setTimeout(() => {
+      const n = clickCountRef.current
+      clickCountRef.current = 0
+      clickTimerRef.current = null
+      if (n >= 3) spinLogo('flipping')
+      else if (n === 2) spinLogo('spinning')
+    }, 280)
   }
 
   if (mode === 'select') {
@@ -199,7 +212,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
           className="setup-logo"
           src={logoUrl}
           alt="TrentCAD"
-          onDoubleClick={spinLogo}
+          onClick={onLogoClick}
         />
         <h1>TrentCAD</h1>
         <p className="subtitle">CAD collaboration for FRC Team 2129</p>

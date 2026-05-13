@@ -127,6 +127,16 @@ input {
   will-change: transform;
 }
 
+@keyframes setup-logo-flip {
+  from { transform: perspective(600px) rotateY(0deg); }
+  to   { transform: perspective(600px) rotateY(1080deg); }
+}
+
+.setup-logo.flipping {
+  animation: setup-logo-flip 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  will-change: transform;
+}
+
 .welcome-admin-btn {
   position: absolute;
   top: 16px;
