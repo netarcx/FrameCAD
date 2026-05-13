@@ -1,10 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
+import { X } from 'lucide-react'
 import type { FileEntry, FileState, ManufacturingMethod, PartMeta, ReleaseState } from '@shared/types'
 
 interface Props {
   file: FileEntry | null
   onCheckOut: (path: string) => void
   onCheckIn: (path: string) => void
+  /** Optional close handler — only wired when the panel is rendered
+   *  as an overlay (medium/compact responsive tiers). When unset the
+   *  panel is inline and never shows a close button. */
+  onClose?: () => void
 }
 
 function stateLabel(state: FileState): string {
@@ -52,7 +57,7 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString()
 }
 
-export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
+export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose }: Props) {
   const [meta, setMeta] = useState<PartMeta>({})
   const [loading, setLoading] = useState(false)
   const [commentText, setCommentText] = useState('')
@@ -96,6 +101,11 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
   if (!file) {
     return (
       <div className="details-panel">
+        {onClose && (
+          <button className="details-overlay-close" onClick={onClose} title="Close details" aria-label="Close details">
+            <X size={16} strokeWidth={2} />
+          </button>
+        )}
         <div className="details-empty">
           Click a file to see details
         </div>
@@ -200,6 +210,11 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn }: Props) {
 
   return (
     <div className="details-panel">
+      {onClose && (
+        <button className="details-overlay-close" onClick={onClose} title="Close details" aria-label="Close details">
+          <X size={16} strokeWidth={2} />
+        </button>
+      )}
       <div className="details-header">
         <div className="file-name">{file.name}</div>
         <div className="file-path">{dir}</div>

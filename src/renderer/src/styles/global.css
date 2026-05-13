@@ -47,6 +47,18 @@
   box-sizing: border-box;
 }
 
+/* Toggled by Ctrl+Shift+D in App.tsx: swaps the UI font (excluding
+   monospace code/identifier sites) to OpenDyslexic. The selector hits
+   every non-monospace element via the body cascade plus a few inputs
+   that opt out via font-family: inherit. */
+:root[data-font="dyslexic"] body,
+:root[data-font="dyslexic"] button,
+:root[data-font="dyslexic"] input,
+:root[data-font="dyslexic"] select,
+:root[data-font="dyslexic"] textarea {
+  font-family: 'OpenDyslexic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg-primary);
@@ -104,6 +116,24 @@ input {
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--accent);
+}
+
+.logo-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin-left: -6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s;
+}
+
+.logo-home-btn:hover {
+  background: var(--bg-hover);
 }
 
 .setup-logo {
@@ -574,6 +604,9 @@ input {
   display: flex;
   flex: 1;
   overflow: hidden;
+  /* Anchor point for the absolutely-positioned DetailsPanel overlay
+     on medium/compact tiers. No effect on wide tier. */
+  position: relative;
 }
 
 .app-sidebar {
@@ -1171,6 +1204,19 @@ input {
   white-space: nowrap;
 }
 
+/* Folders read as containers, not items — bold the name so the eye
+   parses the tree hierarchy at a glance. */
+.file-row .col-name .name.folder {
+  font-weight: 600;
+}
+
+/* File extensions render slightly smaller and dimmer so the base name
+   dominates. Helpful when many files share an extension. */
+.file-row .col-name .file-ext {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
 .file-row .col-name .expand-toggle {
   width: 16px;
   flex-shrink: 0;
@@ -1188,8 +1234,12 @@ input {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--yellow, #d97706);
-  color: #fff;
+  /* Use the theme accent for the pill so dark text on a saturated
+     background reads at a glance in both themes (the previous
+     --yellow / white pairing dropped to ~1.5:1 contrast). Same scheme
+     as .sidebar-badge for visual consistency. */
+  background: var(--accent);
+  color: var(--bg-primary);
   font-size: 10px;
   font-weight: 700;
   border-radius: 8px;
@@ -1285,6 +1335,107 @@ input {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* ─── Responsive tiers ───────────────────────────────────────────────
+   data-layout-tier is set on <html> by useLayoutTier:
+     wide   ≥1280  — full inline layout (default)
+     medium 1024–1279 — DetailsPanel becomes an overlay
+     compact <1024 — DetailsPanel overlay + sidebar collapses to icons
+   The defaults above are the wide layout; the rules below override.
+*/
+
+:root[data-layout-tier="medium"] .details-panel,
+:root[data-layout-tier="compact"] .details-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+  animation: details-slide-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes details-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* Backdrop fades the content behind the overlay so the user is cued
+   that the panel is modal-ish (clicking it dismisses). */
+.details-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  z-index: 49;
+  animation: details-backdrop-fade-in 180ms ease-out;
+}
+
+@keyframes details-backdrop-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* The close button inside DetailsPanel is hidden in the wide tier and
+   shown on narrow tiers where there's no other way to dismiss. */
+.details-overlay-close {
+  display: none;
+}
+:root[data-layout-tier="medium"] .details-overlay-close,
+:root[data-layout-tier="compact"] .details-overlay-close {
+  display: inline-flex;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+/* Reserve room for the close button so a long file name doesn't slide
+   under it on narrow tiers. */
+:root[data-layout-tier="medium"] .details-header,
+:root[data-layout-tier="compact"] .details-header {
+  padding-right: 48px;
+}
+:root[data-layout-tier="medium"] .details-overlay-close:hover,
+:root[data-layout-tier="compact"] .details-overlay-close:hover {
+  background: var(--bg-hover);
+}
+
+/* Compact tier: sidebar shrinks to icon-only width. The label inside
+   each sidebar-item is hidden — only the icon plus optional badge. */
+:root[data-layout-tier="compact"] .app-sidebar {
+  width: 56px;
+  padding: 8px 0;
+}
+:root[data-layout-tier="compact"] .sidebar-item {
+  justify-content: center;
+  padding: 10px 0;
+  position: relative;
+}
+:root[data-layout-tier="compact"] .sidebar-label {
+  display: none;
+}
+:root[data-layout-tier="compact"] .sidebar-icon {
+  width: 22px;
+  height: 22px;
+}
+:root[data-layout-tier="compact"] .sidebar-badge {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 9px;
 }
 
 .details-header {

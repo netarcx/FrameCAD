@@ -1,6 +1,8 @@
 import { createRoot } from 'react-dom/client'
 import { Component, type ReactNode } from 'react'
 import App from './App'
+import '@fontsource/opendyslexic/400.css'
+import '@fontsource/opendyslexic/700.css'
 import './styles/global.css'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

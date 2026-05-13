@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, Sun, Moon, X } from 'lucide-react'
 import { useGit } from './hooks/useGit'
+import useLayoutTier from './hooks/useLayoutTier'
 import { DEFAULT_MATERIALS, DEFAULT_MATERIALS_DATALIST_ID } from './constants'
 import useParts from './hooks/useParts'
 import ProfileSetup from './components/ProfileSetup'
@@ -81,6 +82,27 @@ export default function App() {
   // Sidebar navigation (project view)
   const [activeSection, setActiveSection] = useState<SidebarSection>('files')
   const [inspectorOpen, setInspectorOpen] = useState(true)
+
+  // Track viewport tier so the inspector can be rendered inline on
+  // wide screens and as an overlay on narrow ones, and the sidebar
+  // can collapse to icons-only when there's no room for labels.
+  const layoutTier = useLayoutTier()
+  useEffect(() => {
+    document.documentElement.dataset.layoutTier = layoutTier
+    return () => { delete document.documentElement.dataset.layoutTier }
+  }, [layoutTier])
+
+  // On overlay tiers, re-open the inspector whenever the user selects a
+  // file so they don't have to manually re-open the panel after
+  // dismissing it once. On the wide tier the inspector stays put.
+  const prevSelectedPathRef = useRef<string | null>(selectedFile?.path ?? null)
+  useEffect(() => {
+    const next = selectedFile?.path ?? null
+    if (next && next !== prevSelectedPathRef.current && layoutTier !== 'wide') {
+      setInspectorOpen(true)
+    }
+    prevSelectedPathRef.current = next
+  }, [selectedFile, layoutTier])
 
   const [manufacturingView, setManufacturingView] = useState(false)
 
@@ -307,6 +329,11 @@ export default function App() {
         }
         openAdminOverlay()
       }
+      // Ctrl+Shift+D: toggle the OpenDyslexic UI font
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        setDyslexicFont(v => !v)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -325,6 +352,18 @@ export default function App() {
   const toggleTheme = useCallback(() => {
     setTheme(t => (t === 'dark' ? 'light' : 'dark'))
   }, [])
+
+  // OpenDyslexic UI font, toggleable for users who find the default
+  // harder to read. Persisted in localStorage so it stays on across
+  // launches.
+  const [dyslexicFont, setDyslexicFont] = useState<boolean>(() =>
+    localStorage.getItem('trentcad-dyslexic-font') === '1'
+  )
+  useEffect(() => {
+    if (dyslexicFont) document.documentElement.setAttribute('data-font', 'dyslexic')
+    else document.documentElement.removeAttribute('data-font')
+    localStorage.setItem('trentcad-dyslexic-font', dyslexicFont ? '1' : '0')
+  }, [dyslexicFont])
 
   useEffect(() => {
     window.api.getGitIdentity().then(({ name, email }) => {
@@ -661,7 +700,14 @@ export default function App() {
   }
 
   // ── Main project view (sidebar layout) ──
-  const showInspector = (activeSection === 'files' || activeSection === 'parts') && inspectorOpen
+  // On wide screens DetailsPanel is always rendered inline when the
+  // active section supports it. On medium/compact tiers it becomes an
+  // overlay that only appears when a file is actually selected so the
+  // content underneath stays usable.
+  const inspectorSection = activeSection === 'files' || activeSection === 'parts'
+  const isOverlayTier = layoutTier !== 'wide'
+  const showInspector = inspectorSection && inspectorOpen &&
+    (!isOverlayTier || !!selectedFile)
 
   const materialDatalist = (
     <datalist id={DEFAULT_MATERIALS_DATALIST_ID}>
@@ -676,8 +722,14 @@ export default function App() {
       {errorBanner}
 
       <div className="app-header">
-        <img className="logo-img" src={logoUrl} alt="TrentCAD" />
-        <span className="logo">TrentCAD</span>
+        <button
+          className="logo-home-btn"
+          onClick={() => { setActiveSection('files'); closeProject() }}
+          title="Close this project and return to the welcome screen"
+        >
+          <img className="logo-img" src={logoUrl} alt="TrentCAD" />
+          <span className="logo">TrentCAD</span>
+        </button>
         <span className="divider" />
         <button
           className="back-btn"
@@ -813,11 +865,19 @@ export default function App() {
           )}
         </div>
 
+        {showInspector && isOverlayTier && (
+          <div
+            className="details-overlay-backdrop"
+            onClick={() => setInspectorOpen(false)}
+            aria-hidden="true"
+          />
+        )}
         {showInspector && (
           <DetailsPanel
             file={selectedFile}
             onCheckOut={checkOut}
             onCheckIn={checkIn}
+            onClose={isOverlayTier ? () => setInspectorOpen(false) : undefined}
           />
         )}
       </div>

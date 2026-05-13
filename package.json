@@ -1,6 +1,6 @@
 {
   "name": "trentcad",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "description": "CAD collaboration tool for FRC robotics teams",
   "author": {
     "name": "Trent Fox",
@@ -16,6 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/opendyslexic": "^5.2.5",
     "@googleapis/drive": "^20.1.0",
     "chokidar": "^4.0.3",
     "electron-updater": "^6.8.3",

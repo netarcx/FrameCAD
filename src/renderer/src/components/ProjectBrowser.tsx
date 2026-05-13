@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, memo, type ReactNode } from 'react'
 import type { FileEntry, FileState, ReleaseState } from '@shared/types'
 
 interface Props {
@@ -48,6 +48,21 @@ function fileIcon(entry: FileEntry): string {
     case 'pdf': return '□'
     default: return '□'
   }
+}
+
+// Split "Foo.sldprt" into ["Foo", ".sldprt"] so the extension can be
+// rendered in a slightly smaller font than the base name. Files with
+// no dot just render as-is. Hidden dotfiles like ".gitignore" keep
+// their leading dot in the base — only the *last* dot counts.
+function renderFilename(name: string): ReactNode {
+  const lastDot = name.lastIndexOf('.')
+  if (lastDot <= 0 || lastDot === name.length - 1) return name
+  return (
+    <>
+      {name.slice(0, lastDot)}
+      <span className="file-ext">{name.slice(lastDot)}</span>
+    </>
+  )
 }
 
 function fileIconTitle(entry: FileEntry): string {
@@ -105,7 +120,9 @@ const FileRow = memo(function FileRow({
           <span className="expand-toggle" />
         )}
         <span className="icon" title={iconTitle}>{iconChar}</span>
-        <span className="name">{name}</span>
+        <span className={`name${isDirectory ? ' folder' : ''}`}>
+          {isDirectory ? name : renderFilename(name)}
+        </span>
         {isDirectory && dirtyDescendants && dirtyDescendants > 0 ? (
           <span
             className="folder-dirty-badge"
