@@ -13,7 +13,12 @@ const adminPinHash = JSON.stringify(process.env.FRAMECAD_ADMIN_PIN_HASH || '')
 // welcome-screen admin page, and their overrides survive app updates
 // unless they explicitly Reset to team defaults.
 const defGhOrg = JSON.stringify(process.env.FRAMECAD_DEFAULT_GITHUB_ORG || '')
-const defPrefix = JSON.stringify(process.env.FRAMECAD_DEFAULT_PROJECT_PREFIX || '')
+// Default GitHub-repo prefix when no CI secret is set. Drives the
+// Browse Projects filter and Create-on-GitHub naming. Forks override
+// by setting FRAMECAD_DEFAULT_PROJECT_PREFIX. Existing local overrides
+// from earlier versions persist — users on legacy `trentcad-` prefix
+// keep that value until they click Reset in Admin → Team.
+const defPrefix = JSON.stringify(process.env.FRAMECAD_DEFAULT_PROJECT_PREFIX || 'framecad-')
 const defTeam = JSON.stringify(process.env.FRAMECAD_DEFAULT_TEAM_NAME || '')
 const defWelcome = JSON.stringify(process.env.FRAMECAD_DEFAULT_WELCOME_MESSAGE || '')
 // Forks point auto-bug-reports at their own repo via this var so

@@ -33,6 +33,11 @@ interface Props {
 
 type Mode = 'select' | 'create' | 'join' | 'open'
 
+// Module-scoped so the once-per-session welcome-logo intro animation
+// only plays the first time the welcome screen mounts in this process.
+// Resets on every fresh app launch (Electron starts a new renderer).
+let welcomeIntroShown = false
+
 export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenProject, onEnterManufacturingView, onOpenAdmin, isLoading, globalAdmin, prefilledJoinUrl, prefilledJoinSeq }: Props) {
   const [mode, setMode] = useState<Mode>('select')
   const [name, setName] = useState('')
@@ -190,7 +195,11 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     if (!el) return
     // Already animating — let it finish, ignore the extra click. Avoids
     // the visual glitch of class-toggling mid-animation.
-    if (el.classList.contains('spinning') || el.classList.contains('flipping')) return
+    if (
+      el.classList.contains('spinning') ||
+      el.classList.contains('flipping') ||
+      el.classList.contains('welcome-intro')
+    ) return
     el.classList.add(cls)
     const onEnd = () => {
       el.classList.remove(cls)
@@ -198,6 +207,26 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     }
     el.addEventListener('animationend', onEnd)
   }
+
+  // First time the welcome screen mounts in this app session, the logo
+  // does a 5-rotation intro that decelerates near the end. We use a
+  // module-level flag (not localStorage) so it plays on every fresh
+  // launch but doesn't replay when the user closes a project and comes
+  // back to the welcome screen mid-session.
+  useEffect(() => {
+    if (mode !== 'select') return
+    if (welcomeIntroShown) return
+    const el = logoRef.current
+    if (!el) return
+    welcomeIntroShown = true
+    el.classList.add('welcome-intro')
+    const onEnd = () => {
+      el.classList.remove('welcome-intro')
+      el.removeEventListener('animationend', onEnd)
+    }
+    el.addEventListener('animationend', onEnd)
+    return () => el.removeEventListener('animationend', onEnd)
+  }, [mode])
   const clickCountRef = useRef(0)
   const clickTimerRef = useRef<number | null>(null)
   const onLogoClick = () => {
@@ -232,8 +261,11 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
           alt="FrameCAD"
           onClick={onLogoClick}
         />
-        <h1>FrameCAD</h1>
-        <p className="subtitle">{globalAdmin?.teamName ? `CAD collaboration for ${globalAdmin.teamName}` : 'CAD collaboration for FRC teams'}</p>
+        <h1>FrameCAD FRC</h1>
+        <p className="subtitle">File / Revision / Asset Management Engine</p>
+        {globalAdmin?.teamName && (
+          <p className="subtitle subtitle-team">for {globalAdmin.teamName}</p>
+        )}
         {pinnedProjects.length > 0 && (
           <div className="pinned-projects">
             {pinnedProjects.map(p => (
