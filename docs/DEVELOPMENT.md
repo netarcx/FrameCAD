@@ -69,13 +69,6 @@ Files overwrite on each regeneration. Ride along on the next publish so the buil
 - Auto-refreshes when switching between documents (`ActiveDocChangeNotify`)
 - Communicates with TrentCAD's local REST API (no direct Git operations)
 
-### Google Drive sync (optional)
-
-- One-way mirror from Git to Google Drive — automatically syncs all project files after each Upload
-- OAuth2 authentication via browser-based Google sign-in
-- Creates a `TrentCAD - {ProjectName}` folder in Drive and mirrors the full directory structure
-- Connect/disconnect from the app header with a single click
-
 ### Self-hosted LFS storage (opt-in)
 
 Per-project field in admin settings. When set, TrentCAD writes a `.lfsconfig` at the project root pointing at a custom LFS server (rudolfs, giftless, Gitea, GitLab, etc.). Git push/pull still go to GitHub, only the LFS object bytes change hosts. Blank = use GitHub LFS (default). Auth is left to the user via `.netrc` / git credential helpers.
@@ -141,7 +134,6 @@ src/
     admin-pin.ts                # SHA-256 PIN gate for the admin page
     global-admin.ts             # Install-wide admin settings + defaults from GH secrets
     rest.ts                     # Local REST API server
-    drive.ts                    # Google Drive OAuth + sync
     documents.ts                # Build-season doc generation (CSV + MD + PDF)
     large-files.ts              # Repository health scanner
     issue.ts                    # "Report to GitHub" issue creator via gh
@@ -189,8 +181,7 @@ Renderer (React)  ──IPC──>  Main Process (ipc.ts)
                                     ├──> locking.ts (git lfs lock/unlock)
                                     ├──> parts.ts (manifest)
                                     ├──> meta.ts (parts-meta.json)
-                                    ├──> documents.ts (BOM / Mfg / Summary)
-                                    └──> drive.ts (Google Drive API)
+                                    └──> documents.ts (BOM / Mfg / Summary)
 ```
 
 ## Git-to-CAD terminology
@@ -259,28 +250,6 @@ Then run RegAsm.exe as in Option 2.
 
 The add-in requires TrentCAD (the Electron app) to be running with a project open — it communicates via the REST API on port 42129. The connection indicator in the pane shows green when connected.
 
-## Google Drive setup
-
-Drive sync is optional. To enable it:
-
-1. Create OAuth 2.0 credentials at [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - Application type: **Desktop app**
-   - Enable the **Google Drive API**
-   - Add the `drive.file` scope
-2. Provide credentials via one of:
-   - Environment variables: `TRENTCAD_GOOGLE_CLIENT_ID` and `TRENTCAD_GOOGLE_CLIENT_SECRET`
-   - A `drive-config.json` file in the Electron userData directory:
-     ```json
-     {
-       "clientId": "your-client-id.apps.googleusercontent.com",
-       "clientSecret": "your-client-secret"
-     }
-     ```
-3. In TrentCAD, click **Connect Drive** in the app header — this opens a browser window for Google sign-in
-4. After connecting, all project files are automatically mirrored to a `TrentCAD - {ProjectName}` folder in Google Drive after each Upload
-
-Tokens are stored in `drive-tokens.json` in the Electron userData directory and auto-refresh.
-
 ## Admin page
 
 Access via **Ctrl+Shift+A** from anywhere in the app. The admin page is mode-aware:
@@ -316,9 +285,8 @@ The CI workflow consumes these GitHub Actions secrets to bake defaults into the 
 - **[electron-vite](https://electron-vite.org/)** — Vite-based build tooling for Electron
 - **[simple-git](https://github.com/steveukx/git-js)** — Git CLI wrapper for Node.js
 - **[chokidar](https://github.com/paulmillr/chokidar)** — cross-platform file watching
-- **[googleapis](https://github.com/googleapis/google-api-nodejs-client)** — Google Drive API client
 - **[electron-builder](https://www.electron.build/)** — packaging and installers
-- **[vitest](https://vitest.dev/)** — unit tests (67 covering parts numbering + per-part metadata)
+- **[vitest](https://vitest.dev/)** — unit tests (106 covering parts numbering, per-part metadata, bulk meta + cascade, where-used, legacy mode, canonPath, isNonFastForward)
 
 ## LFS-tracked file types
 

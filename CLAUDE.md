@@ -88,16 +88,6 @@ The file browser is the central element (full-width table, not a sidebar tree). 
 - Health polling every 5 seconds to detect TrentCAD connection
 - Build with Visual Studio on Windows: open `solidworks-addin/TrentCAD.SolidWorksAddin.sln`
 
-## Google Drive Sync (Phase 4)
-
-- One-way mirror: Git → Drive. Automatically syncs all project files to Google Drive after each publish.
-- OAuth2 authentication via loopback redirect (opens browser for Google sign-in)
-- Credentials: set `TRENTCAD_GOOGLE_CLIENT_ID` / `TRENTCAD_GOOGLE_CLIENT_SECRET` env vars, or create `drive-config.json` in Electron userData with `{ "clientId": "...", "clientSecret": "..." }`
-- Create OAuth credentials at https://console.cloud.google.com/apis/credentials (Desktop app type, with `drive.file` scope)
-- Tokens stored in `drive-tokens.json` in Electron userData, auto-refreshed
-- Creates a `TrentCAD - {projectName}` folder in Drive, mirrors full directory structure
-- UI: "Connect Drive" / "Drive Connected" badge in the app header
-
 ## Dev Notes
 
 - On Linux, run with `ELECTRON_DISABLE_SANDBOX=1` (already set in the dev script)

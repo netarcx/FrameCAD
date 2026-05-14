@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { DriveStatus, FileEntry, HistoryEntry, ProjectConfig, LockInfo } from '@shared/types'
+import type { FileEntry, HistoryEntry, ProjectConfig, LockInfo } from '@shared/types'
 
 export function useGit() {
   const [project, setProject] = useState<ProjectConfig | null>(null)
@@ -9,7 +9,6 @@ export function useGit() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<FileEntry | null>(null)
-  const [driveStatus, setDriveStatus] = useState<DriveStatus>({ connected: false, configured: false })
   const cleanupRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -53,7 +52,6 @@ export function useGit() {
       const config = await window.api.getProjectConfig()
       setProject(config)
       await fetchAll()
-      window.api.getDriveStatus().then(setDriveStatus).catch(() => {})
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -69,7 +67,6 @@ export function useGit() {
       const config = await window.api.getProjectConfig()
       setProject(config)
       await fetchAll()
-      window.api.getDriveStatus().then(setDriveStatus).catch(() => {})
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -94,7 +91,6 @@ export function useGit() {
       const config = await window.api.openProject(path)
       setProject(config)
       await fetchAll()
-      window.api.getDriveStatus().then(setDriveStatus).catch(() => {})
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -158,40 +154,6 @@ export function useGit() {
     }
   }, [])
 
-  const refreshDriveStatus = useCallback(async () => {
-    try {
-      const status = await window.api.getDriveStatus()
-      setDriveStatus(status)
-    } catch {
-      // Drive may not be configured
-    }
-  }, [])
-
-  const connectDrive = useCallback(async () => {
-    setError(null)
-    try {
-      const result = await window.api.connectDrive()
-      if (!result.success) {
-        setError(result.error || 'Failed to connect Google Drive')
-      }
-      await refreshDriveStatus()
-      return result
-    } catch (err) {
-      setError((err as Error).message)
-      return { success: false, error: (err as Error).message }
-    }
-  }, [refreshDriveStatus])
-
-  const disconnectDrive = useCallback(async () => {
-    setError(null)
-    try {
-      await window.api.disconnectDrive()
-      await refreshDriveStatus()
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }, [refreshDriveStatus])
-
   const createNewPart = useCallback(async (folder: string, description?: string) => {
     setError(null)
     try {
@@ -250,9 +212,6 @@ export function useGit() {
     createNewPart,
     createNewAssembly,
     createSubsystem,
-    driveStatus,
-    connectDrive,
-    disconnectDrive,
     refresh,
     dismissError
   }

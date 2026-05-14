@@ -147,19 +147,6 @@ export interface PartsManifest {
   legacyMode?: boolean
 }
 
-export interface DriveStatus {
-  connected: boolean
-  configured: boolean
-  folderUrl?: string
-  lastSync?: string
-}
-
-export interface DriveSyncResult {
-  success: boolean
-  filesUploaded: number
-  error?: string
-}
-
 export interface UpdateInfo {
   version: string
 }
@@ -263,10 +250,6 @@ export interface IpcApi {
   getPartsManifest(): Promise<PartsManifest | null>
   createNewPart(folder: string, description?: string): Promise<{ partNumber: string; filePath: string }>
   createNewAssembly(parentFolder: string, name: string, description?: string): Promise<{ partNumber: string; filePath: string }>
-  connectDrive(): Promise<{ success: boolean; error?: string }>
-  disconnectDrive(): Promise<void>
-  getDriveStatus(): Promise<DriveStatus>
-  syncToDrive(): Promise<DriveSyncResult>
   getRecentProjects(): Promise<ProjectConfig[]>
   setProjectPinned(projectPath: string, pinned: boolean): Promise<void>
   removeRecentProject(projectPath: string): Promise<void>

@@ -23,7 +23,7 @@ const defIssueRepo = JSON.stringify(process.env.TRENTCAD_DEFAULT_ISSUE_REPO || '
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@googleapis/drive'] })],
+    plugins: [externalizeDepsPlugin()],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')

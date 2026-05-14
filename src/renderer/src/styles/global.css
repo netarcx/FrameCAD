@@ -497,27 +497,6 @@ input {
 
 .app-header .spacer { flex: 1; }
 
-.app-header .drive-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  padding: 2px 8px;
-  border-radius: 10px;
-  -webkit-app-region: no-drag;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.app-header .drive-badge:hover {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-}
-
-.app-header .drive-badge.connected {
-  color: var(--green);
-}
-
 .app-header .theme-toggle {
   display: inline-flex;
   align-items: center;

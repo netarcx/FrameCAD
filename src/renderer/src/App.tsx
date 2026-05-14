@@ -51,9 +51,6 @@ export default function App() {
     createNewPart,
     createNewAssembly,
     createSubsystem,
-    driveStatus,
-    connectDrive,
-    disconnectDrive,
     dismissError
   } = useGit()
 
@@ -791,17 +788,6 @@ export default function App() {
         </button>
         <span className="project-name-label" title={project.path}>{project.name}</span>
         <span className="spacer" />
-        {driveStatus.configured && (
-          <button
-            className={`drive-badge ${driveStatus.connected ? 'connected' : ''}`}
-            onClick={driveStatus.connected ? disconnectDrive : connectDrive}
-            title={driveStatus.connected
-              ? `Google Drive connected${driveStatus.lastSync ? ` — last sync: ${new Date(driveStatus.lastSync).toLocaleTimeString()}` : ''}`
-              : 'Connect Google Drive'}
-          >
-            {driveStatus.connected ? 'Drive Connected' : 'Connect Drive'}
-          </button>
-        )}
         <button
           className="theme-toggle"
           onClick={toggleTheme}

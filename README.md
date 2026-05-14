@@ -32,7 +32,6 @@ TrentCAD is a desktop app that lets a robotics team collaborate on SolidWorks as
 - 🚦 **Pre-publish guards** catch giant non-LFS files *before* you waste an hour uploading something GitHub will reject.
 - 🛠️ **Repository health scanner** lists every file over 50 MB with badges (`BLOCKER` / `WARNING` / `OK (LFS)`) so you can clean up before the build season crunch.
 - 🔑 **Admin PIN gate** + install-wide settings baked from GitHub Actions secrets keeps team config consistent across student laptops.
-- ☁️ **Optional Google Drive mirror** — one-way Git→Drive sync so non-CAD teammates can still read files in a browser.
 - 🌐 **Self-hosted LFS storage** (opt-in) — point project LFS at your own server when GitHub's bandwidth quota gets tight.
 - 🚀 **Auto-update** from GitHub Releases on Windows and Linux.
 
@@ -80,7 +79,7 @@ For a student-friendly walkthrough, see [docs/STUDENT_SETUP.md](docs/STUDENT_SET
 
 ## Documentation
 
-- **[Developer docs (`docs/DEVELOPMENT.md`)](docs/DEVELOPMENT.md)** — architecture, dev setup, REST API reference, SolidWorks add-in build, Google Drive setup
+- **[Developer docs (`docs/DEVELOPMENT.md`)](docs/DEVELOPMENT.md)** — architecture, dev setup, REST API reference, SolidWorks add-in build
 - **[Student setup guide (`docs/STUDENT_SETUP.md`)](docs/STUDENT_SETUP.md)** — getting students onto the team's CAD repo
 - **Built-in onboarding tour** runs the first time you open the app
 

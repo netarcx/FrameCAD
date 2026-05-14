@@ -21,7 +21,6 @@ import {
 } from './global-admin'
 import { addRecentProject, getRecentProjects, getCachedBrowseConfig, setProjectPinned, removeRecentProject } from './config'
 import { setRestProject, clearRestProject, stopRestServer, queuePendingCreate, setRestMainWindow } from './rest'
-import * as driveOps from './drive'
 import { getThumbnail, clearThumbnailCache } from './thumbnails'
 import type { ProjectConfig } from '@shared/types'
 
@@ -102,7 +101,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     currentProject = { name, path: dirPath, remote }
     await addRecentProject(currentProject)
     setRestProject(currentProject)
-    driveOps.initDrive().catch(() => {})
     const win = getMainWindow()
     if (win) startWatching(dirPath, win)
   })
@@ -116,7 +114,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     currentProject = { name, path: dirPath, remote: url }
     await addRecentProject(currentProject)
     setRestProject(currentProject)
-    driveOps.initDrive().catch(() => {})
     // If the joined project has admin-configured COTS, download it as part
     // of the join so the COTS library is ready before the user enters the
     // project. Network errors are tolerated — the project still opens.
@@ -141,7 +138,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     currentProject = { name, path: dirPath, remote }
     await addRecentProject(currentProject)
     setRestProject(currentProject)
-    driveOps.initDrive().catch(() => {})
     // Apply admin config: pull the shared COTS library in the background
     adminOps.loadAdminConfig().then(cfg => {
       if (cfg.cotsRepoUrl) gitOps.syncCotsRepo(cfg.cotsRepoUrl, cfg.cotsBranch).catch(() => {})
@@ -172,9 +168,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
       const result = await gitOps.publish(message, (progress) => {
         if (win && !win.isDestroyed()) win.webContents.send('publish-progress', progress)
       })
-      if (result.success && driveOps.isDriveConnected()) {
-        driveOps.syncToDrive().catch(() => {})
-      }
       return result
     } finally {
       publishingNow = false
@@ -251,22 +244,6 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     const result = await partsOps.createNewAssembly(parentFolder, name, description)
     queuePendingCreate('assembly', result.filePath, result.partNumber)
     return result
-  })
-
-  ipcMain.handle('connect-drive', async () => {
-    return driveOps.connectDrive()
-  })
-
-  ipcMain.handle('disconnect-drive', async () => {
-    await driveOps.disconnectDrive()
-  })
-
-  ipcMain.handle('get-drive-status', () => {
-    return driveOps.getDriveStatus()
-  })
-
-  ipcMain.handle('sync-to-drive', async () => {
-    return driveOps.syncToDrive()
   })
 
   ipcMain.handle('create-subsystem', async (_e, parentFolder: string, name: string) => {

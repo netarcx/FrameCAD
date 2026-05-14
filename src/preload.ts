@@ -62,18 +62,6 @@ const api: IpcApi = {
   createNewAssembly: (parentFolder, name, description?) =>
     ipcRenderer.invoke('create-new-assembly', parentFolder, name, description),
 
-  connectDrive: () =>
-    ipcRenderer.invoke('connect-drive'),
-
-  disconnectDrive: () =>
-    ipcRenderer.invoke('disconnect-drive'),
-
-  getDriveStatus: () =>
-    ipcRenderer.invoke('get-drive-status'),
-
-  syncToDrive: () =>
-    ipcRenderer.invoke('sync-to-drive'),
-
   getRecentProjects: () =>
     ipcRenderer.invoke('get-recent-projects'),
 
