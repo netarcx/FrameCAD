@@ -183,6 +183,36 @@ namespace FrameCAD.SolidWorksAddin.Models
         public string PartNumber { get; set; }
     }
 
+    /// <summary>
+    /// One pending CAM export task. FrameCAD enqueues these when a CNC
+    /// or 3D-print part is released; the add-in performs the SaveAs
+    /// against the resolved target path and posts /done.
+    /// </summary>
+    public class PendingExport
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("sourceRelPath")]
+        public string SourceRelPath { get; set; }
+
+        [JsonProperty("sourceAbsPath")]
+        public string SourceAbsPath { get; set; }
+
+        [JsonProperty("targetRelPath")]
+        public string TargetRelPath { get; set; }
+
+        [JsonProperty("targetAbsPath")]
+        public string TargetAbsPath { get; set; }
+
+        /// <summary>"step" or "stl".</summary>
+        [JsonProperty("format")]
+        public string Format { get; set; }
+
+        [JsonProperty("enqueuedAt")]
+        public long EnqueuedAt { get; set; }
+    }
+
     public class LockInfo
     {
         [JsonProperty("path")]

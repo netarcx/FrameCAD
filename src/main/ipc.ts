@@ -12,6 +12,7 @@ import { generateDocument } from './documents'
 import type { DocType } from './documents'
 import { scanLargeFiles } from './large-files'
 import * as metaOps from './meta'
+import * as exportQueue from './export-queue'
 import { isPinRequired, verifyPin } from './admin-pin'
 import {
   getGlobalAdminState,
@@ -444,6 +445,54 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('get-manufacturing-queue', async () => {
     return metaOps.getManufacturingQueue()
+  })
+
+  // Status surfaced to the admin Export Queue tab so the UI can tell
+  // whether a batch-export would actually go anywhere (SW must be open
+  // and polling for any of this to do work).
+  ipcMain.handle('get-export-status', async () => {
+    const queue = await metaOps.getManufacturingQueue()
+    const needsExport = queue.filter(q => !!q.needsExport)
+    return {
+      swAlive: exportQueue.isSwAlive(),
+      lastSwSeenAt: exportQueue.getLastSwSeenAt(),
+      pendingTasks: exportQueue.listPendingExports().length,
+      needsExport
+    }
+  })
+
+  // Trigger an export for a single released part. Requires SW alive;
+  // otherwise we'd just be queuing forever. Returns the task id (or
+  // null if the file already has its paired export).
+  ipcMain.handle('trigger-part-export', async (_e, filePath: string) => {
+    if (!exportQueue.isSwAlive()) {
+      throw new Error('SolidWorks is not connected. Open SolidWorks with the FrameCAD add-in, then try again.')
+    }
+    const queue = await metaOps.getManufacturingQueue()
+    const item = queue.find(q => q.path === filePath)
+    if (!item) throw new Error(`Part not released or not found: ${filePath}`)
+    if (!item.needsExport) return { taskId: null, alreadyExists: true }
+    const projectPath = gitOps.getProjectPath()
+    const task = exportQueue.queuePendingExport(projectPath, filePath, item.needsExport)
+    return { taskId: task?.id ?? null, alreadyExists: false }
+  })
+
+  // Batch trigger every needs-export part at once. Useful when a
+  // backlog has built up (parts released while SW was closed, or
+  // legacy parts predating this feature).
+  ipcMain.handle('trigger-batch-export', async () => {
+    if (!exportQueue.isSwAlive()) {
+      throw new Error('SolidWorks is not connected. Open SolidWorks with the FrameCAD add-in, then try again.')
+    }
+    const queue = await metaOps.getManufacturingQueue()
+    const projectPath = gitOps.getProjectPath()
+    let queued = 0
+    for (const item of queue) {
+      if (!item.needsExport) continue
+      const task = exportQueue.queuePendingExport(projectPath, item.path, item.needsExport)
+      if (task) queued++
+    }
+    return { queued }
   })
 
   // Bulk loader used by the admin Parts Manager tab so we don't fire

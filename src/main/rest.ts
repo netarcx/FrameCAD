@@ -5,6 +5,13 @@ import type { FileEntry, ProjectConfig, PublishResult, SyncResult } from '@share
 import * as gitOps from './git'
 import * as lockOps from './locking'
 import * as partsOps from './parts'
+import {
+  clearPendingExports,
+  completePendingExport,
+  findPendingExport,
+  listPendingExports,
+  markSwSeen
+} from './export-queue'
 
 const DEFAULT_PORT = 42129
 const MAX_BODY_SIZE = 1024 * 64 // 64 KB
@@ -125,6 +132,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     res.end()
     return
   }
+
+  // Every incoming REST call comes from the SW add-in (the renderer
+  // goes through IPC), so any request is proof of life. The export
+  // queue uses this to gate auto-export at release time.
+  markSwSeen()
 
   const route = `${req.method} ${url.pathname}`
 
@@ -435,6 +447,54 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         return
       }
 
+      case 'GET /api/pending-exports': {
+        json(res, 200, listPendingExports())
+        return
+      }
+
+      case 'POST /api/pending-exports/done': {
+        if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
+        const body = parseJson(await readBody(req)) as { id?: string; error?: string } | null
+        if (!body?.id) {
+          json(res, 400, { error: 'Missing id' })
+          return
+        }
+        const task = findPendingExport(body.id)
+        if (!task) {
+          // Already cleared or unknown — idempotent ack.
+          json(res, 200, { success: true })
+          return
+        }
+        // If the add-in reported a failure, drop the task without
+        // staging anything; the part stays in needs-export status.
+        if (body.error) {
+          completePendingExport(body.id)
+          console.warn(`Export failed for ${task.sourceRelPath} (${task.format}): ${body.error}`)
+          broadcastStatus()
+          json(res, 200, { success: true })
+          return
+        }
+        // Stage, commit, and push the new export alongside the source.
+        // commitAndPushFile is the shared helper used by every other
+        // metadata write — it scopes the commit to the single path and
+        // handles non-fast-forward rebase, so we don't risk dragging in
+        // unrelated staged changes.
+        try {
+          await serialWrite(() => gitOps.commitAndPushFile(
+            task.targetRelPath,
+            `[export] ${path.basename(task.targetRelPath)}`
+          ))
+          completePendingExport(body.id)
+          broadcastStatus()
+          json(res, 200, { success: true })
+        } catch (err) {
+          // File didn't actually land, or git refused — leave the task
+          // in the queue so a retry can pick it up.
+          json(res, 500, { success: false, error: (err as Error).message })
+        }
+        return
+      }
+
       case 'POST /api/parts/new-subsystem': {
         const body = parseJson(await readBody(req)) as {
           parentFolder?: string
@@ -502,6 +562,7 @@ export function startRestServer(project?: ProjectConfig, port?: number): void {
 
 export function setRestProject(project: ProjectConfig): void {
   currentProject = project
+  clearPendingExports()
 }
 
 export function setRestMainWindow(getter: () => BrowserWindow | null): void {
@@ -510,6 +571,7 @@ export function setRestMainWindow(getter: () => BrowserWindow | null): void {
 
 export function clearRestProject(): void {
   currentProject = null
+  clearPendingExports()
 }
 
 export function stopRestServer(): void {

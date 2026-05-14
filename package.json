@@ -1,6 +1,6 @@
 {
   "name": "framecad",
-  "version": "1.1.2-beta-a",
+  "version": "1.1.2-beta-b",
   "description": "CAD collaboration tool for FRC robotics teams",
   "author": "Trent Fox",
   "main": "./out/main/index.js",
@@ -16,7 +16,9 @@
     "@fontsource/opendyslexic": "^5.2.5",
     "chokidar": "^4.0.3",
     "electron-updater": "^6.8.3",
+    "html-to-image": "^1.11.13",
     "lucide-react": "^1.14.0",
+    "pixi.js": "^8.18.1",
     "simple-git": "^3.27.0"
   },
   "devDependencies": {

@@ -136,13 +136,38 @@ input {
   background: var(--bg-hover);
 }
 
+/* DVD-screensaver wrapper: carries the bounce translate while the
+   inner .setup-logo keeps its own click-animation transforms. Sizes
+   to its content so the bounce maths use the logo's actual bounding
+   box, and inherits the logo's negative bottom margin so the title
+   below still tucks up against it when at rest. */
+.setup-logo-bounce-wrap {
+  display: inline-block;
+  width: fit-content;
+  height: fit-content;
+  will-change: transform;
+  margin-bottom: -16px;
+}
+
+/* Hidden placeholder that takes the wrapper's flex slot while the
+   wrapper is position:fixed during screensaver. Keeps siblings (title,
+   subtitle, cards) from jumping when the wrapper escapes flow. */
+.setup-logo-spacer {
+  display: none;
+  width: 192px;
+  height: 192px;
+  margin-bottom: -16px;
+}
+
+body.logo-screensaver-active .setup-logo-spacer { display: block; }
+body.logo-screensaver-active .setup-logo-bounce-wrap { z-index: 2; }
+
 /* The logo is a stack of identical images at different translateZ
    offsets so the 3D flip animation reads as a real coin with thickness
    instead of going edge-on (invisible) at 90°/270°. */
 .setup-logo {
   width: 192px;
   height: 192px;
-  margin-bottom: -16px;
   user-select: none;
   cursor: default;
   position: relative;
@@ -158,10 +183,16 @@ input {
   height: 100%;
   pointer-events: none;
   user-select: none;
-  /* Four sharp drop-shadows in opposite cardinal directions form a
-     1px alpha-aware black outline that follows the logo's circular
-     silhouette. With every stacked face outlined, the rim of the
-     coin reads as a black ring during the spin. */
+}
+
+/* Black outline only during the 3D coin flip — kept off face-on so the
+   logo sits clean at rest. Four sharp drop-shadows in opposite cardinal
+   directions form a 1px alpha-aware black outline that follows the
+   circular silhouette; stacked across the depth layers, the outlines
+   combine into a visible black rim as the coin rotates. */
+.setup-logo.flipping .setup-logo-face,
+.setup-logo.spinning-flipping .setup-logo-face,
+.setup-logo.chaos .setup-logo-face {
   filter:
     drop-shadow(1px 0 0 #000)
     drop-shadow(-1px 0 0 #000)
@@ -185,8 +216,158 @@ input {
 }
 
 .setup-logo.flipping {
-  animation: setup-logo-flip 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  animation: setup-logo-flip 1.92s cubic-bezier(0.22, 1, 0.36, 1) 1;
   will-change: transform;
+}
+
+/* 4-click easter egg: 2D rotate AND 3D rotateY at the same time. Two
+   CSS animations can't both write `transform`, so the combined motion
+   has to live in a single keyframe that composes both rotations. */
+@keyframes setup-logo-spin-flip {
+  from { transform: perspective(600px) rotate(0deg) rotateY(0deg); }
+  to   { transform: perspective(600px) rotate(1080deg) rotateY(1080deg); }
+}
+
+.setup-logo.spinning-flipping {
+  animation: setup-logo-spin-flip 2.16s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  will-change: transform;
+}
+
+/* 5-click easter egg: random direction + magnitude per axis, random
+   duration 3–7s. JS sets the custom properties on the element right
+   before adding this class so each run feels fresh. */
+@keyframes setup-logo-chaos {
+  from { transform: perspective(600px) rotate(0deg) rotateY(0deg); }
+  to   {
+    transform:
+      perspective(600px)
+      rotate(var(--chaos-z, 1080deg))
+      rotateY(var(--chaos-y, 1080deg));
+  }
+}
+
+.setup-logo.chaos {
+  animation: setup-logo-chaos var(--chaos-duration, 5s) cubic-bezier(0.22, 1, 0.36, 1) 1;
+  will-change: transform;
+}
+
+/* 6-click easter egg: logo falls in from above (60% of the duration),
+   hits the ground, and squash-bounces over the next 40%. The fall uses
+   an accelerating ease-in so it reads as a free-fall; the squash beats
+   are sharp and quick to sell the impact.
+
+   Custom properties are read at keyframe evaluation time so each fire
+   can have a different initial rotation, squash intensity, and bounce
+   height. Defaults match the original tuned values. */
+@keyframes setup-logo-slam {
+  0% {
+    transform: translateY(var(--slam-fall-from, -130vh)) scale(1, 1);
+    animation-timing-function: cubic-bezier(0.5, 0, 1, 0.55);
+  }
+  60% {
+    transform: translateY(0) scale(1, 1);
+    animation-timing-function: cubic-bezier(0.2, 0, 0.4, 1);
+  }
+  68% { transform: translateY(var(--slam-squash-down, 8px)) scale(var(--slam-squash-x, 1.18), var(--slam-squash-y, 0.7)); }
+  78% { transform: translateY(var(--slam-bounce, -14px)) scale(0.92, 1.12); }
+  88% { transform: translateY(3px) scale(1.05, 0.95); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+.setup-logo.slam {
+  animation: setup-logo-slam 1.5s 1 forwards;
+  will-change: transform;
+}
+
+/* @property registration so the radial-gradient stop position is an
+   animatable typed value. Without this, browsers treat the custom
+   property as an unparsed string and snap between keyframes instead
+   of interpolating smoothly. Chromium-based Electron supports this. */
+@property --wave-radius {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* Impact ripple. Full-viewport fixed overlay whose radial gradient
+   carries a soft light crest followed by a darker trough, both as
+   narrow translucent bands. JS sets --impact-x / --impact-y to the
+   click coordinates, then the keyframe sweeps --wave-radius outward
+   so the bands travel as a propagating wave with shadow. Multiple
+   ripples spawned with stagger sell the "waves rolling outward" feel.
+   No mix-blend-mode — the translucent light/dark stops add the
+   highlight + shadow directly, which is more predictable across
+   themes than relying on blend math against whatever's behind. */
+/* Raindrop-on-puddle profile:
+   - thin bright crest (the water peak catches direct light from above)
+   - sharp dark trough right behind it (the water dip is in shadow)
+   - very faint inner ring trailing further behind (the rebound wave)
+   - everything else transparent
+   A tiny blur softens the gradient stops so the bands look refracted
+   rather than digital. Each spawned ripple is one wavefront; the JS
+   spawner stacks 2–4 staggered ripples per impact so several rings
+   coexist on the surface like a real droplet. */
+.slam-ripple,
+.click-ripple {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  filter: blur(0.6px);
+  background: radial-gradient(
+    circle at var(--impact-x, 50%) var(--impact-y, 50%),
+    transparent calc(var(--wave-radius) - 38px),
+    rgba(255, 255, 255, 0.08) calc(var(--wave-radius) - 30px),
+    transparent calc(var(--wave-radius) - 22px),
+    rgba(255, 255, 255, 0.75) calc(var(--wave-radius) - 4px),
+    rgba(255, 255, 255, 0.95) var(--wave-radius),
+    rgba(0, 0, 0, 0.55) calc(var(--wave-radius) + 6px),
+    rgba(0, 0, 0, 0.18) calc(var(--wave-radius) + 18px),
+    transparent calc(var(--wave-radius) + 32px)
+  );
+}
+
+.slam-ripple {
+  /* ease-out: rapid expansion early (impact energy), tapering as the
+     wave loses energy with distance — matches real surface waves. */
+  animation: slam-ripple 2.6s cubic-bezier(0.16, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes slam-ripple {
+  0%   { --wave-radius: 0px;     opacity: 0; }
+  6%   { opacity: 1; }
+  100% { --wave-radius: 2400px;  opacity: 0; }
+}
+
+.click-ripple {
+  animation: click-ripple 1.1s cubic-bezier(0.16, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes click-ripple {
+  0%   { --wave-radius: 0px;   opacity: 0; }
+  8%   { opacity: 0.95; }
+  100% { --wave-radius: 360px; opacity: 0; }
+}
+
+/* Brief, sharp body shake to sell the slam impact. Kept short (500ms)
+   and small-amplitude so it doesn't disorient. */
+@keyframes slam-body-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-6px, 3px); }
+  20% { transform: translate(5px, -4px); }
+  30% { transform: translate(-4px, 2px); }
+  40% { transform: translate(3px, -3px); }
+  55% { transform: translate(-2px, 2px); }
+  70% { transform: translate(2px, -1px); }
+  85% { transform: translate(-1px, 1px); }
+}
+
+body.slam-shake {
+  animation: slam-body-shake 0.5s ease-out 1;
 }
 
 /* First-mount intro: 1.5 rotations decelerating at the end. Starts
@@ -2034,6 +2215,97 @@ input {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   margin-bottom: 6px;
+}
+
+.mfg-queue-item.needs-export {
+  border-color: var(--yellow);
+  background: color-mix(in srgb, var(--yellow) 8%, var(--bg-primary));
+}
+
+.mfg-queue-needs-export-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--yellow);
+  color: #fff;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+
+.mfg-queue-needs-export-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--yellow);
+  color: #fff;
+  border-radius: 8px;
+}
+
+.mfg-queue-export-banner {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--yellow) 15%, var(--bg-primary));
+  border: 1px solid var(--yellow);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.mfg-queue-export-banner strong { color: var(--yellow); }
+
+.export-queue-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 8px 0 16px;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.export-queue-sw-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.export-queue-sw-state.alive { color: var(--text-primary); }
+
+.export-queue-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.export-queue-sw-state.alive .export-queue-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 30%, transparent);
+}
+
+.export-queue-pending {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.export-queue-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
 }
 
 .mfg-queue-main {

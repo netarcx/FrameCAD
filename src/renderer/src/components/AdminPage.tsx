@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type {
   AdminConfig, BulkMetaPatch, GlobalAdminConfig, GlobalAdminState, LockInfo,
-  PartsManifest, PartMeta, ReleaseState, ManufacturingMethod
+  ManufacturingQueueItem, PartsManifest, PartMeta, ReleaseState, ManufacturingMethod
 } from '@shared/types'
 import ProfileSetup from './ProfileSetup'
 import PartsManager from './PartsManager'
 import ApprovalsPanel from './ApprovalsPanel'
 
-type AdminTab = 'settings' | 'parts' | 'approvals' | 'documents' | 'locks' | 'health' | 'tools' | 'profile' | 'about'
+type AdminTab = 'settings' | 'parts' | 'approvals' | 'documents' | 'locks' | 'health' | 'tools' | 'export-queue' | 'profile' | 'about'
 
 interface JoinedPart {
   path: string
@@ -623,6 +623,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
     { id: 'locks', label: 'Locks', projectOnly: true },
     { id: 'health', label: 'Repository Health', projectOnly: true },
     { id: 'tools', label: 'Tools', projectOnly: true },
+    { id: 'export-queue', label: 'Export Queue', projectOnly: true },
     { id: 'profile', label: 'Profile' },
     { id: 'about', label: 'About' }
   ]
@@ -1098,6 +1099,10 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
           </div>
         )}
 
+        {tab === 'export-queue' && hasProject && (
+          <ExportQueueTab />
+        )}
+
         {tab === 'profile' && (
           <div className="settings-profile-wrap">
             <ProfileSetup
@@ -1236,5 +1241,176 @@ function ToolsTab(props: ToolsTabProps) {
         </div>
       </div>
     </>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Export Queue tab — released parts that still need a paired .step/.stl
+// pushed by the SolidWorks add-in. Batch-trigger lives here so a backlog
+// can be cleared in one click once SW is open.
+// ---------------------------------------------------------------------
+
+function relTime(iso?: string): string {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  if (diff < 60_000) return 'just now'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+function ExportQueueTab() {
+  const [items, setItems] = useState<ManufacturingQueueItem[]>([])
+  const [swAlive, setSwAlive] = useState(false)
+  const [pendingTasks, setPendingTasks] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [perRowBusy, setPerRowBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const s = await window.api.getExportStatus()
+      setItems(s.needsExport)
+      setSwAlive(s.swAlive)
+      setPendingTasks(s.pendingTasks)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  // Re-poll every 4s while the tab is mounted so swAlive and the
+  // pending-task count reflect the SolidWorks add-in's actual state
+  // (it heartbeats every 5s via /api/health).
+  useEffect(() => {
+    const id = setInterval(refresh, 4000)
+    return () => clearInterval(id)
+  }, [refresh])
+
+  // Pick up new "needs export" entries as parts get released elsewhere.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const cleanup = window.api.onFileChange(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(refresh, 250)
+    })
+    return () => { if (timer) clearTimeout(timer); cleanup() }
+  }, [refresh])
+
+  const onBatch = async () => {
+    setBusy(true)
+    setError(null)
+    setStatus(null)
+    try {
+      const r = await window.api.triggerBatchExport()
+      setStatus(r.queued === 0
+        ? 'Nothing to export — all released CAM parts already have their files.'
+        : `Queued ${r.queued} export${r.queued === 1 ? '' : 's'}. SolidWorks will work through them.`)
+      await refresh()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onOne = async (filePath: string) => {
+    setPerRowBusy(filePath)
+    setError(null)
+    setStatus(null)
+    try {
+      const r = await window.api.triggerPartExport(filePath)
+      setStatus(r.alreadyExists
+        ? 'File already on disk — nothing to do.'
+        : 'Queued. SolidWorks will pick it up shortly.')
+      await refresh()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setPerRowBusy(null)
+    }
+  }
+
+  return (
+    <div className="admin-section">
+      <h3>Export Queue</h3>
+      <p className="admin-hint">
+        Released parts with method <strong>CNC</strong> or <strong>3D Print</strong> need a paired CAM file
+        (<code>.step</code> or <code>.stl</code>) alongside the source. Parts missing that file appear here.
+        When SolidWorks is open with the FrameCAD add-in, hitting <em>Batch Export</em> queues SaveAs operations
+        for every missing file in one shot.
+      </p>
+
+      <div className="export-queue-status">
+        <div className={`export-queue-sw-state${swAlive ? ' alive' : ''}`}>
+          <span className="export-queue-dot" />
+          {swAlive ? 'SolidWorks add-in connected' : 'SolidWorks add-in not connected'}
+        </div>
+        {pendingTasks > 0 && (
+          <div className="export-queue-pending">
+            {pendingTasks} export task{pendingTasks === 1 ? '' : 's'} in flight
+          </div>
+        )}
+        <div className="export-queue-actions">
+          <button className="toolbar-btn" onClick={refresh} disabled={loading}>Refresh</button>
+          <button
+            className="toolbar-btn primary"
+            onClick={onBatch}
+            disabled={busy || !swAlive || items.length === 0}
+            title={!swAlive ? 'Open SolidWorks with the FrameCAD add-in first' : undefined}
+          >
+            {busy ? 'Queueing…' : `Batch Export ${items.length || ''}`.trim()}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="admin-error">{error}</div>}
+      {status && <div className="admin-status">{status}</div>}
+
+      {loading && items.length === 0 && <div className="mfg-queue-empty">Loading…</div>}
+      {!loading && items.length === 0 && (
+        <div className="mfg-queue-empty">All released CAM parts have their export files. Nothing to do.</div>
+      )}
+
+      {items.length > 0 && (
+        <div className="mfg-queue-list">
+          {items.map(item => (
+            <div className="mfg-queue-item needs-export" key={item.path}>
+              <div className="mfg-queue-main">
+                <div className="mfg-queue-path">
+                  {item.path}
+                  <span className="mfg-queue-needs-export-badge">
+                    Needs .{item.needsExport}
+                  </span>
+                </div>
+                <div className="mfg-queue-meta">
+                  <span><strong>Method:</strong> {item.method === 'cnc' ? 'CNC' : item.method === 'print' ? '3D Print' : item.method}</span>
+                  {item.material && <span><strong>Material:</strong> {item.material}</span>}
+                  {item.releasedBy && <span><strong>Released by:</strong> {item.releasedBy}</span>}
+                  {item.releasedAt && <span>{relTime(item.releasedAt)}</span>}
+                </div>
+                {item.expectedExportPath && (
+                  <div className="mfg-queue-notes">Expected at: <code>{item.expectedExportPath}</code></div>
+                )}
+              </div>
+              <button
+                className="toolbar-btn"
+                onClick={() => onOne(item.path)}
+                disabled={perRowBusy === item.path || !swAlive}
+                title={!swAlive ? 'Open SolidWorks with the FrameCAD add-in first' : undefined}
+              >
+                {perRowBusy === item.path ? '…' : 'Export Now'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

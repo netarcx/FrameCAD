@@ -169,6 +169,24 @@ namespace FrameCAD.SolidWorksAddin
             await Client.PostAsync($"{_baseUrl}/api/pending-creates/done", content);
         }
 
+        public async Task<List<PendingExport>> GetPendingExportsAsync()
+        {
+            var response = await Client.GetAsync($"{_baseUrl}/api/pending-exports");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<List<PendingExport>>(json);
+        }
+
+        public async Task MarkExportDoneAsync(string id, string error = null)
+        {
+            var payload = error == null
+                ? (object)new { id }
+                : new { id, error };
+            var body = JsonConvert.SerializeObject(payload);
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            await Client.PostAsync($"{_baseUrl}/api/pending-exports/done", content);
+        }
+
         public async Task<List<LockInfo>> GetLocksAsync()
         {
             var response = await Client.GetAsync($"{_baseUrl}/api/locks");

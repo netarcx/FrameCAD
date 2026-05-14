@@ -185,6 +185,7 @@ namespace FrameCAD.SolidWorksAddin
             _taskPaneControl = new TaskPaneControl();
             _taskPaneControl.OnProjectPathChanged = SetSolidWorksWorkingDirectory;
             _taskPaneControl.OnCreateSolidWorksFile = CreateSolidWorksFile;
+            _taskPaneControl.OnExportSolidWorksFile = ExportSolidWorksFile;
             _taskPaneControl.OnStageFile = StageFileViaApi;
             _taskPaneControl.OnGetAssemblyChildren = GetAssemblyChildren;
             _taskPaneControl.OnGetActiveDocMaterial = GetActiveDocMaterial;
@@ -396,6 +397,100 @@ namespace FrameCAD.SolidWorksAddin
                 if (!saved) return "SaveAs failed (errors=" + errors + " warnings=" + warnings + ")";
                 if (!File.Exists(absolutePath)) return "SolidWorks reported success but file is missing on disk";
                 return null;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        /// <summary>
+        /// Export a SolidWorks document to STEP or STL alongside the source.
+        /// Called from TaskPaneControl when FrameCAD enqueues a pending-export
+        /// task for a released CNC / 3D-print part.
+        ///
+        /// If the source isn't currently open, we OpenDoc6 silently and close
+        /// it again afterwards so the user's session is undisturbed. If it's
+        /// already open we use the live ModelDoc and leave it open.
+        ///
+        /// SolidWorks picks the exporter from the target extension (.step / .stl),
+        /// so we just need to call SaveAs with the right path.
+        ///
+        /// Returns null on success, or an error string. Must run on the COM
+        /// thread (the WinForms timer Tick that drives this satisfies that).
+        /// </summary>
+        private string ExportSolidWorksFile(string sourceAbsPath, string targetAbsPath, string format)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(sourceAbsPath) || !File.Exists(sourceAbsPath))
+                    return "Source file not found: " + sourceAbsPath;
+                if (string.IsNullOrEmpty(targetAbsPath))
+                    return "Target path missing";
+
+                var ext = Path.GetExtension(sourceAbsPath).ToLowerInvariant();
+                int docType;
+                if (ext == ".sldprt") docType = (int)swDocumentTypes_e.swDocPART;
+                else if (ext == ".sldasm") docType = (int)swDocumentTypes_e.swDocASSEMBLY;
+                else if (ext == ".slddrw") docType = (int)swDocumentTypes_e.swDocDRAWING;
+                else return "Unsupported source extension: " + ext;
+
+                // Is it already loaded? GetOpenDocument doesn't open anything;
+                // it just looks up by full path.
+                var already = _swApp.GetOpenDocument(sourceAbsPath) as ModelDoc2;
+                ModelDoc2 doc;
+                bool openedByUs;
+
+                if (already != null)
+                {
+                    doc = already;
+                    openedByUs = false;
+                }
+                else
+                {
+                    int openErrors = 0, openWarnings = 0;
+                    doc = _swApp.OpenDoc6(
+                        sourceAbsPath,
+                        docType,
+                        (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                        "",
+                        ref openErrors,
+                        ref openWarnings) as ModelDoc2;
+                    if (doc == null)
+                        return "OpenDoc6 failed (errors=" + openErrors + " warnings=" + openWarnings + ")";
+                    openedByUs = true;
+                }
+
+                try
+                {
+                    var dir = Path.GetDirectoryName(targetAbsPath);
+                    if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                        Directory.CreateDirectory(dir);
+
+                    int errors = 0, warnings = 0;
+                    var saved = doc.Extension.SaveAs(
+                        targetAbsPath,
+                        (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                        (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                        null,
+                        ref errors,
+                        ref warnings);
+                    if (!saved)
+                        return "SaveAs failed (errors=" + errors + " warnings=" + warnings + ")";
+                    if (!File.Exists(targetAbsPath))
+                        return "SolidWorks reported success but " + format + " is missing on disk";
+                    return null;
+                }
+                finally
+                {
+                    if (openedByUs)
+                    {
+                        // CloseDoc takes the document title (its filename), not
+                        // the full path. Best-effort — if it fails the user
+                        // just ends up with an extra doc open.
+                        try { _swApp.CloseDoc(Path.GetFileName(sourceAbsPath)); } catch { }
+                    }
+                }
             }
             catch (Exception ex)
             {

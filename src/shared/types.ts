@@ -65,6 +65,11 @@ export interface ManufacturingQueueItem {
   notes?: string
   releasedBy?: string
   releasedAt?: string
+  /** Set when a CAM-ready export (.step for cnc, .stl for print) is
+   *  expected for this part but the file is missing on disk. */
+  needsExport?: 'step' | 'stl'
+  /** Project-relative path the export should land at, when needsExport is set. */
+  expectedExportPath?: string
 }
 
 export interface ProjectTotals {
@@ -315,6 +320,14 @@ export interface IpcApi {
   setManufacturingMaterial(filePath: string, material: string): Promise<void>
   bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Promise<number>
   getManufacturingQueue(): Promise<ManufacturingQueueItem[]>
+  getExportStatus(): Promise<{
+    swAlive: boolean
+    lastSwSeenAt: number
+    pendingTasks: number
+    needsExport: ManufacturingQueueItem[]
+  }>
+  triggerPartExport(filePath: string): Promise<{ taskId: string | null; alreadyExists: boolean }>
+  triggerBatchExport(): Promise<{ queued: number }>
   getAllPartsMeta(): Promise<Record<string, PartMeta>>
   checkManifestIntegrity(): Promise<{
     success: boolean

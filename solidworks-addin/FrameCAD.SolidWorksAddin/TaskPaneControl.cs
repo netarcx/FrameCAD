@@ -608,9 +608,12 @@ namespace FrameCAD.SolidWorksAddin
         private bool _connected;
         private string _currentProjectPath;
         private bool _processingPending;
+        private bool _processingExports;
 
         public Action<string> OnProjectPathChanged { get; set; }
         public Func<string, bool, string> OnCreateSolidWorksFile { get; set; }
+        /// <summary>(sourceAbsPath, targetAbsPath, "step"|"stl") -> null on success or error string.</summary>
+        public Func<string, string, string, string> OnExportSolidWorksFile { get; set; }
         public Func<string, System.Threading.Tasks.Task> OnStageFile { get; set; }
         public Func<string, System.Collections.Generic.List<string>> OnGetAssemblyChildren { get; set; }
 
@@ -681,6 +684,7 @@ namespace FrameCAD.SolidWorksAddin
             if (error == null && health?.Running == true && health?.Project != null)
             {
                 await ProcessPendingCreates();
+                await ProcessPendingExports();
             }
 
             SafeInvoke(() =>
@@ -789,6 +793,64 @@ namespace FrameCAD.SolidWorksAddin
             finally
             {
                 _processingPending = false;
+            }
+        }
+
+        /// <summary>
+        /// Drain the pending CAM export queue. Each task is the SolidWorks
+        /// side of a release for a CNC/3D-print part: we SaveAs the source
+        /// to .step / .stl alongside it, then ack /done so FrameCAD stages
+        /// + commits the new file. Errors are reported back so the part
+        /// stays in the "needs export" queue rather than getting silently
+        /// dropped.
+        /// </summary>
+        private async System.Threading.Tasks.Task ProcessPendingExports()
+        {
+            if (_processingExports) return;
+            _processingExports = true;
+            try
+            {
+                var pending = await _api.GetPendingExportsAsync();
+                if (pending == null) return;
+                foreach (var p in pending)
+                {
+                    if (string.IsNullOrEmpty(p?.SourceAbsPath) || string.IsNullOrEmpty(p?.TargetAbsPath))
+                    {
+                        try { await _api.MarkExportDoneAsync(p?.Id, "Missing source or target path"); } catch { }
+                        continue;
+                    }
+                    if (OnExportSolidWorksFile == null)
+                    {
+                        try { await _api.MarkExportDoneAsync(p.Id, "Export handler not wired"); } catch { }
+                        continue;
+                    }
+                    var error = OnExportSolidWorksFile.Invoke(p.SourceAbsPath, p.TargetAbsPath, p.Format);
+                    try
+                    {
+                        await _api.MarkExportDoneAsync(p.Id, error);
+                    }
+                    catch
+                    {
+                        // Ack failed; FrameCAD will see the task again next
+                        // poll and reissue. Idempotent on its side.
+                    }
+                    if (error == null)
+                    {
+                        ShowMessage("Exported " + System.IO.Path.GetFileName(p.TargetAbsPath));
+                    }
+                    else
+                    {
+                        ShowMessage("Export failed: " + error, true);
+                    }
+                }
+            }
+            catch
+            {
+                // Network/HTTP errors: next health tick retries.
+            }
+            finally
+            {
+                _processingExports = false;
             }
         }
 

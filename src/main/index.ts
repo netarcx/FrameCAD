@@ -5,10 +5,6 @@ import { setupIpc, stopWatching, stopRestServer, isPublishing } from './ipc'
 import { startRestServer } from './rest'
 import { initAutoUpdater } from './updater'
 
-app.disableHardwareAcceleration()
-app.commandLine.appendSwitch('disable-gpu')
-app.commandLine.appendSwitch('disable-software-rasterizer')
-
 let mainWindow: BrowserWindow | null = null
 
 // Holds a deep-link URL that arrived before the renderer was ready to

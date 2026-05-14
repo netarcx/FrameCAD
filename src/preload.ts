@@ -197,6 +197,15 @@ const api: IpcApi = {
   getManufacturingQueue: () =>
     ipcRenderer.invoke('get-manufacturing-queue'),
 
+  getExportStatus: () =>
+    ipcRenderer.invoke('get-export-status'),
+
+  triggerPartExport: (filePath) =>
+    ipcRenderer.invoke('trigger-part-export', filePath),
+
+  triggerBatchExport: () =>
+    ipcRenderer.invoke('trigger-batch-export'),
+
   getAllPartsMeta: () =>
     ipcRenderer.invoke('get-all-parts-meta'),
 

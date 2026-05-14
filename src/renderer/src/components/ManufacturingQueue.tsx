@@ -75,6 +75,13 @@ export default function ManufacturingQueue({ onClose, embedded = false }: Props)
     return acc
   }, {})
 
+  const needsExportCounts = METHODS.reduce<Record<string, number>>((acc, m) => {
+    acc[m] = items.filter(i => i.method === m && !!i.needsExport).length
+    return acc
+  }, {})
+
+  const totalNeedsExport = items.filter(i => !!i.needsExport).length
+
   const visible = items.filter(i => i.method === tab)
 
   const handleMarkManufactured = async (path: string) => {
@@ -97,6 +104,12 @@ export default function ManufacturingQueue({ onClose, embedded = false }: Props)
           Every part with release state <strong>Released</strong> appears here, grouped by manufacturing method. Click <em>Done</em> when the part has been made and state will move to <strong>Manufactured</strong>.
         </p>
 
+        {totalNeedsExport > 0 && (
+          <div className="mfg-queue-export-banner">
+            <strong>{totalNeedsExport}</strong> {totalNeedsExport === 1 ? 'part is' : 'parts are'} released but missing the paired CAM file. Use <em>Admin → Export Queue</em> to batch-export, or open the part in SolidWorks to trigger an auto-export.
+          </div>
+        )}
+
         <div className="mfg-queue-tabs">
           {METHODS.map(m => (
             <button
@@ -106,6 +119,11 @@ export default function ManufacturingQueue({ onClose, embedded = false }: Props)
             >
               {methodLabel(m)}
               <span className="mfg-queue-count">{counts[m] || 0}</span>
+              {(needsExportCounts[m] || 0) > 0 && (
+                <span className="mfg-queue-needs-export-pill" title="Parts missing their CAM export">
+                  {needsExportCounts[m]}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -118,9 +136,16 @@ export default function ManufacturingQueue({ onClose, embedded = false }: Props)
         {visible.length > 0 && (
           <div className="mfg-queue-list">
             {visible.map(item => (
-              <div className="mfg-queue-item" key={item.path}>
+              <div className={`mfg-queue-item${item.needsExport ? ' needs-export' : ''}`} key={item.path}>
                 <div className="mfg-queue-main">
-                  <div className="mfg-queue-path">{item.path}</div>
+                  <div className="mfg-queue-path">
+                    {item.path}
+                    {item.needsExport && (
+                      <span className="mfg-queue-needs-export-badge" title={`Expected file: ${item.expectedExportPath}`}>
+                        Needs .{item.needsExport}
+                      </span>
+                    )}
+                  </div>
                   <div className="mfg-queue-meta">
                     {item.material && <span><strong>Material:</strong> {item.material}</span>}
                     {typeof item.mass === 'number' && <span><strong>Mass:</strong> {item.mass.toFixed(2)} lb</span>}

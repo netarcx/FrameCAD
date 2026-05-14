@@ -3,6 +3,7 @@ import fs from 'fs/promises'
 import type { BulkMetaPatch, ManufacturingMethod, ManufacturingQueueItem, PartMeta, ProjectTotals, ReleaseState } from '@shared/types'
 export type { BulkMetaPatch }
 import { getProjectPath, getGit, pullRemoteFile, commitAndPushFile } from './git'
+import { isSwAlive, queuePendingExport } from './export-queue'
 
 const META_DIR = '.trentcad'
 const META_FILE = 'parts-meta.json'
@@ -178,6 +179,18 @@ export async function setReleaseState(
     ? `[release] ${baseName} → ${state} (+ ${cascadeCount} cascaded)`
     : `[release] ${baseName} → ${state}`
   await commitAndPushFile(metaRelPath(), msg)
+
+  // After a CAM-track part lands in "released", try to get an export
+  // paired with it. If SolidWorks is open and listening we kick off an
+  // async export task; otherwise the part shows up in the needs-export
+  // queue and someone can batch-trigger from the admin panel later.
+  if (state === 'released') {
+    const method = all[filePath]?.manufacturingMethod
+    const format = exportFormatFor(method)
+    if (format && !(await exportExistsOnDisk(filePath, format)) && isSwAlive()) {
+      queuePendingExport(getProjectPath(), filePath, format)
+    }
+  }
 }
 
 export async function addComment(filePath: string, text: string): Promise<void> {
@@ -355,24 +368,73 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
 }
 
 /**
+ * Format expected for the CAM-ready export paired with a released part:
+ *   cnc   → .step  (also accept .stp on disk)
+ *   print → .stl
+ * Anything else returns null — no export is required.
+ */
+export function exportFormatFor(method: ManufacturingMethod | undefined): 'step' | 'stl' | null {
+  if (method === 'cnc') return 'step'
+  if (method === 'print') return 'stl'
+  return null
+}
+
+/**
+ * Resolve where the paired export should live for a given source file.
+ * The export sits next to the source with the same basename. Returns
+ * project-relative path.
+ */
+export function expectedExportRelPath(srcRelPath: string, format: 'step' | 'stl'): string {
+  const ext = path.extname(srcRelPath)
+  const base = srcRelPath.slice(0, srcRelPath.length - ext.length)
+  return `${base}.${format}`
+}
+
+/**
+ * Does the paired export already exist on disk? For STEP we also accept
+ * the `.stp` alias so manual exports from other tools count.
+ */
+async function exportExistsOnDisk(srcRelPath: string, format: 'step' | 'stl'): Promise<boolean> {
+  const projectPath = getProjectPath()
+  const candidates = format === 'step'
+    ? [expectedExportRelPath(srcRelPath, 'step'), srcRelPath.slice(0, -path.extname(srcRelPath).length) + '.stp']
+    : [expectedExportRelPath(srcRelPath, 'stl')]
+  for (const rel of candidates) {
+    try {
+      await fs.access(path.join(projectPath, rel))
+      return true
+    } catch { /* not present, try next */ }
+  }
+  return false
+}
+
+/**
  * Build the manufacturing queue — every part currently in the "released"
  * state, ready for the shop to make. Ordered oldest-first so the earliest
- * approvals get worked first.
+ * approvals get worked first. CAM-required parts (cnc/print) get a
+ * `needsExport` flag when their paired .step/.stl is missing on disk.
  */
 export async function getManufacturingQueue(): Promise<ManufacturingQueueItem[]> {
   const all = await loadAllMeta()
   const items: ManufacturingQueueItem[] = []
   for (const [filePath, entry] of Object.entries(all)) {
     if (entry.release?.state !== 'released') continue
-    items.push({
+    const method = entry.manufacturingMethod || 'other'
+    const format = exportFormatFor(method)
+    const item: ManufacturingQueueItem = {
       path: filePath,
-      method: entry.manufacturingMethod || 'other',
+      method,
       material: entry.manufacturingMaterial,
       mass: entry.mass,
       notes: entry.manufacturingNotes,
       releasedBy: entry.release.by,
       releasedAt: entry.release.at
-    })
+    }
+    if (format && !(await exportExistsOnDisk(filePath, format))) {
+      item.needsExport = format
+      item.expectedExportPath = expectedExportRelPath(filePath, format)
+    }
+    items.push(item)
   }
   items.sort((a, b) => (a.releasedAt || '').localeCompare(b.releasedAt || ''))
   return items
