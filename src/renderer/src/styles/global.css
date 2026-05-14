@@ -167,14 +167,14 @@ input {
   will-change: transform;
 }
 
-/* First-mount intro: 5 full rotations decelerating at the end. The
+/* First-mount intro: 1.5 rotations decelerating at the end. The
    bezier (0.15, 0.7, 0.25, 1) keeps the first ~70% of the spin fast
    and ramps down sharply over the last ~30% so the logo "lands"
    into place rather than just easing out the whole way. Class is
    added once per app session by ProjectSetup. */
 @keyframes setup-logo-welcome-intro {
   from { transform: rotate(0deg); }
-  to   { transform: rotate(1800deg); }
+  to   { transform: rotate(540deg); }
 }
 
 .setup-logo.welcome-intro {
