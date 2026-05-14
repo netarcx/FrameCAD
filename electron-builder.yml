@@ -61,8 +61,16 @@ linux:
 # to auto-update through a rename, but the publish step in CI uses this
 # value verbatim — change to "FrameCAD" once you rename the repo on
 # github.com/netarcx so the upload target matches.
+#
+# `channel: latest` forces electron-builder to write latest.yml even
+# when the version contains a prerelease tag like "-beta". Without
+# this, prerelease versions publish to beta.yml only, and users on
+# the stable channel never see them. We run a single update channel
+# where every published build (stable or beta) is the next update for
+# everyone.
 publish:
   provider: github
   owner: netarcx
   repo: TrentCAD
   releaseType: release
+  channel: latest

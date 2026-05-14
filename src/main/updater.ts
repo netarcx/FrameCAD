@@ -4,6 +4,10 @@ import { ipcMain, BrowserWindow } from 'electron'
 export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
+  // Treat -beta / -rc builds as valid updates. Combined with
+  // electron-builder's `channel: latest` override, this means every
+  // published build (stable or prerelease) is offered to all users.
+  autoUpdater.allowPrerelease = true
 
   autoUpdater.on('update-available', (info) => {
     const win = getMainWindow()
