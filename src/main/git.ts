@@ -409,7 +409,14 @@ async function runJoinClone(
     // buffer / timeouts from the FIRST object download, not git's
     // defaults. `applyUploadTunings()` after the clone would write the
     // same config too late: the smudge has already run.
+    //
+    // `--single-branch --no-tags` skips fetching every dev branch and
+    // every release tag, which cuts the git-side of the clone for repos
+    // with active history. We undo the narrowed refspec right after so
+    // future syncs still see teammates' new branches.
     await cloneGit.clone(cloneUrl, dirPath, [
+      '--single-branch',
+      '--no-tags',
       '--config', 'lfs.concurrenttransfers=12',
       '--config', 'http.postBuffer=524288000',
       '--config', 'lfs.activitytimeout=600',
@@ -417,6 +424,14 @@ async function runJoinClone(
     ])
     git = simpleGit(dirPath)
     projectPath = dirPath
+    // `--single-branch` writes a narrowed `remote.origin.fetch` that
+    // only pulls the cloned branch. Reset it to the default wildcard
+    // so future syncs discover new branches normally.
+    await git.raw([
+      'config', '--local',
+      'remote.origin.fetch',
+      '+refs/heads/*:refs/remotes/origin/*'
+    ]).catch(() => {})
     if (tokenUsed) {
       // Reset the stored remote URL so the token isn't persisted
       // in .git/config. Future push/pull will get credentials via
