@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to TrentCAD are recorded here. The format follows
+All notable changes to FrameCAD are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 uses [SemVer](https://semver.org/) — though for a single-team app the
 versions are mostly chronology markers.
@@ -39,8 +39,8 @@ polish pass.
   into a slide-in overlay, compact (<1024px) collapses the left sidebar
   to icons-only. Minimum window size now 960×600 so 1366×768 laptops
   fit with the Windows taskbar visible.
-- **`trentcad://` deep-link protocol** — auto-generated project READMEs
-  include a one-click `trentcad://join?url=…` link that opens the
+- **`framecad://` deep-link protocol** — auto-generated project READMEs
+  include a one-click `framecad://join?url=…` link that opens the
   desktop app straight into the Join Project flow.
 - **Clickable logo** in the app header returns to the welcome screen
   / exits manufacturing view.
@@ -98,4 +98,4 @@ Foundation: check-out / check-in, part numbering, REST API, Google
 Drive sync.
 
 For the full per-version history before 1.0, see
-[`git log`](https://github.com/netarcx/TrentCAD/commits/main).
+[`git log`](https://github.com/netarcx/FrameCAD/commits/main).

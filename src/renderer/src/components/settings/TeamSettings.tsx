@@ -99,7 +99,7 @@ export default function TeamSettings() {
         <input
           value={form.projectPrefix ?? ''}
           onChange={e => set('projectPrefix', e.target.value)}
-          placeholder={globalState.defaults.projectPrefix || 'trentcad-'}
+          placeholder={globalState.defaults.projectPrefix || 'framecad-'}
         />
       </div>
 

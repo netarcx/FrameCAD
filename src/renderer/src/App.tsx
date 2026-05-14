@@ -117,7 +117,7 @@ export default function App() {
     prevProjectRef.current = project
   }, [manufacturingView, project])
 
-  // trentcad:// deep-link → prefill the Join Project URL field. Bumped
+  // framecad:// deep-link → prefill the Join Project URL field. Bumped
   // by sequence number so the same URL can re-trigger after the user
   // dismisses it. Pulled once on mount (cold launch) and on every
   // subsequent deep-link event (warm app).
@@ -551,7 +551,7 @@ export default function App() {
       <div className="modal deps-modal">
         <h2>Required software missing</h2>
         <p className="deps-intro">
-          TrentCAD uses Git and Git LFS under the hood to manage CAD files.
+          FrameCAD uses Git and Git LFS under the hood to manage CAD files.
           Install whichever is missing and click "Check again" to continue.
         </p>
         {!missingDeps.git.installed && (
@@ -774,8 +774,8 @@ export default function App() {
           onClick={() => { setActiveSection('files'); closeProject() }}
           title="Close this project and return to the welcome screen"
         >
-          <img className="logo-img" src={logoUrl} alt="TrentCAD" />
-          <span className="logo">TrentCAD</span>
+          <img className="logo-img" src={logoUrl} alt="FrameCAD" />
+          <span className="logo">FrameCAD</span>
         </button>
         <span className="divider" />
         <button

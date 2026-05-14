@@ -4,11 +4,11 @@ using System.Net.Http;
 using System.Text;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
-using TrentCAD.SolidWorksAddin.Models;
+using FrameCAD.SolidWorksAddin.Models;
 
-namespace TrentCAD.SolidWorksAddin
+namespace FrameCAD.SolidWorksAddin
 {
-    public class TrentCadApiClient
+    public class FrameCadApiClient
     {
         private static readonly HttpClient Client = new HttpClient(
             new HttpClientHandler { UseProxy = false, Proxy = null, UseDefaultCredentials = false })
@@ -19,7 +19,7 @@ namespace TrentCAD.SolidWorksAddin
         private readonly string _baseUrl;
         private string _projectRoot;
 
-        public TrentCadApiClient(int port = 42129)
+        public FrameCadApiClient(int port = 42129)
         {
             _baseUrl = $"http://127.0.0.1:{port}";
         }
@@ -178,9 +178,9 @@ namespace TrentCAD.SolidWorksAddin
         }
 
         /// <summary>
-        /// Bring the TrentCAD main window to the foreground.
+        /// Bring the FrameCAD main window to the foreground.
         /// </summary>
-        public async Task<ApiResult> FocusTrentCadAsync()
+        public async Task<ApiResult> FocusFrameCadAsync()
         {
             try
             {
@@ -261,7 +261,7 @@ namespace TrentCAD.SolidWorksAddin
         /// <summary>
         /// Push a SolidWorks-computed mass (in pounds) for the given file.
         /// Used by the SW add-in's FileSavePostNotify hook so the user
-        /// doesn't have to manually type mass into TrentCAD every save.
+        /// doesn't have to manually type mass into FrameCAD every save.
         /// </summary>
         public async Task<ApiResult> SetPartMassAutoAsync(string absolutePath, double massPounds)
         {
@@ -281,7 +281,7 @@ namespace TrentCAD.SolidWorksAddin
         }
 
         /// <summary>
-        /// Set the part's manufacturing material in TrentCAD metadata.
+        /// Set the part's manufacturing material in FrameCAD metadata.
         /// </summary>
         public async Task<ApiResult> SetManufacturingMaterialAsync(string absolutePath, string material)
         {
@@ -303,7 +303,7 @@ namespace TrentCAD.SolidWorksAddin
         /// <summary>
         /// Set the part's manufacturing method (print/cnc/manual/other).
         /// Pass null or empty to clear. Required so released parts show up
-        /// on the correct tab of TrentCAD's manufacturing queue.
+        /// on the correct tab of FrameCAD's manufacturing queue.
         /// </summary>
         public async Task<ApiResult> SetManufacturingMethodAsync(string absolutePath, string method)
         {

@@ -20,7 +20,7 @@ async function isCotsProject(): Promise<boolean> {
 }
 function defaultPrefix(): string {
   const yy = new Date().getFullYear().toString().slice(-2)
-  // Build-time default first (forks set TRENTCAD_DEFAULT_PROJECT_PREFIX).
+  // Build-time default first (forks set FRAMECAD_DEFAULT_PROJECT_PREFIX).
   // If the baked-in value already has a year, take it as-is; if it's
   // just the team segment (e.g. "1234"), prepend the current year.
   // Falls back to a neutral placeholder when nothing's set — the user
@@ -215,7 +215,7 @@ export function assignPartNumber(manifest: PartsManifest, relPath: string): Part
   const type = classifyFile(filename)
   if (!type) return null
 
-  // Legacy mode: project pre-dates TrentCAD's numbering scheme. Use the
+  // Legacy mode: project pre-dates FrameCAD's numbering scheme. Use the
   // filename (sans extension) as the "part number" so the existing
   // folder structure and file names show up unchanged in the UI. Still
   // store an entry so meta, drawings, and where-used lookups have
@@ -378,7 +378,7 @@ async function syncManifestImpl(): Promise<PartsManifest> {
 
   // Legacy-mode auto-detect: this is a first-time open if the manifest
   // has zero entries yet. If there are SolidWorks files on disk anyway,
-  // the project pre-dates TrentCAD and the team already has filenames
+  // the project pre-dates FrameCAD and the team already has filenames
   // they care about — switch to legacy mode so we don't rename anything.
   // Explicit `legacyMode: false` (toggled by the user later) wins.
   if (manifest.legacyMode === undefined && Object.keys(manifest.entries).length === 0 && swFiles.length > 0) {

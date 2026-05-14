@@ -12,7 +12,7 @@ export interface AdminConfig {
   mainRepoUrl?: string
   /**
    * Separate Git repository containing shared COTS (Commercial Off-The-Shelf)
-   * parts. TrentCAD clones this into a `COTS/` subfolder of the project on
+   * parts. FrameCAD clones this into a `COTS/` subfolder of the project on
    * every open and refreshes it on Sync. The folder is gitignored in the
    * main repo so the two histories never mix.
    */
@@ -25,7 +25,7 @@ export interface AdminConfig {
    */
   isCotsProject?: boolean
   /**
-   * Optional LFS storage override. When set, TrentCAD writes a `.lfsconfig`
+   * Optional LFS storage override. When set, FrameCAD writes a `.lfsconfig`
    * pointing at this URL so the project's LFS objects go to a self-hosted
    * server (rudolfs / giftless / Gitea / etc.) instead of GitHub LFS. Blank
    * = use GitHub LFS (default).

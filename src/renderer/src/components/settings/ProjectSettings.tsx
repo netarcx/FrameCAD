@@ -138,7 +138,7 @@ export default function ProjectSettings() {
           still go to GitHub, only the LFS object bytes change
           hosts. Leave blank to use GitHub LFS. Auth (if your server
           needs it) is handled by `.netrc` or git credential helpers,
-          not by TrentCAD.
+          not by FrameCAD.
         </p>
         <label>LFS server URL</label>
         <input

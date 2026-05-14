@@ -815,7 +815,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
                   </p>
                   <p className="admin-hint">
                     Turn this on for an existing project that pre-dates
-                    TrentCAD's numbering scheme. New files keep their
+                    FrameCAD's numbering scheme. New files keep their
                     original filename (e.g. <code>Frame.sldprt</code>) as
                     the displayed part number instead of getting a
                     generated <code>26-2129-001</code>. <strong>Toggling
@@ -823,7 +823,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
                     assembly references would break if it did, so once a
                     file has a number it keeps that number for life. Only
                     files added after the flip pick up the other behavior.
-                    TrentCAD auto-enables this when opening a non-TrentCAD
+                    FrameCAD auto-enables this when opening a non-FrameCAD
                     project for the first time.
                   </p>
                 </div>
@@ -853,7 +853,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
                     still go to GitHub, only the LFS object bytes change
                     hosts. Leave blank to use GitHub LFS. Auth (if your server
                     needs it) is handled by `.netrc` or git credential helpers,
-                    not by TrentCAD.
+                    not by FrameCAD.
                   </p>
                   <label>LFS server URL</label>
                   <input
@@ -1111,7 +1111,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
 
         {tab === 'about' && (
           <div className="admin-section">
-            <h3>About TrentCAD</h3>
+            <h3>About FrameCAD</h3>
             <p>Version {appVersion || 'unknown'}</p>
             <p className="admin-hint">
               Press Ctrl+Shift+R to check for updates manually.

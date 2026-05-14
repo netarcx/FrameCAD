@@ -25,7 +25,7 @@ export default function ProfileSetup({ onComplete, onCancel, initialName = '', i
 
   return (
     <div className={embedded ? 'admin-section' : 'setup-screen'}>
-      <h1>{embedded ? 'Profile' : 'Welcome to TrentCAD'}</h1>
+      <h1>{embedded ? 'Profile' : 'Welcome to FrameCAD'}</h1>
       <p className={embedded ? 'admin-hint' : 'subtitle'}>Set up your profile so your team knows who made changes</p>
       <div className="setup-form">
         <div className="form-group">

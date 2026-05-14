@@ -19,7 +19,7 @@ interface Props {
   /** Count of commits on origin ahead of local. > 0 highlights the Sync
    *  button so the user knows there's something to pull. */
   remoteAhead?: number
-  /** When true, this project pre-dates TrentCAD's part-numbering and
+  /** When true, this project pre-dates FrameCAD's part-numbering and
    *  uses filenames as the de-facto part numbers. The auto-numbered
    *  New Part / New Assembly buttons are hidden so we don't impose
    *  the YY-team-XX-YYY scheme on a project that has its own. */
@@ -154,7 +154,7 @@ export default function Toolbar({
                 {showCreateMenu && (
                   <div className="create-dropdown-menu" onMouseLeave={() => setShowCreateMenu(false)}>
                     {/* Hide auto-numbered creators in legacy mode — the
-                        project pre-dates TrentCAD's numbering scheme and
+                        project pre-dates FrameCAD's numbering scheme and
                         the team names files themselves in SolidWorks. */}
                     {!legacyMode && (
                       <>

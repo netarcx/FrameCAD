@@ -70,8 +70,8 @@ export default function ManufacturingModeShell({ project, onSwitchProject, onExi
           onClick={onExit}
           title="Exit the manufacturing view"
         >
-          <img className="logo-img" src={logoUrl} alt="TrentCAD" />
-          <span className="logo">TrentCAD</span>
+          <img className="logo-img" src={logoUrl} alt="FrameCAD" />
+          <span className="logo">FrameCAD</span>
         </button>
         <span className="divider" />
         <div className="mfg-mode-project">

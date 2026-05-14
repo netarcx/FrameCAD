@@ -61,36 +61,36 @@ const NEVER_MERGE_PATTERNS = [
 ]
 
 /**
- * Compose the initial README.md for a fresh TrentCAD project. The
+ * Compose the initial README.md for a fresh FrameCAD project. The
  * GitHub repo page is the first thing teammates see, so this should
  * orient a brand-new user without making them read external docs.
  *
- * The `trentcad://join?url=<remote>` link opens TrentCAD straight into
+ * The `framecad://join?url=<remote>` link opens FrameCAD straight into
  * the Join Project flow with the URL prefilled (see `app.setAsDefault\
- * ProtocolClient('trentcad')` in main/index.ts).
+ * ProtocolClient('framecad')` in main/index.ts).
  */
 function buildProjectReadme(name: string, remote: string): string {
   const cleanRemote = (remote || '').trim()
   const joinHttpsUrl = cleanRemote || '<paste this repo URL>'
-  const deepLink = cleanRemote ? `trentcad://join?url=${encodeURIComponent(cleanRemote)}` : ''
+  const deepLink = cleanRemote ? `framecad://join?url=${encodeURIComponent(cleanRemote)}` : ''
   const teamName = getBuildDefaultTeamName() || 'an FRC team'
-  const issueRepo = getBuildDefaultIssueRepo() || 'netarcx/TrentCAD'
+  const issueRepo = getBuildDefaultIssueRepo() || 'netarcx/FrameCAD'
 
   // shields.io renders a badge image GitHub-side that looks like a
   // button, so the deep link reads as an obvious call-to-action
   // instead of a plain hyperlink. `for-the-badge` is the tall pill
   // style; the message text after the dash is what shows on the
   // right side of the badge. Color matches the app accent.
-  const badgeUrl = 'https://img.shields.io/badge/Open%20in-TrentCAD-2563eb?style=for-the-badge'
+  const badgeUrl = 'https://img.shields.io/badge/Open%20in-FrameCAD-2563eb?style=for-the-badge'
   const deepLinkBlock = deepLink
-    ? `## Quick add to TrentCAD
+    ? `## Quick add to FrameCAD
 
-[![Open in TrentCAD](${badgeUrl})](${deepLink})
+[![Open in FrameCAD](${badgeUrl})](${deepLink})
 
-Clicking that button from this README opens the TrentCAD desktop app
+Clicking that button from this README opens the FrameCAD desktop app
 and jumps straight into the Join Project flow with the URL prefilled.
-If nothing happens, you don't have TrentCAD installed yet — download
-the latest release from [TrentCAD releases](https://github.com/${issueRepo}/releases)
+If nothing happens, you don't have FrameCAD installed yet — download
+the latest release from [FrameCAD releases](https://github.com/${issueRepo}/releases)
 and try again.
 
 `
@@ -98,25 +98,25 @@ and try again.
 
   return `# ${name}
 
-A TrentCAD project — CAD collaboration for ${teamName}. This repository
+A FrameCAD project — CAD collaboration for ${teamName}. This repository
 stores SolidWorks files via Git LFS and is managed end-to-end by the
-TrentCAD desktop app. You shouldn't need to use \`git\` directly.
+FrameCAD desktop app. You shouldn't need to use \`git\` directly.
 
 ${deepLinkBlock}## Joining manually
 
-If the quick-add link doesn't work, open TrentCAD and click
+If the quick-add link doesn't work, open FrameCAD and click
 **Join Project**, then paste:
 
 \`\`\`
 ${joinHttpsUrl}
 \`\`\`
 
-TrentCAD will clone the repo, install Git LFS hooks, and surface every
+FrameCAD will clone the repo, install Git LFS hooks, and surface every
 part in the browser table.
 
 ## How collaboration works
 
-TrentCAD wraps Git LFS with a check-out / check-in lock model so two
+FrameCAD wraps Git LFS with a check-out / check-in lock model so two
 people never edit the same SolidWorks file at once.
 
 - **Sync** — pull everyone else's latest work into your copy.
@@ -133,7 +133,7 @@ The Git terminology lives below the surface; the UI never uses it.
 
 ## Project metadata
 
-Two files at the project root are managed by TrentCAD and committed to
+Two files at the project root are managed by FrameCAD and committed to
 git so the team shares one source of truth:
 
 - \`parts.json\` — the part-numbering manifest. Tracks the assigned
@@ -142,10 +142,10 @@ git so the team shares one source of truth:
 - \`.trentcad/parts-meta.json\` — per-part metadata: release state
   (draft / in-review / released / manufactured), manufacturing method
   (3D Print / CNC / Hand / Other), material, mass, cost, comments.
-  Edited through the TrentCAD UI; commits are batched so rapid edits
+  Edited through the FrameCAD UI; commits are batched so rapid edits
   collapse into one push.
 
-## Settings inside TrentCAD
+## Settings inside FrameCAD
 
 The **Settings** entry in the sidebar opens the Admin panel after a PIN
 prompt. Notable tabs:
@@ -166,20 +166,20 @@ prompt. Notable tabs:
 
 ## Need help?
 
-- TrentCAD bugs / requests: [github.com/${issueRepo}/issues](https://github.com/${issueRepo}/issues)
+- FrameCAD bugs / requests: [github.com/${issueRepo}/issues](https://github.com/${issueRepo}/issues)
 - Project-specific questions: ask the team lead.
 `
 }
 
 function buildGitAttributes(): string {
-  const lines: string[] = ['# Managed by TrentCAD — adds run by openProject if missing.']
+  const lines: string[] = ['# Managed by FrameCAD — adds run by openProject if missing.']
   for (const p of LFS_PATTERNS) lines.push(`${p} filter=lfs diff=lfs merge=lfs -text`)
   for (const p of NEVER_MERGE_PATTERNS) lines.push(`${p} binary`)
   return lines.join('\n') + '\n'
 }
 
 /**
- * Ensure every CAD-related pattern TrentCAD knows about is present in
+ * Ensure every CAD-related pattern FrameCAD knows about is present in
  * .gitattributes. Adds missing lines without rewriting any custom rules
  * the user added. Returns true if the file was modified.
  */
@@ -265,7 +265,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
 
   // Drop a README the first time around so the GitHub repo page has
   // useful onboarding for new teammates — including a one-click
-  // `trentcad://` link that opens TrentCAD straight into the Join flow.
+  // `framecad://` link that opens FrameCAD straight into the Join flow.
   const readmePath = path.join(dirPath, 'README.md')
   const readmeExists = await fs.stat(readmePath).then(() => true).catch(() => false)
   if (!readmeExists) {
@@ -277,7 +277,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
     // Commit may throw "nothing to commit" if create-project is re-run on an
     // already-initialised repo — treat that as success
     try {
-      await git.commit('Initialize TrentCAD project')
+      await git.commit('Initialize FrameCAD project')
     } catch { /* nothing to commit */ }
 
     if (remote) {
@@ -505,7 +505,7 @@ export async function openProject(dirPath: string): Promise<void> {
     const isRepo = await git.checkIsRepo()
     if (!isRepo) throw new Error('Not a Git repository')
 
-    // Auto-add any new CAD patterns introduced by a newer TrentCAD version
+    // Auto-add any new CAD patterns introduced by a newer FrameCAD version
     // so files added today never get the default text-merge treatment
     await ensureGitAttributes().catch(() => { /* best-effort */ })
   })
@@ -827,7 +827,7 @@ export async function publish(
           `GitHub will reject the push for any of these over 100 MB:\n\n${list}\n\n` +
           `Fix: either delete these files (installers and large zips usually ` +
           `don't belong in a CAD repo), or add the extension to .gitattributes ` +
-          `and re-stage them. TrentCAD now LFS-tracks zip/rar/7z/tar/gz/exe/msi ` +
+          `and re-stage them. FrameCAD now LFS-tracks zip/rar/7z/tar/gz/exe/msi ` +
           `out of the box, so this should auto-resolve on new projects.`
         onProgress?.({ phase: 'error', error: msg })
         return { success: false, error: msg }

@@ -8,7 +8,7 @@ using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using SolidWorks.Interop.swpublished;
 
-namespace TrentCAD.SolidWorksAddin
+namespace FrameCAD.SolidWorksAddin
 {
     [ComVisible(true)]
     [Guid("8A3F4B2E-1C5D-4E6F-9A7B-2D3E4F5A6B7C")]
@@ -38,8 +38,8 @@ namespace TrentCAD.SolidWorksAddin
             using (var key = Registry.LocalMachine.CreateSubKey(keyPath))
             {
                 key.SetValue(null, 1);
-                key.SetValue("Description", "TrentCAD - CAD Collaboration for FRC 2129");
-                key.SetValue("Title", "TrentCAD");
+                key.SetValue("Description", "FrameCAD - CAD Collaboration for FRC 2129");
+                key.SetValue("Title", "FrameCAD");
             }
         }
 
@@ -98,7 +98,7 @@ namespace TrentCAD.SolidWorksAddin
 
         /// <summary>
         /// Hook FileSavePostNotify on the currently-active PartDoc so that
-        /// every save automatically pushes the part's mass to TrentCAD's
+        /// every save automatically pushes the part's mass to FrameCAD's
         /// metadata. Assemblies and drawings are skipped (only parts have a
         /// single mass property). Called from OnActiveDocChange whenever
         /// the user switches documents.
@@ -140,7 +140,7 @@ namespace TrentCAD.SolidWorksAddin
 
         /// <summary>
         /// Read the saved part's mass via GetMassProperties2 and POST it
-        /// to TrentCAD's REST API. UseSystemUnits=true (SI/kg) so we know
+        /// to FrameCAD's REST API. UseSystemUnits=true (SI/kg) so we know
         /// what unit we're converting from, regardless of the document's
         /// configured units. Converts kg→lb and posts in pounds.
         ///
@@ -176,7 +176,7 @@ namespace TrentCAD.SolidWorksAddin
             {
                 // Any failure (model not fully loaded, units edge case,
                 // network drop) silently aborts — user can set mass
-                // manually via the TrentCAD app
+                // manually via the FrameCAD app
             }
         }
 
@@ -191,7 +191,7 @@ namespace TrentCAD.SolidWorksAddin
             _taskPaneControl.OnFillTitleBlock = FillActiveDrawingTitleBlock;
 
             // Task-pane chrome icon (the small bitmap SolidWorks shows next to
-            // "TrentCAD" in the right-side panel tabs). CreateTaskpaneView2
+            // "FrameCAD" in the right-side panel tabs). CreateTaskpaneView2
             // expects a 16x18 .bmp; we ship one rendered from the app logo
             // next to the DLL. Falls back to "" so SW shows its default
             // generic icon if the file is missing.
@@ -200,7 +200,7 @@ namespace TrentCAD.SolidWorksAddin
             var iconPath = System.IO.Path.Combine(dllDir ?? "", "taskpane-icon.bmp");
             if (!System.IO.File.Exists(iconPath)) iconPath = "";
 
-            _taskPaneView = _swApp.CreateTaskpaneView2(iconPath, "TrentCAD");
+            _taskPaneView = _swApp.CreateTaskpaneView2(iconPath, "FrameCAD");
 
             if (_taskPaneView != null)
             {
@@ -263,7 +263,7 @@ namespace TrentCAD.SolidWorksAddin
         ///
         /// Returns the count of properties successfully written. Properties
         /// with empty values are skipped (we don't want to wipe an
-        /// existing title-block value with a blank from TrentCAD).
+        /// existing title-block value with a blank from FrameCAD).
         ///
         /// **SW API caveat**: Add3 returns 0 on success and a small int
         /// otherwise — we treat any non-throw as success and let the
@@ -368,7 +368,7 @@ namespace TrentCAD.SolidWorksAddin
                 var doc = created as ModelDoc2;
                 if (doc == null) return "Unexpected document type from SolidWorks";
 
-                // Force IPS (inch / pound / second) on every part TrentCAD
+                // Force IPS (inch / pound / second) on every part FrameCAD
                 // creates. FRC teams build in pounds and inches; the team
                 // template might be MMGS or MKS, so we override here.
                 // SetUserPreferenceIntegerValue on the model affects only
@@ -405,7 +405,7 @@ namespace TrentCAD.SolidWorksAddin
 
         private async System.Threading.Tasks.Task StageFileViaApi(string relativePath)
         {
-            // Tell TrentCAD to git-add the new file so it's actively tracked
+            // Tell FrameCAD to git-add the new file so it's actively tracked
             try
             {
                 using (var client = new System.Net.Http.HttpClient(

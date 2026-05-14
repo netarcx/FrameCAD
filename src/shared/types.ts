@@ -138,7 +138,7 @@ export interface PartsManifest {
   assemblies: Record<string, string>
   /** When true, partNumbers are the file's base name (without
    *  extension) instead of a generated YY-team-XX-YYY number.
-   *  Auto-set when TrentCAD opens an existing project that has CAD
+   *  Auto-set when FrameCAD opens an existing project that has CAD
    *  files but no prior parts.json — preserves the team's existing
    *  naming so we don't rename or shadow files they've already built
    *  around. Toggleable from Project Settings; the underlying numbers
@@ -179,7 +179,7 @@ export interface AdminConfig {
   isCotsProject?: boolean
   /**
    * Optional override for where LFS object bytes are stored. When set,
-   * TrentCAD writes a `.lfsconfig` file at the project root pointing at
+   * FrameCAD writes a `.lfsconfig` file at the project root pointing at
    * this URL — git clone/pull/push respect it for LFS operations while
    * the repo itself stays on GitHub. Blank = use GitHub LFS (default).
    * Auth is left to the user via .netrc / git credential.
@@ -194,7 +194,7 @@ export interface AdminConfig {
 }
 
 /**
- * Settings that apply to the TrentCAD install as a whole, not to any
+ * Settings that apply to the FrameCAD install as a whole, not to any
  * single project. Defaults are baked in at build time from GH Actions
  * secrets; users override locally via the welcome-screen admin page
  * and their overrides persist across app updates.

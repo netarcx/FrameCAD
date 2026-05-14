@@ -1,7 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace TrentCAD.SolidWorksAddin
+namespace FrameCAD.SolidWorksAddin
 {
     public class PublishMessageDialog : Form
     {

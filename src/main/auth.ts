@@ -21,8 +21,8 @@ function run(cmd: string): Promise<string | null> {
 /**
  * Find the gh executable. Prefers `gh` if it's in PATH (works for most users
  * who installed GitHub CLI normally), but falls back to common install
- * locations because TrentCAD inherits the PATH it was launched with — if the
- * user installed gh AFTER opening TrentCAD, PATH won't have it yet.
+ * locations because FrameCAD inherits the PATH it was launched with — if the
+ * user installed gh AFTER opening FrameCAD, PATH won't have it yet.
  */
 async function locateGh(): Promise<string | null> {
   // 1. PATH lookup
@@ -160,7 +160,7 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
   if (!gh) {
     return {
       launched: false,
-      error: 'GitHub CLI not found. Install from https://cli.github.com and restart TrentCAD.'
+      error: 'GitHub CLI not found. Install from https://cli.github.com and restart FrameCAD.'
     }
   }
 
@@ -183,7 +183,7 @@ async function launchGhLoginWindows(gh: string): Promise<{ launched: boolean; er
     const scriptPath = path.join(os.tmpdir(), 'trentcad-gh-login.cmd')
     const script =
       '@echo off\r\n' +
-      'title TrentCAD GitHub Login\r\n' +
+      'title FrameCAD GitHub Login\r\n' +
       'echo Signing in to GitHub...\r\n' +
       'echo.\r\n' +
       `${quoteForCmd(gh)} auth login --web --git-protocol https --hostname github.com\r\n` +
@@ -214,7 +214,7 @@ async function launchGhLoginWindows(gh: string): Promise<{ launched: boolean; er
 async function launchGhLoginUnix(_gh: string): Promise<{ launched: boolean; error?: string }> {
   return {
     launched: false,
-    error: 'MANUAL_SIGNIN_REQUIRED:Open a terminal and run `gh auth login --web`, then click "Refresh status" in TrentCAD.'
+    error: 'MANUAL_SIGNIN_REQUIRED:Open a terminal and run `gh auth login --web`, then click "Refresh status" in FrameCAD.'
   }
 }
 
@@ -269,7 +269,7 @@ export async function createGitHubRepo(
 
   const visibility = isPrivate ? '--private' : '--public'
   // Quote description for shell — escape any embedded quotes
-  const desc = (description || 'TrentCAD project').replace(/"/g, '\\"')
+  const desc = (description || 'FrameCAD project').replace(/"/g, '\\"')
   const cmd = `${quoteForCmd(gh)} repo create ${org}/${name} ${visibility} --description "${desc}"`
   const output = await run(cmd)
   if (!output) {

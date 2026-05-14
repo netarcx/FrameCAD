@@ -3,23 +3,23 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 // Build-time injection of the admin-PIN hash. CI passes
-// TRENTCAD_ADMIN_PIN_HASH from a GitHub Actions secret; in dev / local
+// FRAMECAD_ADMIN_PIN_HASH from a GitHub Actions secret; in dev / local
 // builds the var is empty and the admin page opens without a PIN
 // prompt (so devs aren't locked out).
-const adminPinHash = JSON.stringify(process.env.TRENTCAD_ADMIN_PIN_HASH || '')
+const adminPinHash = JSON.stringify(process.env.FRAMECAD_ADMIN_PIN_HASH || '')
 
 // Build-time defaults for the global admin settings (Team + Browse).
 // Sourced from GH Actions secrets; local clients override these via the
 // welcome-screen admin page, and their overrides survive app updates
 // unless they explicitly Reset to team defaults.
-const defGhOrg = JSON.stringify(process.env.TRENTCAD_DEFAULT_GITHUB_ORG || '')
-const defPrefix = JSON.stringify(process.env.TRENTCAD_DEFAULT_PROJECT_PREFIX || '')
-const defTeam = JSON.stringify(process.env.TRENTCAD_DEFAULT_TEAM_NAME || '')
-const defWelcome = JSON.stringify(process.env.TRENTCAD_DEFAULT_WELCOME_MESSAGE || '')
+const defGhOrg = JSON.stringify(process.env.FRAMECAD_DEFAULT_GITHUB_ORG || '')
+const defPrefix = JSON.stringify(process.env.FRAMECAD_DEFAULT_PROJECT_PREFIX || '')
+const defTeam = JSON.stringify(process.env.FRAMECAD_DEFAULT_TEAM_NAME || '')
+const defWelcome = JSON.stringify(process.env.FRAMECAD_DEFAULT_WELCOME_MESSAGE || '')
 // Forks point auto-bug-reports at their own repo via this var so
 // upstream isn't flooded with team-specific issues. Falls back to the
 // upstream tracker in app code when unset.
-const defIssueRepo = JSON.stringify(process.env.TRENTCAD_DEFAULT_ISSUE_REPO || '')
+const defIssueRepo = JSON.stringify(process.env.FRAMECAD_DEFAULT_ISSUE_REPO || '')
 
 export default defineConfig({
   main: {
@@ -30,12 +30,12 @@ export default defineConfig({
       }
     },
     define: {
-      __TRENTCAD_ADMIN_PIN_HASH__: adminPinHash,
-      __TRENTCAD_DEFAULT_GITHUB_ORG__: defGhOrg,
-      __TRENTCAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
-      __TRENTCAD_DEFAULT_TEAM_NAME__: defTeam,
-      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome,
-      __TRENTCAD_DEFAULT_ISSUE_REPO__: defIssueRepo
+      __FRAMECAD_ADMIN_PIN_HASH__: adminPinHash,
+      __FRAMECAD_DEFAULT_GITHUB_ORG__: defGhOrg,
+      __FRAMECAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
+      __FRAMECAD_DEFAULT_TEAM_NAME__: defTeam,
+      __FRAMECAD_DEFAULT_WELCOME_MESSAGE__: defWelcome,
+      __FRAMECAD_DEFAULT_ISSUE_REPO__: defIssueRepo
     }
   },
   preload: {
@@ -64,12 +64,12 @@ export default defineConfig({
       }
     },
     define: {
-      __TRENTCAD_ADMIN_PIN_HASH__: adminPinHash,
-      __TRENTCAD_DEFAULT_GITHUB_ORG__: defGhOrg,
-      __TRENTCAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
-      __TRENTCAD_DEFAULT_TEAM_NAME__: defTeam,
-      __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: defWelcome,
-      __TRENTCAD_DEFAULT_ISSUE_REPO__: defIssueRepo
+      __FRAMECAD_ADMIN_PIN_HASH__: adminPinHash,
+      __FRAMECAD_DEFAULT_GITHUB_ORG__: defGhOrg,
+      __FRAMECAD_DEFAULT_PROJECT_PREFIX__: defPrefix,
+      __FRAMECAD_DEFAULT_TEAM_NAME__: defTeam,
+      __FRAMECAD_DEFAULT_WELCOME_MESSAGE__: defWelcome,
+      __FRAMECAD_DEFAULT_ISSUE_REPO__: defIssueRepo
     }
   }
 })

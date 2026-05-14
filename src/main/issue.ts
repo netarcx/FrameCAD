@@ -6,12 +6,12 @@ import { app } from 'electron'
 import { getBuildDefaultIssueRepo } from './branding'
 
 /**
- * Where bug reports go. TrentCAD's own repo, not the user's project repo —
- * project bugs and TrentCAD bugs are different things. Forks override
- * the default via the TRENTCAD_DEFAULT_ISSUE_REPO env var at build time
+ * Where bug reports go. FrameCAD's own repo, not the user's project repo —
+ * project bugs and FrameCAD bugs are different things. Forks override
+ * the default via the FRAMECAD_DEFAULT_ISSUE_REPO env var at build time
  * so their auto-reports land in their own tracker instead of upstream.
  */
-const ISSUE_REPO = getBuildDefaultIssueRepo() || 'netarcx/TrentCAD'
+const ISSUE_REPO = getBuildDefaultIssueRepo() || 'netarcx/FrameCAD'
 const ISSUE_LABEL = 'auto-report'
 
 export interface ReportIssueResult {
@@ -85,7 +85,7 @@ function buildBody(errorMessage: string, ghUser?: string): string {
     errorMessage,
     '```',
     '',
-    '<sub>Auto-reported from the TrentCAD error banner. The user clicked "Report" — no other context provided.</sub>'
+    '<sub>Auto-reported from the FrameCAD error banner. The user clicked "Report" — no other context provided.</sub>'
   ].filter(line => line !== '').join('\n')
 }
 

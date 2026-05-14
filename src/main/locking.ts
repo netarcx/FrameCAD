@@ -6,7 +6,7 @@ import { getGit } from './git'
  * the lock; surfaces a clear "already checked out by <name>" error
  * when someone else holds it. Without this wrapper the LFS CLI's raw
  * "Lock exists" message lands in the UI verbatim — which auto-reported
- * as issue #1 (https://github.com/netarcx/TrentCAD/issues/1).
+ * as issue #1 (https://github.com/netarcx/FrameCAD/issues/1).
  */
 export async function checkOut(filePath: string): Promise<void> {
   const g = getGit()

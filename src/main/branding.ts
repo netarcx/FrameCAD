@@ -7,9 +7,9 @@
  * (e.g. unit tests, the parts.ts default-prefix helper).
  */
 
-declare const __TRENTCAD_DEFAULT_PROJECT_PREFIX__: string
-declare const __TRENTCAD_DEFAULT_TEAM_NAME__: string
-declare const __TRENTCAD_DEFAULT_ISSUE_REPO__: string
+declare const __FRAMECAD_DEFAULT_PROJECT_PREFIX__: string
+declare const __FRAMECAD_DEFAULT_TEAM_NAME__: string
+declare const __FRAMECAD_DEFAULT_ISSUE_REPO__: string
 
 function pick(v: string | undefined): string | null {
   if (typeof v !== 'string') return null
@@ -19,24 +19,24 @@ function pick(v: string | undefined): string | null {
 
 export function getBuildDefaultPrefix(): string | null {
   try {
-    if (typeof __TRENTCAD_DEFAULT_PROJECT_PREFIX__ === 'undefined') return null
-    return pick(__TRENTCAD_DEFAULT_PROJECT_PREFIX__)
+    if (typeof __FRAMECAD_DEFAULT_PROJECT_PREFIX__ === 'undefined') return null
+    return pick(__FRAMECAD_DEFAULT_PROJECT_PREFIX__)
   } catch { return null }
 }
 
 export function getBuildDefaultTeamName(): string | null {
   try {
-    if (typeof __TRENTCAD_DEFAULT_TEAM_NAME__ === 'undefined') return null
-    return pick(__TRENTCAD_DEFAULT_TEAM_NAME__)
+    if (typeof __FRAMECAD_DEFAULT_TEAM_NAME__ === 'undefined') return null
+    return pick(__FRAMECAD_DEFAULT_TEAM_NAME__)
   } catch { return null }
 }
 
 /** Bug-report destination repo (`owner/name`). Forks override via the
- *  TRENTCAD_DEFAULT_ISSUE_REPO env var. Returns null if unset so the
+ *  FRAMECAD_DEFAULT_ISSUE_REPO env var. Returns null if unset so the
  *  caller can fall back to the upstream tracker. */
 export function getBuildDefaultIssueRepo(): string | null {
   try {
-    if (typeof __TRENTCAD_DEFAULT_ISSUE_REPO__ === 'undefined') return null
-    return pick(__TRENTCAD_DEFAULT_ISSUE_REPO__)
+    if (typeof __FRAMECAD_DEFAULT_ISSUE_REPO__ === 'undefined') return null
+    return pick(__FRAMECAD_DEFAULT_ISSUE_REPO__)
   } catch { return null }
 }

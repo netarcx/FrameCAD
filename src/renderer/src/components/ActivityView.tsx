@@ -18,7 +18,7 @@ interface ClassifiedEvent {
 
 function classify(entry: HistoryEntry): ClassifiedEvent {
   const msg = entry.message.trim()
-  if (msg === 'Initialize TrentCAD project') {
+  if (msg === 'Initialize FrameCAD project') {
     return { entry, kind: 'init', label: 'Project created', Icon: Sparkles, cleanMessage: '' }
   }
   if (msg.startsWith('[admin]')) {

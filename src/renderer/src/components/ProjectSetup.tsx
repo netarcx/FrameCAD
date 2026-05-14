@@ -22,8 +22,8 @@ interface Props {
    */
   globalAdmin?: GlobalAdminConfig
   /** When set, jump straight into the Join Project flow with this URL
-   *  prefilled. Used by the trentcad:// deep-link handler so README
-   *  "Open in TrentCAD" links land on a ready-to-go join form. */
+   *  prefilled. Used by the framecad:// deep-link handler so README
+   *  "Open in FrameCAD" links land on a ready-to-go join form. */
   prefilledJoinUrl?: string | null
   /** Monotonic counter bumped on every deep-link arrival so the same
    *  URL can re-trigger the prefill (e.g. user backs out then clicks
@@ -82,7 +82,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
       const result = await window.api.githubLogin()
       if (result.launched) {
         setSignInPending(true)
-        setResetupMsg('Sign-in opened in a new window. Finish there — TrentCAD will detect it automatically.')
+        setResetupMsg('Sign-in opened in a new window. Finish there — FrameCAD will detect it automatically.')
       } else if (result.error?.startsWith('MANUAL_SIGNIN_REQUIRED:')) {
         // Mac/Linux: we can't reliably spawn a terminal, so we tell the
         // user to run the command themselves. Strip the sentinel prefix.
@@ -229,10 +229,10 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
           ref={logoRef}
           className="setup-logo"
           src={logoUrl}
-          alt="TrentCAD"
+          alt="FrameCAD"
           onClick={onLogoClick}
         />
-        <h1>TrentCAD</h1>
+        <h1>FrameCAD</h1>
         <p className="subtitle">{globalAdmin?.teamName ? `CAD collaboration for ${globalAdmin.teamName}` : 'CAD collaboration for FRC teams'}</p>
         {pinnedProjects.length > 0 && (
           <div className="pinned-projects">
@@ -461,7 +461,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
                   const repoName = `${projectPrefix}${safeName}`
                   try {
                     const result = await window.api.createGitHubRepo(
-                      orgConfigured, repoName, true, `TrentCAD project — ${name}`
+                      orgConfigured, repoName, true, `FrameCAD project — ${name}`
                     )
                     if (!result.success || !result.url) {
                       setCreateMsg('✗ ' + (result.error || 'Could not create repo on GitHub'))

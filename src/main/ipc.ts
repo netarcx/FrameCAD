@@ -90,7 +90,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
   let currentProject: ProjectConfig | null = null
 
   // Let the REST server bring the main window forward when the SW
-  // add-in's "Show in TrentCAD" button is clicked
+  // add-in's "Show in FrameCAD" button is clicked
   setRestMainWindow(getMainWindow)
 
   ipcMain.handle('create-project', async (_e, name: string, dirPath: string, remote: string, isCotsProject?: boolean) => {
@@ -152,7 +152,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     if (result.success && result.filesUpdated > 0 && Notification.isSupported()) {
       try {
         new Notification({
-          title: 'TrentCAD — Downloaded',
+          title: 'FrameCAD — Downloaded',
           body: `${result.filesUpdated} file${result.filesUpdated === 1 ? '' : 's'} updated from the team`,
           silent: false
         }).show()
@@ -292,7 +292,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     try {
       const cfg = await import('./git').then(m => m.getGit())
       const raw = await cfg.raw(['config', '--get', 'user.name']).catch(() => '')
-      const generatedBy = raw.trim() || 'TrentCAD'
+      const generatedBy = raw.trim() || 'FrameCAD'
       return generateDocument(type, generatedBy)
     } catch (err) {
       return { success: false, error: (err as Error).message }

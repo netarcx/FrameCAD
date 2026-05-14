@@ -12,7 +12,7 @@ const MAX_BODY_SIZE = 1024 * 64 // 64 KB
 let server: http.Server | null = null
 let currentProject: ProjectConfig | null = null
 let activePort: number | null = null
-/** Set by setupIpc so the SW add-in can request TrentCAD's main window come to the front. */
+/** Set by setupIpc so the SW add-in can request FrameCAD's main window come to the front. */
 let getMainWindowRef: (() => BrowserWindow | null) | null = null
 
 interface PendingCreate {
@@ -250,8 +250,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       }
 
       case 'POST /api/focus': {
-        // Bring TrentCAD's main window to the foreground. Used by the
-        // SW add-in's "Show in TrentCAD" button so the user doesn't
+        // Bring FrameCAD's main window to the foreground. Used by the
+        // SW add-in's "Show in FrameCAD" button so the user doesn't
         // have to alt-tab to find it.
         const win = getMainWindowRef?.()
         if (win && !win.isDestroyed()) {
@@ -260,7 +260,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           win.focus()
           json(res, 200, { success: true })
         } else {
-          json(res, 503, { success: false, error: 'TrentCAD window unavailable' })
+          json(res, 503, { success: false, error: 'FrameCAD window unavailable' })
         }
         return
       }
@@ -323,7 +323,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           const linkedMeta = await meta.getPartMeta(linkedPath).catch(() => ({}))
           // Designer = the user who's about to publish. git config
           // user.name is the right field — same one used as commit
-          // author throughout TrentCAD.
+          // author throughout FrameCAD.
           const identity = await gitOps.getGitIdentity().catch(() => ({ name: '', email: '' }))
           const today = new Date()
           const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -362,7 +362,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
       case 'POST /api/manufacturing-method': {
         // SolidWorks add-in sets manufacturing method directly so the
-        // designer doesn't have to alt-tab to TrentCAD to make their
+        // designer doesn't have to alt-tab to FrameCAD to make their
         // part show up on the shop-floor queue.
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string; method?: string | null } | null
@@ -483,7 +483,7 @@ export function startRestServer(project?: ProjectConfig, port?: number): void {
 
   if (server) return
 
-  activePort = port || Number(process.env.TRENTCAD_API_PORT) || DEFAULT_PORT
+  activePort = port || Number(process.env.FRAMECAD_API_PORT) || DEFAULT_PORT
 
   server = http.createServer((req, res) => {
     handleRequest(req, res).catch(() => {
@@ -492,7 +492,7 @@ export function startRestServer(project?: ProjectConfig, port?: number): void {
   })
 
   server.listen(activePort, '127.0.0.1', () => {
-    console.log(`TrentCAD REST API running on http://127.0.0.1:${activePort}`)
+    console.log(`FrameCAD REST API running on http://127.0.0.1:${activePort}`)
   })
 
   server.on('error', (err) => {

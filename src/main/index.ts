@@ -16,11 +16,11 @@ let mainWindow: BrowserWindow | null = null
 // once it has mounted.
 let pendingDeepLink: string | null = null
 
-function parseTrentCADUrl(rawUrl: string): { action: 'join'; url: string } | null {
+function parseFrameCADUrl(rawUrl: string): { action: 'join'; url: string } | null {
   try {
     const u = new URL(rawUrl)
-    if (u.protocol !== 'trentcad:') return null
-    // Both `trentcad://join?url=...` (host=join) and `trentcad:join?url=...`
+    if (u.protocol !== 'framecad:') return null
+    // Both `framecad://join?url=...` (host=join) and `framecad:join?url=...`
     // (pathname=join) are valid depending on the platform's URL parser.
     const action = u.hostname || u.pathname.replace(/^\/+/, '').split('/')[0]
     if (action === 'join') {
@@ -36,7 +36,7 @@ function parseTrentCADUrl(rawUrl: string): { action: 'join'; url: string } | nul
 
 function handleDeepLink(rawUrl: string | undefined): void {
   if (!rawUrl) return
-  const parsed = parseTrentCADUrl(rawUrl)
+  const parsed = parseFrameCADUrl(rawUrl)
   if (!parsed) return
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore()
@@ -48,18 +48,18 @@ function handleDeepLink(rawUrl: string | undefined): void {
   }
 }
 
-// Register the trentcad:// scheme so README "Open in TrentCAD" links
+// Register the framecad:// scheme so README "Open in FrameCAD" links
 // route back to the app. On Windows this writes to the registry on first
 // run; on macOS it relies on Info.plist (set via electron-builder).
-if (!app.isDefaultProtocolClient('trentcad')) {
+if (!app.isDefaultProtocolClient('framecad')) {
   if (process.platform === 'win32' && process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('trentcad', process.execPath, [path.resolve(process.argv[1])])
+    app.setAsDefaultProtocolClient('framecad', process.execPath, [path.resolve(process.argv[1])])
   } else {
-    app.setAsDefaultProtocolClient('trentcad')
+    app.setAsDefaultProtocolClient('framecad')
   }
 }
 
-// Single-instance lock: a second launch (typically from a trentcad:// URL
+// Single-instance lock: a second launch (typically from a framecad:// URL
 // on Windows/Linux) shovels its argv into the existing instance.
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -72,7 +72,7 @@ if (!gotLock) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    const url = argv.find(a => a.startsWith('trentcad://'))
+    const url = argv.find(a => a.startsWith('framecad://'))
     handleDeepLink(url)
   })
 }
@@ -93,7 +93,7 @@ function createWindow(): void {
     // without things colliding.
     minWidth: 960,
     minHeight: 600,
-    title: 'TrentCAD',
+    title: 'FrameCAD',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -102,7 +102,7 @@ function createWindow(): void {
   })
 
   // Drop the default Electron File/Edit/View menu so students don't see a
-  // distracting menu bar — TrentCAD's own UI exposes everything they need
+  // distracting menu bar — FrameCAD's own UI exposes everything they need
   Menu.setApplicationMenu(null)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -128,11 +128,11 @@ function createWindow(): void {
       e.preventDefault()
       const choice = dialog.showMessageBoxSync(mainWindow, {
         type: 'warning',
-        buttons: ['Keep TrentCAD open', 'Close anyway'],
+        buttons: ['Keep FrameCAD open', 'Close anyway'],
         defaultId: 0,
         cancelId: 0,
         title: 'Upload in progress',
-        message: 'TrentCAD is uploading parts to GitHub.',
+        message: 'FrameCAD is uploading parts to GitHub.',
         detail: 'Closing now will interrupt the upload. Files that have already been uploaded will be safe, but anything still in flight will need to be re-uploaded on the next attempt.'
       })
       if (choice === 1) {
@@ -151,7 +151,7 @@ setupIpc(() => mainWindow)
 
 ipcMain.handle('consume-pending-deep-link', () => {
   if (!pendingDeepLink) return null
-  const parsed = parseTrentCADUrl(pendingDeepLink)
+  const parsed = parseFrameCADUrl(pendingDeepLink)
   pendingDeepLink = null
   return parsed
 })
@@ -161,7 +161,7 @@ app.whenReady().then(() => {
   // Capture before createWindow so handleDeepLink can stash it for the
   // renderer to consume once mounted.
   if (process.platform !== 'darwin') {
-    const url = process.argv.find(a => a.startsWith('trentcad://'))
+    const url = process.argv.find(a => a.startsWith('framecad://'))
     if (url) pendingDeepLink = url
   }
   createWindow()

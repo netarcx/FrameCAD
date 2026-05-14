@@ -5,7 +5,7 @@ REM for bundling into the Windows installer.
 setlocal
 set ROOT=%~dp0..
 set OUTPUT=%ROOT%\build\solidworks-addin
-set PROJECT=%ROOT%\solidworks-addin\TrentCAD.SolidWorksAddin\TrentCAD.SolidWorksAddin.csproj
+set PROJECT=%ROOT%\solidworks-addin\FrameCAD.SolidWorksAddin\FrameCAD.SolidWorksAddin.csproj
 
 echo Building SolidWorks add-in for installer...
 if exist "%OUTPUT%" rmdir /s /q "%OUTPUT%"

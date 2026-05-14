@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What is TrentCAD
+## What is FrameCAD
 
 A desktop CAD collaboration tool built for FRC Team 2129. Wraps Git LFS with a user-friendly UI so SolidWorks users can share files without learning Git. Uses check-out/check-in (lock-based) collaboration like GrabCAD Workbench. GitHub is the Git host.
 
@@ -33,7 +33,7 @@ npm run package    # Build + create installer (outputs to dist/)
 - `hooks/useGit.ts` — Single hook managing all project state and IPC calls
 - Components: `ProjectSetup` (create/join/open wizard), `ProjectBrowser` (full-width file table with Name/Part #/Status/Checked Out By columns), `Toolbar` (sync/publish/check-out/check-in/new part/new assembly), `ActivityFeed` (collapsible bottom panel), `DetailsPanel` (right sidebar for selected file info)
 
-**SolidWorks add-in** (`solidworks-addin/`) — C# add-in (.NET Framework 4.8) that integrates with SolidWorks via COM. Communicates with TrentCAD's REST API to show part numbers, file status, and enable check-out/check-in/sync/publish from within SolidWorks.
+**SolidWorks add-in** (`solidworks-addin/`) — C# add-in (.NET Framework 4.8) that integrates with SolidWorks via COM. Communicates with FrameCAD's REST API to show part numbers, file status, and enable check-out/check-in/sync/publish from within SolidWorks.
 
 **Shared types** in `src/shared/types.ts` — used by both main and renderer.
 
@@ -76,7 +76,7 @@ The file browser is the central element (full-width table, not a sidebar tree). 
 - HTTP server on `127.0.0.1:42129` (localhost only), starts when a project is open
 - Endpoints: `/api/health`, `/api/status`, `/api/file?path=`, `/api/checkout`, `/api/checkin`, `/api/sync`, `/api/publish`, `/api/locks`, `/api/parts`
 - Write operations are serialized via a mutex to prevent concurrent git commands
-- Port configurable via `TRENTCAD_API_PORT` environment variable
+- Port configurable via `FRAMECAD_API_PORT` environment variable
 
 ## SolidWorks Add-in (Phase 3)
 
@@ -85,8 +85,8 @@ The file browser is the central element (full-width table, not a sidebar tree). 
 - Task pane shows: part number, file status, lock state for the active document
 - Buttons: Check Out, Check In, Sync, Publish
 - Auto-refreshes on document switch via `ActiveDocChangeNotify`
-- Health polling every 5 seconds to detect TrentCAD connection
-- Build with Visual Studio on Windows: open `solidworks-addin/TrentCAD.SolidWorksAddin.sln`
+- Health polling every 5 seconds to detect FrameCAD connection
+- Build with Visual Studio on Windows: open `solidworks-addin/FrameCAD.SolidWorksAddin.sln`
 
 ## Dev Notes
 

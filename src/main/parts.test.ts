@@ -331,8 +331,8 @@ describe('parts module (with temp project dir)', () => {
       expect(manifest.legacyMode).toBeFalsy()
     })
 
-    it('does NOT flip an existing TrentCAD project into legacy mode', async () => {
-      // Pre-existing project with one TrentCAD-style entry already in
+    it('does NOT flip an existing FrameCAD project into legacy mode', async () => {
+      // Pre-existing project with one FrameCAD-style entry already in
       // the manifest — even if the user later adds non-scheme files,
       // legacyMode stays off so we don't silently rename.
       await fs.writeFile(

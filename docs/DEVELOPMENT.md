@@ -1,6 +1,6 @@
-# TrentCAD — Developer Documentation
+# FrameCAD — Developer Documentation
 
-Architecture, build flow, REST API reference, and integration details for everyone working on TrentCAD itself or wiring an external tool to it.
+Architecture, build flow, REST API reference, and integration details for everyone working on FrameCAD itself or wiring an external tool to it.
 
 For end-user docs see the [README](../README.md). For student onboarding see [STUDENT_SETUP.md](STUDENT_SETUP.md).
 
@@ -67,11 +67,11 @@ Files overwrite on each regeneration. Ride along on the next publish so the buil
 - Displays the active document's part number, file status, and lock state
 - Check Out, Check In, Download, and Upload buttons available without leaving SolidWorks
 - Auto-refreshes when switching between documents (`ActiveDocChangeNotify`)
-- Communicates with TrentCAD's local REST API (no direct Git operations)
+- Communicates with FrameCAD's local REST API (no direct Git operations)
 
 ### Self-hosted LFS storage (opt-in)
 
-Per-project field in admin settings. When set, TrentCAD writes a `.lfsconfig` at the project root pointing at a custom LFS server (rudolfs, giftless, Gitea, GitLab, etc.). Git push/pull still go to GitHub, only the LFS object bytes change hosts. Blank = use GitHub LFS (default). Auth is left to the user via `.netrc` / git credential helpers.
+Per-project field in admin settings. When set, FrameCAD writes a `.lfsconfig` at the project root pointing at a custom LFS server (rudolfs, giftless, Gitea, GitLab, etc.). Git push/pull still go to GitHub, only the LFS object bytes change hosts. Blank = use GitHub LFS (default). Auth is left to the user via `.netrc` / git credential helpers.
 
 ### REST API
 
@@ -91,8 +91,8 @@ Per-project field in admin settings. When set, TrentCAD writes a `.lfsconfig` at
 ### Installation
 
 ```bash
-git clone https://github.com/netarcx/TrentCAD.git
-cd TrentCAD
+git clone https://github.com/netarcx/FrameCAD.git
+cd FrameCAD
 npm install
 ```
 
@@ -162,10 +162,10 @@ src/
         global.css              # All styles
 
 solidworks-addin/               # C# SolidWorks add-in (separate project, Windows-only)
-  TrentCAD.SolidWorksAddin/
+  FrameCAD.SolidWorksAddin/
     SwAddin.cs                  # COM entry point, Task Pane creation
     TaskPaneControl.cs          # WinForms UI with status display + buttons
-    TrentCadApiClient.cs        # HTTP client for TrentCAD REST API
+    FrameCadApiClient.cs        # HTTP client for FrameCAD REST API
     PublishMessageDialog.cs     # Commit message input dialog
 ```
 
@@ -186,9 +186,9 @@ Renderer (React)  ──IPC──>  Main Process (ipc.ts)
 
 ## Git-to-CAD terminology
 
-TrentCAD deliberately hides Git terminology to be approachable for CAD users:
+FrameCAD deliberately hides Git terminology to be approachable for CAD users:
 
-| Git Term | TrentCAD Term |
+| Git Term | FrameCAD Term |
 |----------|---------------|
 | Repository | Project |
 | Clone | Join Project |
@@ -200,7 +200,7 @@ TrentCAD deliberately hides Git terminology to be approachable for CAD users:
 
 ## REST API reference
 
-All endpoints are served on `http://127.0.0.1:42129` (configurable via `TRENTCAD_API_PORT` env var). The server starts automatically when a project is opened.
+All endpoints are served on `http://127.0.0.1:42129` (configurable via `FRAMECAD_API_PORT` env var). The server starts automatically when a project is opened.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -221,19 +221,19 @@ Write operations (`checkout`, `checkin`, `sync`, `publish`, `stage`) are seriali
 
 ### Option 1: Use the Windows installer (recommended)
 
-The Windows installer auto-registers the add-in via `RegAsm.exe`. Restart SolidWorks after installing — the TrentCAD pane appears in the right Task Pane.
+The Windows installer auto-registers the add-in via `RegAsm.exe`. Restart SolidWorks after installing — the FrameCAD pane appears in the right Task Pane.
 
 ### Option 2: Manual install from GitHub Actions artifact
 
 The add-in is built automatically by GitHub Actions on every push.
 
-1. Go to **Actions** → the latest **Build & Release** run → download the **TrentCAD-SolidWorksAddin** artifact
-2. Extract the zip to a permanent folder (e.g., `C:\TrentCAD-Addin\`)
+1. Go to **Actions** → the latest **Build & Release** run → download the **FrameCAD-SolidWorksAddin** artifact
+2. Extract the zip to a permanent folder (e.g., `C:\FrameCAD-Addin\`)
 3. Open a Command Prompt **as Administrator** and run:
    ```batch
-   %windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase "C:\TrentCAD-Addin\TrentCAD.SolidWorksAddin.dll"
+   %windir%\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe /codebase "C:\FrameCAD-Addin\FrameCAD.SolidWorksAddin.dll"
    ```
-4. Restart SolidWorks — the TrentCAD pane appears in the Task Pane
+4. Restart SolidWorks — the FrameCAD pane appears in the Task Pane
 
 ### Option 3: Build locally
 
@@ -241,14 +241,14 @@ Requires the [.NET SDK](https://dotnet.microsoft.com/download) and [.NET Framewo
 
 ```batch
 cd solidworks-addin
-dotnet publish TrentCAD.SolidWorksAddin/TrentCAD.SolidWorksAddin.csproj -c Release -o build/solidworks-addin
+dotnet publish FrameCAD.SolidWorksAddin/FrameCAD.SolidWorksAddin.csproj -c Release -o build/solidworks-addin
 ```
 
 Then run RegAsm.exe as in Option 2.
 
 ### Usage
 
-The add-in requires TrentCAD (the Electron app) to be running with a project open — it communicates via the REST API on port 42129. The connection indicator in the pane shows green when connected.
+The add-in requires FrameCAD (the Electron app) to be running with a project open — it communicates via the REST API on port 42129. The connection indicator in the pane shows green when connected.
 
 ## Admin page
 
@@ -259,23 +259,23 @@ Access via **Ctrl+Shift+A** from anywhere in the app. The admin page is mode-awa
 
 ### PIN gate
 
-Optional. When the `TRENTCAD_ADMIN_PIN_HASH` GitHub Actions secret is set (lowercase SHA-256 hex of the team admin PIN), Ctrl+Shift+A prompts for a PIN before opening. Hash is baked into the installer at build time and verified in the main process — never exposed to the renderer.
+Optional. When the `FRAMECAD_ADMIN_PIN_HASH` GitHub Actions secret is set (lowercase SHA-256 hex of the team admin PIN), Ctrl+Shift+A prompts for a PIN before opening. Hash is baked into the installer at build time and verified in the main process — never exposed to the renderer.
 
 To generate the hash:
 ```bash
 node -e "console.log(require('crypto').createHash('sha256').update('YOUR-PIN').digest('hex'))"
 ```
 
-Then add the result to the repo's GitHub Actions secrets as `TRENTCAD_ADMIN_PIN_HASH`. Empty / unset = no PIN gate (dev mode).
+Then add the result to the repo's GitHub Actions secrets as `FRAMECAD_ADMIN_PIN_HASH`. Empty / unset = no PIN gate (dev mode).
 
 ### Other build-time secrets
 
 The CI workflow consumes these GitHub Actions secrets to bake defaults into the installer:
 
-- `TRENTCAD_DEFAULT_GITHUB_ORG` — team's GitHub organisation (e.g. `netarcx`)
-- `TRENTCAD_DEFAULT_PROJECT_PREFIX` — repo name prefix for filtering Browse (e.g. `trentcad-`)
-- `TRENTCAD_DEFAULT_TEAM_NAME` — team display name
-- `TRENTCAD_DEFAULT_WELCOME_MESSAGE` — optional welcome text on the setup screen
+- `FRAMECAD_DEFAULT_GITHUB_ORG` — team's GitHub organisation (e.g. `netarcx`)
+- `FRAMECAD_DEFAULT_PROJECT_PREFIX` — repo name prefix for filtering Browse (e.g. `trentcad-`)
+- `FRAMECAD_DEFAULT_TEAM_NAME` — team display name
+- `FRAMECAD_DEFAULT_WELCOME_MESSAGE` — optional welcome text on the setup screen
 
 ## Tech stack
 
@@ -290,7 +290,7 @@ The CI workflow consumes these GitHub Actions secrets to bake defaults into the 
 
 ## LFS-tracked file types
 
-TrentCAD automatically configures Git LFS tracking for these file types when creating a project. Existing projects get them appended to `.gitattributes` on the next open.
+FrameCAD automatically configures Git LFS tracking for these file types when creating a project. Existing projects get them appended to `.gitattributes` on the next open.
 
 | Category | Extensions |
 |----------|------------|
@@ -304,4 +304,4 @@ Archives and installers are LFS-tracked defensively — they don't really belong
 
 ## License
 
-Source-available for FRC team use. No license file is currently included — if you're a mentor on another team interested in using TrentCAD, open an issue and we'll talk.
+Source-available for FRC team use. No license file is currently included — if you're a mentor on another team interested in using FrameCAD, open an issue and we'll talk.

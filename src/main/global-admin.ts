@@ -2,10 +2,10 @@ import { app } from 'electron'
 import path from 'path'
 import { promises as fs } from 'fs'
 
-declare const __TRENTCAD_DEFAULT_GITHUB_ORG__: string
-declare const __TRENTCAD_DEFAULT_PROJECT_PREFIX__: string
-declare const __TRENTCAD_DEFAULT_TEAM_NAME__: string
-declare const __TRENTCAD_DEFAULT_WELCOME_MESSAGE__: string
+declare const __FRAMECAD_DEFAULT_GITHUB_ORG__: string
+declare const __FRAMECAD_DEFAULT_PROJECT_PREFIX__: string
+declare const __FRAMECAD_DEFAULT_TEAM_NAME__: string
+declare const __FRAMECAD_DEFAULT_WELCOME_MESSAGE__: string
 
 export interface GlobalAdminConfig {
   teamName?: string
@@ -45,13 +45,13 @@ function readDefine(name: string, val: string | undefined): string | undefined {
 function buildDefaults(): GlobalAdminConfig {
   return {
     gitHubOrg: readDefine('GH_ORG',
-      typeof __TRENTCAD_DEFAULT_GITHUB_ORG__ !== 'undefined' ? __TRENTCAD_DEFAULT_GITHUB_ORG__ : undefined),
+      typeof __FRAMECAD_DEFAULT_GITHUB_ORG__ !== 'undefined' ? __FRAMECAD_DEFAULT_GITHUB_ORG__ : undefined),
     projectPrefix: readDefine('PREFIX',
-      typeof __TRENTCAD_DEFAULT_PROJECT_PREFIX__ !== 'undefined' ? __TRENTCAD_DEFAULT_PROJECT_PREFIX__ : undefined),
+      typeof __FRAMECAD_DEFAULT_PROJECT_PREFIX__ !== 'undefined' ? __FRAMECAD_DEFAULT_PROJECT_PREFIX__ : undefined),
     teamName: readDefine('TEAM',
-      typeof __TRENTCAD_DEFAULT_TEAM_NAME__ !== 'undefined' ? __TRENTCAD_DEFAULT_TEAM_NAME__ : undefined),
+      typeof __FRAMECAD_DEFAULT_TEAM_NAME__ !== 'undefined' ? __FRAMECAD_DEFAULT_TEAM_NAME__ : undefined),
     welcomeMessage: readDefine('WELCOME',
-      typeof __TRENTCAD_DEFAULT_WELCOME_MESSAGE__ !== 'undefined' ? __TRENTCAD_DEFAULT_WELCOME_MESSAGE__ : undefined),
+      typeof __FRAMECAD_DEFAULT_WELCOME_MESSAGE__ !== 'undefined' ? __FRAMECAD_DEFAULT_WELCOME_MESSAGE__ : undefined),
   }
 }
 

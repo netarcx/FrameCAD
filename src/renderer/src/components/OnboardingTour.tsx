@@ -6,7 +6,7 @@ interface Props {
 
 const STEPS = [
   {
-    title: 'Welcome to TrentCAD',
+    title: 'Welcome to FrameCAD',
     body: 'A quick tour of the buttons you\'ll use every day. Takes about 30 seconds.'
   },
   {
@@ -15,7 +15,7 @@ const STEPS = [
   },
   {
     title: '+ Part / + Assembly',
-    body: 'Reserves a unique part number and creates a new SolidWorks document for you to edit. Saves you typing the filename — TrentCAD generates year-team-subsystem-part numbers automatically based on your team\'s prefix.'
+    body: 'Reserves a unique part number and creates a new SolidWorks document for you to edit. Saves you typing the filename — FrameCAD generates year-team-subsystem-part numbers automatically based on your team\'s prefix.'
   },
   {
     title: 'Check Out, then Check In',
@@ -27,7 +27,7 @@ const STEPS = [
   },
   {
     title: 'Need help?',
-    body: 'Full setup and workflow guide at github.com/netarcx/TrentCAD/blob/main/docs/STUDENT_SETUP.md. Ask your CAD lead if anything looks broken.'
+    body: 'Full setup and workflow guide at github.com/netarcx/FrameCAD/blob/main/docs/STUDENT_SETUP.md. Ask your CAD lead if anything looks broken.'
   }
 ]
 

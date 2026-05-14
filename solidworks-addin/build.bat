@@ -2,7 +2,7 @@
 setlocal
 
 REM ──────────────────────────────────────────────────────────────────────
-REM  TrentCAD SolidWorks Add-in Build Script
+REM  FrameCAD SolidWorks Add-in Build Script
 REM  Builds and optionally registers the add-in without Visual Studio.
 REM
 REM  Prerequisites (one-time):
@@ -17,9 +17,9 @@ REM    build.bat /register    Build + register COM add-in (requires Admin)
 REM    build.bat /unregister  Unregister the COM add-in (requires Admin)
 REM ──────────────────────────────────────────────────────────────────────
 
-set PROJECT=TrentCAD.SolidWorksAddin\TrentCAD.SolidWorksAddin.csproj
+set PROJECT=FrameCAD.SolidWorksAddin\FrameCAD.SolidWorksAddin.csproj
 set OUTPUT=%~dp0publish
-set DLL=%OUTPUT%\TrentCAD.SolidWorksAddin.dll
+set DLL=%OUTPUT%\FrameCAD.SolidWorksAddin.dll
 
 if /i "%~1"=="/unregister" (
     echo Unregistering add-in...
@@ -28,7 +28,7 @@ if /i "%~1"=="/unregister" (
     exit /b %ERRORLEVEL%
 )
 
-echo Building TrentCAD SolidWorks Add-in...
+echo Building FrameCAD SolidWorks Add-in...
 dotnet publish "%~dp0%PROJECT%" -c Release -o "%OUTPUT%"
 if %ERRORLEVEL% neq 0 (
     echo.

@@ -221,7 +221,7 @@ function buildSummaryMarkdown(
   const lines: string[] = []
   lines.push(`# Project Summary`)
   lines.push('')
-  lines.push(`*Generated ${dateStamp()} by ${generatedBy || 'TrentCAD'}*`)
+  lines.push(`*Generated ${dateStamp()} by ${generatedBy || 'FrameCAD'}*`)
   lines.push('')
   lines.push(`## Totals`)
   lines.push('')
@@ -322,7 +322,7 @@ function buildBomHtml(rows: JoinedRow[], generatedBy: string): string {
   </tr>`).join('')
   const body = `
     <h1>Bill of Materials</h1>
-    <div class="meta">Generated ${dateStamp()} by ${escapeHtml(generatedBy || 'TrentCAD')} · ${rows.length} entries</div>
+    <div class="meta">Generated ${dateStamp()} by ${escapeHtml(generatedBy || 'FrameCAD')} · ${rows.length} entries</div>
     <table>
       <thead><tr>
         <th class="pn">Part #</th><th>File</th><th>Type</th><th>Subsystem</th>
@@ -380,7 +380,7 @@ function buildManufacturingHtml(rows: JoinedRow[], generatedBy: string): string 
 
   const body = `
     <h1>Manufacturing Queue</h1>
-    <div class="meta">Generated ${dateStamp()} by ${escapeHtml(generatedBy || 'TrentCAD')} · ${queue.length} parts in queue (released + in-review)</div>
+    <div class="meta">Generated ${dateStamp()} by ${escapeHtml(generatedBy || 'FrameCAD')} · ${queue.length} parts in queue (released + in-review)</div>
     ${queue.length === 0 ? '<p>Nothing in the queue yet — no parts are marked released or in-review.</p>' : sections}
   `
   return htmlShell('Manufacturing Queue', body)
@@ -443,7 +443,7 @@ function buildSummaryHtml(rows: JoinedRow[], generatedBy: string): string {
 
   const body = `
     <h1>Project Summary</h1>
-    <div class="meta">Generated ${dateStamp()} by ${escapeHtml(generatedBy || 'TrentCAD')}</div>
+    <div class="meta">Generated ${dateStamp()} by ${escapeHtml(generatedBy || 'FrameCAD')}</div>
 
     <div class="totals">
       <div><strong>Mass:</strong> ${totalMass.toFixed(2)} lb of ${FRC_WEIGHT_LIMIT_LB} lb FRC limit

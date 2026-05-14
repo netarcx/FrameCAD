@@ -1,9 +1,12 @@
+# appId stays com.trentcad.app on purpose — preserves the auto-update
+# chain from v1.0.x TrentCAD installs to v1.1.x FrameCAD releases.
+# Existing installs match on appId, not productName.
 appId: com.trentcad.app
-productName: TrentCAD
+productName: FrameCAD
 protocols:
-  - name: TrentCAD Project
+  - name: FrameCAD Project
     schemes:
-      - trentcad
+      - framecad
 directories:
   buildResources: build
   output: dist
@@ -53,6 +56,11 @@ linux:
   category: Development
   executableArgs:
     - "--no-sandbox"
+# `repo` is left as TrentCAD until the GitHub repo itself is renamed.
+# GitHub redirects releases-API requests so existing installs continue
+# to auto-update through a rename, but the publish step in CI uses this
+# value verbatim — change to "FrameCAD" once you rename the repo on
+# github.com/netarcx so the upload target matches.
 publish:
   provider: github
   owner: netarcx

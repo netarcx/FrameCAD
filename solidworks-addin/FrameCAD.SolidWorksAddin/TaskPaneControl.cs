@@ -4,13 +4,13 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using TrentCAD.SolidWorksAddin.Models;
+using FrameCAD.SolidWorksAddin.Models;
 
-namespace TrentCAD.SolidWorksAddin
+namespace FrameCAD.SolidWorksAddin
 {
     public class TaskPaneControl : UserControl
     {
-        private readonly TrentCadApiClient _api = new TrentCadApiClient();
+        private readonly FrameCadApiClient _api = new FrameCadApiClient();
         private Timer _healthTimer;
         private string _currentFilePath;
         private bool _busy;
@@ -49,7 +49,7 @@ namespace TrentCAD.SolidWorksAddin
         private Label _lblStatus;
         private Label _lblLockedBy;
         // Warning shown when the active file's name doesn't include its
-        // TrentCAD part number — likely the user did a Save As and broke
+        // FrameCAD part number — likely the user did a Save As and broke
         // the parts.json link to this file
         private Label _lblRenameWarning;
 
@@ -102,7 +102,7 @@ namespace TrentCAD.SolidWorksAddin
 
         /// <summary>
         /// Called by SwAddin's FileSavePostNotify hook with the part's
-        /// new mass (in pounds). Pushes to TrentCAD's REST API in the
+        /// new mass (in pounds). Pushes to FrameCAD's REST API in the
         /// background — fire-and-forget so SW's save event isn't blocked.
         /// Failures are silently ignored; the user can still set mass
         /// manually if the auto-push misses.
@@ -151,7 +151,7 @@ namespace TrentCAD.SolidWorksAddin
 
             _title = new Label
             {
-                Text = $"TrentCAD v{version.Major}.{version.Minor}.{version.Build}",
+                Text = $"FrameCAD v{version.Major}.{version.Minor}.{version.Build}",
                 Font = new Font("Segoe UI Semibold", 11f),
                 ForeColor = CText,
                 Location = new Point(Pad + LogoSize + 8, 16),
@@ -225,7 +225,7 @@ namespace TrentCAD.SolidWorksAddin
             _btnFillTitleBlock.Visible = false;  // only for .slddrw documents
             Controls.Add(_btnFillTitleBlock);
 
-            _btnOpenApp = MakeButton("Open TrentCAD");
+            _btnOpenApp = MakeButton("Open FrameCAD");
             _btnOpenApp.BackColor = CBlue;
             _btnOpenApp.ForeColor = CMantle;
             _btnOpenApp.Font = new Font("Segoe UI Semibold", 11f);
@@ -330,7 +330,7 @@ namespace TrentCAD.SolidWorksAddin
             y += 28;
 
             // Manufacturing method — required for released parts to land
-            // on the right tab of TrentCAD's shop-floor queue. Mirrors
+            // on the right tab of FrameCAD's shop-floor queue. Mirrors
             // the desktop DetailsPanel's method picker.
             _lblMethodLabel = new Label
             {
@@ -694,11 +694,11 @@ namespace TrentCAD.SolidWorksAddin
                     {
                         // Connection refused / unreachable — almost always means the
                         // desktop app isn't running
-                        label = "TrentCAD desktop app is not open";
+                        label = "FrameCAD desktop app is not open";
                     }
                     else if (error is System.Threading.Tasks.TaskCanceledException)
                     {
-                        label = "TrentCAD not responding";
+                        label = "FrameCAD not responding";
                     }
                     else
                     {
@@ -876,7 +876,7 @@ namespace TrentCAD.SolidWorksAddin
                 var data = await _api.GetTitleBlockDataAsync(_currentFilePath);
                 if (data == null)
                 {
-                    ShowMessage("Could not fetch title-block data from TrentCAD.", true);
+                    ShowMessage("Could not fetch title-block data from FrameCAD.", true);
                     return;
                 }
                 var props = new System.Collections.Generic.Dictionary<string, string>
@@ -898,7 +898,7 @@ namespace TrentCAD.SolidWorksAddin
                 }
                 else
                 {
-                    ShowMessage("No title-block fields written — TrentCAD had no data for this drawing.", true);
+                    ShowMessage("No title-block fields written — FrameCAD had no data for this drawing.", true);
                 }
             }
             finally
@@ -1096,7 +1096,7 @@ namespace TrentCAD.SolidWorksAddin
             _lblLockedBy.Text = lockedBy ?? "";
             _lblLockedBy.Visible = !string.IsNullOrEmpty(lockedBy);
 
-            // Rename guard: TrentCAD creates files pre-named with their
+            // Rename guard: FrameCAD creates files pre-named with their
             // part number (e.g. "26-2129-01-005.sldprt"). If the file name
             // doesn't contain its assigned part number, someone Save-As-d
             // it to a different name and parts.json may no longer track
@@ -1304,7 +1304,7 @@ namespace TrentCAD.SolidWorksAddin
             using (var dialog = new PublishMessageDialog())
             {
                 if (dialog.ShowDialog() != DialogResult.OK) return;
-                // Empty message is OK — TrentCAD generates a random 3-word label
+                // Empty message is OK — FrameCAD generates a random 3-word label
                 var message = dialog.CommitMessage ?? "";
 
                 _busy = true;
@@ -1412,8 +1412,8 @@ namespace TrentCAD.SolidWorksAddin
 
         private void DoOpenApp()
         {
-            // If TrentCAD is already running, just bring its window to the foreground
-            var existing = System.Diagnostics.Process.GetProcessesByName("TrentCAD");
+            // If FrameCAD is already running, just bring its window to the foreground
+            var existing = System.Diagnostics.Process.GetProcessesByName("FrameCAD");
             try
             {
                 foreach (var proc in existing)
@@ -1432,21 +1432,27 @@ namespace TrentCAD.SolidWorksAddin
                 foreach (var proc in existing) proc.Dispose();
             }
 
-            var localApp = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Programs", "trentcad", "TrentCAD.exe");
-            var progFiles = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "TrentCAD", "TrentCAD.exe");
-
-            var target = System.IO.File.Exists(localApp) ? localApp
-                       : System.IO.File.Exists(progFiles) ? progFiles
-                       : null;
+            // Look in every plausible install location. Fresh FrameCAD
+            // installs land under "FrameCAD"; v1.0.x TrentCAD installs
+            // that were upgraded in place keep their old folder names
+            // until the user does a clean re-install.
+            var localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var candidates = new[] {
+                System.IO.Path.Combine(localData, "Programs", "framecad", "FrameCAD.exe"),
+                System.IO.Path.Combine(localData, "Programs", "FrameCAD", "FrameCAD.exe"),
+                System.IO.Path.Combine(localData, "Programs", "trentcad", "FrameCAD.exe"),
+                System.IO.Path.Combine(localData, "Programs", "trentcad", "TrentCAD.exe"),
+                System.IO.Path.Combine(progFiles, "FrameCAD", "FrameCAD.exe"),
+                System.IO.Path.Combine(progFiles, "TrentCAD", "TrentCAD.exe")
+            };
+            string target = null;
+            foreach (var c in candidates) { if (System.IO.File.Exists(c)) { target = c; break; } }
 
             if (target != null)
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = target, UseShellExecute = true });
             else
-                ShowMessage("TrentCAD not found", true);
+                ShowMessage("FrameCAD not found", true);
         }
 
         [DllImport("user32.dll")]

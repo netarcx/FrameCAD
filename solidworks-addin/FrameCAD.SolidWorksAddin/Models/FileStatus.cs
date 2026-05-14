@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace TrentCAD.SolidWorksAddin.Models
+namespace FrameCAD.SolidWorksAddin.Models
 {
     public class FileStatus
     {

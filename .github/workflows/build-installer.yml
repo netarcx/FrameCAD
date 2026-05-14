@@ -96,7 +96,7 @@ jobs:
           $numeric = $v -replace '-.*$', ''
           # AssemblyVersion uses W.X.Y.Z; package.json is W.X.Y so we append .0
           $stamp = "$numeric.0"
-          $f = 'solidworks-addin/TrentCAD.SolidWorksAddin/Properties/AssemblyInfo.cs'
+          $f = 'solidworks-addin/FrameCAD.SolidWorksAddin/Properties/AssemblyInfo.cs'
           $c = Get-Content $f -Raw
           $c = $c -replace 'AssemblyVersion\("[^"]+"\)', "AssemblyVersion(`"$stamp`")"
           $c = $c -replace 'AssemblyFileVersion\("[^"]+"\)', "AssemblyFileVersion(`"$stamp`")"
@@ -105,7 +105,7 @@ jobs:
 
       - name: Build SolidWorks add-in
         if: matrix.platform == 'win'
-        run: dotnet publish solidworks-addin/TrentCAD.SolidWorksAddin/TrentCAD.SolidWorksAddin.csproj -c Release -o build/solidworks-addin
+        run: dotnet publish solidworks-addin/FrameCAD.SolidWorksAddin/FrameCAD.SolidWorksAddin.csproj -c Release -o build/solidworks-addin
 
       - name: Install dependencies
         run: npm ci
@@ -114,23 +114,21 @@ jobs:
         run: npx electron-vite build && npx electron-builder --config electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # SHA-256 hex hash of the team admin PIN. When unset, the admin
-          # page opens without a PIN prompt (dev fallback). To enable:
-          # set this repo secret to the lowercase hex SHA-256 of your PIN.
-          TRENTCAD_ADMIN_PIN_HASH: ${{ secrets.TRENTCAD_ADMIN_PIN_HASH }}
-          # Defaults for the install-wide admin settings (Team + Browse).
-          # Local clients override these via the welcome-screen admin page;
-          # their overrides survive future updates unless they Reset.
-          TRENTCAD_DEFAULT_GITHUB_ORG: ${{ secrets.TRENTCAD_DEFAULT_GITHUB_ORG }}
-          TRENTCAD_DEFAULT_PROJECT_PREFIX: ${{ secrets.TRENTCAD_DEFAULT_PROJECT_PREFIX }}
-          TRENTCAD_DEFAULT_TEAM_NAME: ${{ secrets.TRENTCAD_DEFAULT_TEAM_NAME }}
-          TRENTCAD_DEFAULT_WELCOME_MESSAGE: ${{ secrets.TRENTCAD_DEFAULT_WELCOME_MESSAGE }}
+          # Build-time defaults baked into the installer. GitHub Actions
+          # secret names stay TRENTCAD_* so they don't need to be re-added
+          # post-rename; the build code now reads FRAMECAD_*, so we
+          # bridge the two here. Rename the secrets if/when convenient.
+          FRAMECAD_ADMIN_PIN_HASH: ${{ secrets.TRENTCAD_ADMIN_PIN_HASH }}
+          FRAMECAD_DEFAULT_GITHUB_ORG: ${{ secrets.TRENTCAD_DEFAULT_GITHUB_ORG }}
+          FRAMECAD_DEFAULT_PROJECT_PREFIX: ${{ secrets.TRENTCAD_DEFAULT_PROJECT_PREFIX }}
+          FRAMECAD_DEFAULT_TEAM_NAME: ${{ secrets.TRENTCAD_DEFAULT_TEAM_NAME }}
+          FRAMECAD_DEFAULT_WELCOME_MESSAGE: ${{ secrets.TRENTCAD_DEFAULT_WELCOME_MESSAGE }}
 
       - name: Upload Windows installer artifact
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: TrentCAD-Installer-Windows
+          name: FrameCAD-Installer-Windows
           path: |
             dist/*.exe
             !dist/*-uninstaller-*.exe
@@ -140,7 +138,7 @@ jobs:
         if: matrix.platform == 'mac'
         uses: actions/upload-artifact@v4
         with:
-          name: TrentCAD-Installer-macOS
+          name: FrameCAD-Installer-macOS
           path: dist/*.dmg
           retention-days: 90
 
@@ -148,7 +146,7 @@ jobs:
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: TrentCAD-Installer-Linux
+          name: FrameCAD-Installer-Linux
           path: dist/*.AppImage
           retention-days: 90
 
@@ -156,6 +154,6 @@ jobs:
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: TrentCAD-SolidWorksAddin
+          name: FrameCAD-SolidWorksAddin
           path: build/solidworks-addin/
           retention-days: 90
