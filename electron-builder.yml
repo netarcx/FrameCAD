@@ -56,12 +56,6 @@ linux:
   category: Development
   executableArgs:
     - "--no-sandbox"
-# `repo` is left as TrentCAD until the GitHub repo itself is renamed.
-# GitHub redirects releases-API requests so existing installs continue
-# to auto-update through a rename, but the publish step in CI uses this
-# value verbatim — change to "FrameCAD" once you rename the repo on
-# github.com/netarcx so the upload target matches.
-#
 # `channel: latest` forces electron-builder to write latest.yml even
 # when the version contains a prerelease tag like "-beta". Without
 # this, prerelease versions publish to beta.yml only, and users on
@@ -71,6 +65,6 @@ linux:
 publish:
   provider: github
   owner: netarcx
-  repo: TrentCAD
+  repo: framecad
   releaseType: release
   channel: latest

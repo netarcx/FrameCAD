@@ -136,15 +136,37 @@ input {
   background: var(--bg-hover);
 }
 
+/* The logo is a stack of identical images at different translateZ
+   offsets so the 3D flip animation reads as a real coin with thickness
+   instead of going edge-on (invisible) at 90°/270°. */
 .setup-logo {
-  width: 96px;
-  height: 96px;
+  width: 192px;
+  height: 192px;
   margin-bottom: -16px;
   user-select: none;
   cursor: default;
+  position: relative;
   display: block;
   transform-origin: 50% 50%;
-  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.setup-logo-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  /* Four sharp drop-shadows in opposite cardinal directions form a
+     1px alpha-aware black outline that follows the logo's circular
+     silhouette. With every stacked face outlined, the rim of the
+     coin reads as a black ring during the spin. */
+  filter:
+    drop-shadow(1px 0 0 #000)
+    drop-shadow(-1px 0 0 #000)
+    drop-shadow(0 1px 0 #000)
+    drop-shadow(0 -1px 0 #000);
 }
 
 @keyframes setup-logo-spin {
@@ -167,14 +189,15 @@ input {
   will-change: transform;
 }
 
-/* First-mount intro: 1.5 rotations decelerating at the end. The
-   bezier (0.15, 0.7, 0.25, 1) keeps the first ~70% of the spin fast
-   and ramps down sharply over the last ~30% so the logo "lands"
+/* First-mount intro: 1.5 rotations decelerating at the end. Starts
+   upside-down (180°) so the 540° spin lands at 720° ≡ 0° — upright.
+   The bezier (0.15, 0.7, 0.25, 1) keeps the first ~70% of the spin
+   fast and ramps down sharply over the last ~30% so the logo "lands"
    into place rather than just easing out the whole way. Class is
    added once per app session by ProjectSetup. */
 @keyframes setup-logo-welcome-intro {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(540deg); }
+  from { transform: rotate(180deg); }
+  to   { transform: rotate(720deg); }
 }
 
 .setup-logo.welcome-intro {

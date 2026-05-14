@@ -189,7 +189,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   }, [])
 
   // Logo double-click easter egg
-  const logoRef = useRef<HTMLImageElement | null>(null)
+  const logoRef = useRef<HTMLDivElement | null>(null)
   const spinLogo = (cls: 'spinning' | 'flipping') => {
     const el = logoRef.current
     if (!el) return
@@ -254,13 +254,25 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <span>Admin Panel</span>
           </button>
         )}
-        <img
+        <div
           ref={logoRef}
           className="setup-logo"
-          src={logoUrl}
-          alt="FrameCAD"
           onClick={onLogoClick}
-        />
+          role="img"
+          aria-label="FrameCAD"
+        >
+          {Array.from({ length: 11 }, (_, i) => (
+            <img
+              key={i}
+              className="setup-logo-face"
+              src={logoUrl}
+              alt=""
+              aria-hidden="true"
+              style={{ transform: `translateZ(${(i - 5) * 2}px)` }}
+              draggable={false}
+            />
+          ))}
+        </div>
         <h1>FrameCAD FRC</h1>
         <p className="subtitle">File / Revision / Asset Management Engine</p>
         {globalAdmin?.teamName && (

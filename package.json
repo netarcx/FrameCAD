@@ -1,11 +1,8 @@
 {
   "name": "framecad",
-  "version": "1.1.2-beta",
+  "version": "1.1.2-beta-a",
   "description": "CAD collaboration tool for FRC robotics teams",
-  "author": {
-    "name": "Trent Fox",
-    "email": "tfox@swrobotics.com"
-  },
+  "author": "Trent Fox",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "ELECTRON_DISABLE_SANDBOX=1 electron-vite dev",
