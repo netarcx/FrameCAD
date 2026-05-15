@@ -42,7 +42,7 @@ The FrameCAD installer auto-installs the GitHub CLI for you (it runs `winget ins
 
 1. Go to <https://github.com/netarcx/FrameCAD/releases>
 2. Find the **latest release** at the top of the page.
-3. Under **Assets**, click `trentcad-X.Y.Z-setup.exe` to download it.
+3. Under **Assets**, click `framecad-X.Y.Z-setup.exe` to download it.
 4. Run the installer. Accept any **User Account Control (UAC)** prompts.
 5. **Important:** if you have SolidWorks open, close it before installing. The installer needs to update the SolidWorks add-in and won't be able to if SolidWorks is running.
 6. The installer will:

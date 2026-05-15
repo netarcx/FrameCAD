@@ -48,7 +48,7 @@ export async function writeLocalAdminConfig(config: AdminConfig): Promise<void> 
   await fs.writeFile(fullPath, JSON.stringify(config, null, 2) + '\n')
 }
 
-const ADMIN_DIR = '.trentcad'
+const ADMIN_DIR = '.framecad'
 const ADMIN_FILE = 'admin.json'
 
 function adminPath(): string {

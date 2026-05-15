@@ -3,7 +3,26 @@ import path from 'path'
 import fs from 'fs/promises'
 import type { ProjectConfig } from '@shared/types'
 
-const CONFIG_FILE = 'trentcad-app.json'
+const CONFIG_FILE = 'framecad-app.json'
+const LEGACY_CONFIG_FILE = 'trentcad-app.json'
+
+// One-shot rename of the userData app-config file from the legacy
+// trentcad-app.json to framecad-app.json. Runs lazily on first read so
+// users on the new client keep their recent-projects list.
+let legacyConfigMigrationDone = false
+async function migrateLegacyConfigFile(): Promise<void> {
+  if (legacyConfigMigrationDone) return
+  legacyConfigMigrationDone = true
+  const newPath = path.join(app.getPath('userData'), CONFIG_FILE)
+  const oldPath = path.join(app.getPath('userData'), LEGACY_CONFIG_FILE)
+  try {
+    await fs.access(newPath)
+    return
+  } catch { /* new file absent */ }
+  try {
+    await fs.rename(oldPath, newPath)
+  } catch { /* old file absent or rename failed; harmless */ }
+}
 
 /**
  * Collapse a project path to a single canonical form so we can compare
@@ -50,6 +69,7 @@ function getConfigPath(): string {
 }
 
 async function readConfig(): Promise<AppConfig> {
+  await migrateLegacyConfigFile()
   try {
     const data = await fs.readFile(getConfigPath(), 'utf-8')
     const parsed = JSON.parse(data) as AppConfig

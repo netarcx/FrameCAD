@@ -205,18 +205,18 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   // 9-click corner sequence. Once unlocked, the welcome screen shows
   // a permanent Admin Panel button.
   const [adminUnlocked, setAdminUnlocked] = useState(
-    () => localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1'
+    () => localStorage.getItem('framecad-admin-shortcut-unlocked') === '1'
   )
   useEffect(() => {
     const recheck = () =>
-      setAdminUnlocked(localStorage.getItem('trentcad-admin-shortcut-unlocked') === '1')
+      setAdminUnlocked(localStorage.getItem('framecad-admin-shortcut-unlocked') === '1')
     // Same-window unlock (admin overlay closes back into the welcome
     // screen). storage events only fire cross-window, so AdminPage
     // dispatches a custom event we listen for here.
     window.addEventListener('admin-shortcut-unlocked', recheck)
     // Cross-window or external edit (rare).
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'trentcad-admin-shortcut-unlocked') recheck()
+      if (e.key === 'framecad-admin-shortcut-unlocked') recheck()
     }
     window.addEventListener('storage', onStorage)
     window.addEventListener('focus', recheck)

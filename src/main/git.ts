@@ -139,7 +139,7 @@ git so the team shares one source of truth:
 - \`parts.json\` — the part-numbering manifest. Tracks the assigned
   number for every part / assembly / drawing, plus the next-counter
   state. Never edit this by hand.
-- \`.trentcad/parts-meta.json\` — per-part metadata: release state
+- \`.framecad/parts-meta.json\` — per-part metadata: release state
   (draft / in-review / released / manufactured), manufacturing method
   (3D Print / CNC / Hand / Other), material, mass, cost, comments.
   Edited through the FrameCAD UI; commits are batched so rapid edits
@@ -510,9 +510,34 @@ async function withDubiousOwnershipRecovery<T>(fn: () => Promise<T>): Promise<T>
   }
 }
 
+/**
+ * Move a project's metadata directory from the legacy name `.trentcad`
+ * to `.framecad`. Runs once per project on first open with the renamed
+ * client. Skips if the new dir already exists (already migrated, or
+ * fresh project). The rename shows up as a working-tree change that the
+ * user publishes via the normal sync/publish flow.
+ */
+async function migrateLegacyMetaDir(dirPath: string): Promise<void> {
+  const oldDir = path.join(dirPath, '.trentcad')
+  const newDir = path.join(dirPath, '.framecad')
+  try {
+    await fs.access(newDir)
+    return
+  } catch { /* new dir absent, continue */ }
+  try {
+    await fs.access(oldDir)
+  } catch {
+    return
+  }
+  try {
+    await fs.rename(oldDir, newDir)
+  } catch { /* best-effort; permissions or in-use file shouldn't block project open */ }
+}
+
 export async function openProject(dirPath: string): Promise<void> {
   await addSafeDirectory(dirPath)
   await addSafeDirectory(path.dirname(dirPath))
+  await migrateLegacyMetaDir(dirPath)
   await withDubiousOwnershipRecovery(async () => {
     git = simpleGit(dirPath)
     projectPath = dirPath
@@ -622,7 +647,7 @@ export async function sync(): Promise<SyncResult> {
     // brand-new .sldprt isn't left out.
     const status = await g.status()
     const dirty = status.files.length > 0
-    const stashLabel = `trentcad-sync-${Date.now()}`
+    const stashLabel = `framecad-sync-${Date.now()}`
     let stashed = false
 
     if (dirty) {
@@ -1157,7 +1182,7 @@ export async function commitAndPushFile(relPath: string, message: string): Promi
 
   // Non-fast-forward — rebase on top of origin and retry. Stash unrelated
   // dirty files so the rebase can run cleanly.
-  const stashLabel = `trentcad-meta-${Date.now()}`
+  const stashLabel = `framecad-meta-${Date.now()}`
   let stashed = false
   const dirtyStatus = await g.status()
   if (dirtyStatus.files.length > 0) {

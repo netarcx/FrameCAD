@@ -54,7 +54,7 @@ let writeLock: Promise<void> = Promise.resolve()
  * Mirror of ipc.ts broadcastStatus — push a fresh getStatus() to the
  * renderer so views (file tree, AdminPage, ManufacturingQueue) pick up
  * meta changes made over REST from the SolidWorks add-in. The chokidar
- * watcher ignores `.trentcad/`, so meta writes need an explicit nudge.
+ * watcher ignores `.framecad/`, so meta writes need an explicit nudge.
  */
 function broadcastStatus(): void {
   const win = getMainWindowRef?.()

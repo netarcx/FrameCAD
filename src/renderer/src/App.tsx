@@ -30,6 +30,28 @@ function countByState(files: FileEntry[], state: string): number {
   return count
 }
 
+// One-shot rename of localStorage keys from the legacy trentcad-* prefix
+// to framecad-*. Runs at module import, before any useState initializer
+// reads from localStorage, so users coming from older builds keep their
+// theme, dyslexic-font toggle, onboarding-seen flag, and admin unlock.
+;(() => {
+  const legacyKeys = [
+    'onboarding-seen',
+    'theme',
+    'dyslexic-font',
+    'admin-shortcut-unlocked'
+  ]
+  for (const k of legacyKeys) {
+    const oldKey = `trentcad-${k}`
+    const newKey = `framecad-${k}`
+    if (localStorage.getItem(newKey) !== null) continue
+    const v = localStorage.getItem(oldKey)
+    if (v === null) continue
+    localStorage.setItem(newKey, v)
+    localStorage.removeItem(oldKey)
+  }
+})()
+
 export default function App() {
   const {
     project,
@@ -185,13 +207,13 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!localStorage.getItem('trentcad-onboarding-seen')) {
+    if (!localStorage.getItem('framecad-onboarding-seen')) {
       setShowOnboarding(true)
     }
   }, [])
 
   const dismissOnboarding = useCallback(() => {
-    localStorage.setItem('trentcad-onboarding-seen', '1')
+    localStorage.setItem('framecad-onboarding-seen', '1')
     setShowOnboarding(false)
   }, [])
 
@@ -365,13 +387,13 @@ export default function App() {
   }, [showAdmin, openAdminOverlay])
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const stored = localStorage.getItem('trentcad-theme')
+    const stored = localStorage.getItem('framecad-theme')
     return stored === 'light' ? 'light' : 'dark'
   })
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('trentcad-theme', theme)
+    localStorage.setItem('framecad-theme', theme)
   }, [theme])
 
   const toggleTheme = useCallback(() => {
@@ -382,12 +404,12 @@ export default function App() {
   // harder to read. Persisted in localStorage so it stays on across
   // launches.
   const [dyslexicFont, setDyslexicFont] = useState<boolean>(() =>
-    localStorage.getItem('trentcad-dyslexic-font') === '1'
+    localStorage.getItem('framecad-dyslexic-font') === '1'
   )
   useEffect(() => {
     if (dyslexicFont) document.documentElement.setAttribute('data-font', 'dyslexic')
     else document.documentElement.removeAttribute('data-font')
-    localStorage.setItem('trentcad-dyslexic-font', dyslexicFont ? '1' : '0')
+    localStorage.setItem('framecad-dyslexic-font', dyslexicFont ? '1' : '0')
   }, [dyslexicFont])
 
   useEffect(() => {

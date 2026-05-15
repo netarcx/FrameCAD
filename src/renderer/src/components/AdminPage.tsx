@@ -596,7 +596,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
   useEffect(() => {
     if (cornerClicks === 0) return
     if (cornerClicks >= 9) {
-      localStorage.setItem('trentcad-admin-shortcut-unlocked', '1')
+      localStorage.setItem('framecad-admin-shortcut-unlocked', '1')
       // Notify any listening welcome-screen instance in the same window
       // (storage events only fire across windows, not within one).
       window.dispatchEvent(new CustomEvent('admin-shortcut-unlocked'))
@@ -742,7 +742,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
               <input
                 value={globalForm.projectPrefix ?? ''}
                 onChange={e => setGlobal('projectPrefix', e.target.value)}
-                placeholder={globalState?.defaults.projectPrefix || 'trentcad-'}
+                placeholder={globalState?.defaults.projectPrefix || 'framecad-'}
               />
             </div>
 

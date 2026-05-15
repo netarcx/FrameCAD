@@ -44,7 +44,7 @@ Examples (for a project created in 2026):
 
 ### Per-part metadata
 
-Stored in `.trentcad/parts-meta.json` (committed to Git) and edited from the Details panel:
+Stored in `.framecad/parts-meta.json` (committed to Git) and edited from the Details panel:
 
 - **Release state**: draft → in-review → released → manufactured
 - **Comments thread** (author + timestamp)
@@ -111,7 +111,7 @@ npm run build       # Build to out/
 npm run package     # Build + create installer to dist/
 ```
 
-The packager produces a Windows NSIS installer (`trentcad-{version}-setup.exe`), a macOS DMG, and a Linux AppImage depending on what platform you build on.
+The packager produces a Windows NSIS installer (`framecad-{version}-setup.exe`), a macOS DMG, and a Linux AppImage depending on what platform you build on.
 
 ### CI / release
 
@@ -129,8 +129,8 @@ src/
     git.ts                      # All Git/LFS operations (simple-git)
     locking.ts                  # Check-out/check-in via git lfs lock/unlock
     parts.ts                    # Part numbering engine + manifest management
-    meta.ts                     # Per-part metadata (.trentcad/parts-meta.json)
-    admin.ts                    # Per-project admin config (.trentcad/admin.json)
+    meta.ts                     # Per-part metadata (.framecad/parts-meta.json)
+    admin.ts                    # Per-project admin config (.framecad/admin.json)
     admin-pin.ts                # SHA-256 PIN gate for the admin page
     global-admin.ts             # Install-wide admin settings + defaults from GH secrets
     rest.ts                     # Local REST API server
@@ -273,7 +273,7 @@ Then add the result to the repo's GitHub Actions secrets as `FRAMECAD_ADMIN_PIN_
 The CI workflow consumes these GitHub Actions secrets to bake defaults into the installer:
 
 - `FRAMECAD_DEFAULT_GITHUB_ORG` — team's GitHub organisation (e.g. `netarcx`)
-- `FRAMECAD_DEFAULT_PROJECT_PREFIX` — repo name prefix for filtering Browse (e.g. `trentcad-`)
+- `FRAMECAD_DEFAULT_PROJECT_PREFIX` — repo name prefix for filtering Browse (e.g. `framecad-`)
 - `FRAMECAD_DEFAULT_TEAM_NAME` — team display name
 - `FRAMECAD_DEFAULT_WELCOME_MESSAGE` — optional welcome text on the setup screen
 

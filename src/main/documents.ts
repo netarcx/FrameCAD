@@ -494,7 +494,7 @@ function buildSummaryHtml(rows: JoinedRow[], generatedBy: string): string {
  * styles because they don't inherit the body's stylesheet.
  */
 async function htmlToPdf(html: string, title: string): Promise<Buffer> {
-  const tmpHtmlPath = path.join(os.tmpdir(), `trentcad-doc-${Date.now()}.html`)
+  const tmpHtmlPath = path.join(os.tmpdir(), `framecad-doc-${Date.now()}.html`)
   await fs.writeFile(tmpHtmlPath, html, 'utf-8')
 
   const win = new BrowserWindow({

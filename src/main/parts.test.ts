@@ -58,7 +58,7 @@ describe('parts module (with temp project dir)', () => {
   let tempDir: string
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(tmpdir(), 'trentcad-test-'))
+    tempDir = await fs.mkdtemp(path.join(tmpdir(), 'framecad-test-'))
     mockProjectPath = tempDir
   })
 
@@ -261,7 +261,7 @@ describe('parts module (with temp project dir)', () => {
 
   describe('COTS-library project behavior', () => {
     async function markAsCotsProject() {
-      const dir = path.join(tempDir, '.trentcad')
+      const dir = path.join(tempDir, '.framecad')
       await fs.mkdir(dir, { recursive: true })
       await fs.writeFile(path.join(dir, 'admin.json'), JSON.stringify({ isCotsProject: true }))
     }

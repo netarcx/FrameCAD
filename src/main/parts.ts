@@ -8,10 +8,10 @@ const MANIFEST_FILE = 'parts.json'
 const SOLIDWORKS_EXTS = new Set(['.sldprt', '.sldasm', '.slddrw'])
 
 async function isCotsProject(): Promise<boolean> {
-  // Read .trentcad/admin.json directly to avoid a circular import with admin.ts.
+  // Read .framecad/admin.json directly to avoid a circular import with admin.ts.
   // COTS-library projects skip the entire part-numbering layer.
   try {
-    const adminFile = path.join(getProjectPath(), '.trentcad', 'admin.json')
+    const adminFile = path.join(getProjectPath(), '.framecad', 'admin.json')
     const raw = await fs.readFile(adminFile, 'utf-8')
     return JSON.parse(raw).isCotsProject === true
   } catch {

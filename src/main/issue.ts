@@ -115,7 +115,7 @@ export async function reportIssue(errorMessage: string): Promise<ReportIssueResu
   // write the body to a temp file and pass --body-file. Avoids any shell
   // quoting issues with multi-line bodies that contain backticks, quotes,
   // and arbitrary user-supplied paths.
-  const bodyPath = path.join(os.tmpdir(), `trentcad-issue-${Date.now()}.md`)
+  const bodyPath = path.join(os.tmpdir(), `framecad-issue-${Date.now()}.md`)
   try {
     await fs.writeFile(bodyPath, body, 'utf-8')
 

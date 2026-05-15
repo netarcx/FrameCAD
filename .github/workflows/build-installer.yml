@@ -6,9 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   # Compute which platforms to build for this run. Windows on every
   # push; mac/linux only when the workflow is manually dispatched.
@@ -147,7 +144,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FrameCAD-Installer-Linux
-          path: dist/*.AppImage
+          path: |
+            dist/*.AppImage
+            dist/*.deb
           retention-days: 90
 
       - name: Upload add-in artifact

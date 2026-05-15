@@ -66,7 +66,7 @@ If you want students to see your team's name in the title bar, taskbar,
 and Add/Remove Programs list, change `electron-builder.yml`:
 
 ```yaml
-appId: com.yourteam.trentcad   # was com.trentcad.app
+appId: com.yourteam.framecad   # upstream uses com.trentcad.app for update-chain compat
 productName: YourTeamCAD       # was FrameCAD
 ```
 

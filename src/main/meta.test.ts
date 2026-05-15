@@ -23,7 +23,7 @@ describe('meta module', () => {
   let tempDir: string
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(tmpdir(), 'trentcad-meta-test-'))
+    tempDir = await fs.mkdtemp(path.join(tmpdir(), 'framecad-meta-test-'))
     mockProjectPath = tempDir
     mockUsername = 'tfox'
   })
@@ -39,9 +39,9 @@ describe('meta module', () => {
     })
 
     it('returns an empty object for a file with no entry', async () => {
-      await fs.mkdir(path.join(tempDir, '.trentcad'), { recursive: true })
+      await fs.mkdir(path.join(tempDir, '.framecad'), { recursive: true })
       await fs.writeFile(
-        path.join(tempDir, '.trentcad', 'parts-meta.json'),
+        path.join(tempDir, '.framecad', 'parts-meta.json'),
         JSON.stringify({ 'OtherFile.sldprt': { release: { state: 'released' } } })
       )
       const result = await meta.getPartMeta('Drivetrain/foo.sldprt')
@@ -49,9 +49,9 @@ describe('meta module', () => {
     })
 
     it('returns existing entry data', async () => {
-      await fs.mkdir(path.join(tempDir, '.trentcad'), { recursive: true })
+      await fs.mkdir(path.join(tempDir, '.framecad'), { recursive: true })
       await fs.writeFile(
-        path.join(tempDir, '.trentcad', 'parts-meta.json'),
+        path.join(tempDir, '.framecad', 'parts-meta.json'),
         JSON.stringify({
           'foo.sldprt': {
             release: { state: 'in-review', by: 'alex', at: '2026-01-01T00:00:00Z' },

@@ -1,15 +1,18 @@
 {
   "name": "framecad",
-  "version": "1.1.2-beta-b",
+  "version": "1.1.2-beta-c",
   "description": "CAD collaboration tool for FRC robotics teams",
-  "author": "Trent Fox",
+  "author": {
+    "name": "Trent Fox",
+    "email": "tfox@swrobotics.com"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "ELECTRON_DISABLE_SANDBOX=1 electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder --config electron-builder.yml",
-    "package:win": "scripts\\build-addin.bat && electron-vite build && electron-builder --config electron-builder.yml --win",
+    "package:win": "scripts/build-addin.bat && electron-vite build && electron-builder --config electron-builder.yml --win",
     "test": "vitest run"
   },
   "dependencies": {

@@ -58,7 +58,7 @@ function notifyFileChange(win: BrowserWindow): void {
  * AdminPage caches, and ManufacturingQueue all pick up the new
  * release-state / comments / mass / cost / method / material without
  * waiting for the next file-watcher tick. The chokidar watcher ignores
- * `.trentcad/` so parts-meta.json writes never fire it on their own.
+ * `.framecad/` so parts-meta.json writes never fire it on their own.
  */
 function broadcastStatus(getMainWindow: () => BrowserWindow | null): void {
   const win = getMainWindow()

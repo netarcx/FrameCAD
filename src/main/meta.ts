@@ -5,7 +5,7 @@ export type { BulkMetaPatch }
 import { getProjectPath, getGit, pullRemoteFile, commitAndPushFile } from './git'
 import { isSwAlive, queuePendingExport } from './export-queue'
 
-const META_DIR = '.trentcad'
+const META_DIR = '.framecad'
 const META_FILE = 'parts-meta.json'
 
 interface PartsMetaFile { [relPath: string]: PartMeta }

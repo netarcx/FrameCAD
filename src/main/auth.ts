@@ -99,7 +99,7 @@ async function ensureGhCredentialHelper(gh: string): Promise<void> {
  * Password prompts that git sends during HTTPS auth.
  */
 async function installAskpass(token: string): Promise<void> {
-  const scriptPath = path.join(os.tmpdir(), 'trentcad-git-askpass.sh')
+  const scriptPath = path.join(os.tmpdir(), 'framecad-git-askpass.sh')
   const script =
     '#!/bin/sh\n' +
     'case "$1" in\n' +
@@ -180,7 +180,7 @@ export async function githubLogin(): Promise<{ launched: boolean; error?: string
  */
 async function launchGhLoginWindows(gh: string): Promise<{ launched: boolean; error?: string }> {
   try {
-    const scriptPath = path.join(os.tmpdir(), 'trentcad-gh-login.cmd')
+    const scriptPath = path.join(os.tmpdir(), 'framecad-gh-login.cmd')
     const script =
       '@echo off\r\n' +
       'title FrameCAD GitHub Login\r\n' +
