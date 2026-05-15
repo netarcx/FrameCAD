@@ -86,9 +86,10 @@ function createWindow(): void {
     // Layout floor that still fits 1366×768 laptops with the Windows
     // taskbar visible. Below this the responsive tiers in the renderer
     // (icon-only sidebar + DetailsPanel overlay) keep the UI usable
-    // without things colliding.
+    // without things colliding. minHeight 680 gives the first-run
+    // setup wizard enough room to render without internal scrolling.
     minWidth: 960,
-    minHeight: 600,
+    minHeight: 680,
     title: 'FrameCAD',
     autoHideMenuBar: true,
     webPreferences: {

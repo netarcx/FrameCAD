@@ -119,6 +119,12 @@ The packager produces a Windows NSIS installer (`framecad-{version}-setup.exe`),
 
 The Windows job additionally builds and bundles the SolidWorks add-in DLL via `dotnet publish`; non-Windows jobs skip it (SolidWorks is Windows-only).
 
+### Version numbering — beta releases
+
+**Always use dot-separated prerelease identifiers** (`1.1.4-beta.1`, `1.1.4-beta.2`), never hyphen-separated (`1.1.4-beta-a`). electron-updater's GitHub provider treats hyphen-separated suffixes as their own custom channel, which means each `-beta-X` build is its own dead-end chain that can't auto-update to anything else (not to the next beta, and not even to the eventual stable release). Dot-separated lands every beta on the shared `"beta"` channel, which auto-flows to stable.
+
+If a user gets stranded on a hyphen-suffix beta, they have to manually reinstall a non-suffix release once to break out.
+
 ## Architecture
 
 ```
