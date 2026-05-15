@@ -6,8 +6,7 @@ import { getLocks, verifyLocks } from './locking'
 import { loadManifest, syncManifest, annotatePartNumbers } from './parts'
 import { loadAllMeta, annotateMeta } from './meta'
 import { getGitHubToken } from './auth'
-import { getBuildDefaultPrefix } from './branding'
-import { getEffectiveGlobalAdmin } from './global-admin'
+import { getBuildDefaultPrefix, getBuildDefaultTeamName, getBuildDefaultIssueRepo } from './branding'
 
 // Large binary or text-based CAD files that go through Git LFS. `-text` keeps
 // git from running line-ending conversion on the file; `merge=lfs` uses the
@@ -70,15 +69,12 @@ const NEVER_MERGE_PATTERNS = [
  * the Join Project flow with the URL prefilled (see `app.setAsDefault\
  * ProtocolClient('framecad')` in main/index.ts).
  */
-async function buildProjectReadme(name: string, remote: string): Promise<string> {
+function buildProjectReadme(name: string, remote: string): string {
   const cleanRemote = (remote || '').trim()
   const joinHttpsUrl = cleanRemote || '<paste this repo URL>'
   const deepLink = cleanRemote ? `framecad://join?url=${encodeURIComponent(cleanRemote)}` : ''
-  const effective = await getEffectiveGlobalAdmin()
-  const teamName = effective.teamName || 'an FRC team'
-  const issueRepo = (effective.issueRepo && /^[\w.-]+\/[\w.-]+$/.test(effective.issueRepo))
-    ? effective.issueRepo
-    : 'netarcx/FrameCAD'
+  const teamName = getBuildDefaultTeamName() || 'an FRC team'
+  const issueRepo = getBuildDefaultIssueRepo() || 'netarcx/FrameCAD'
 
   // shields.io renders a badge image GitHub-side that looks like a
   // button, so the deep link reads as an obvious call-to-action
@@ -273,7 +269,7 @@ export async function createProject(name: string, dirPath: string, remote: strin
   const readmePath = path.join(dirPath, 'README.md')
   const readmeExists = await fs.stat(readmePath).then(() => true).catch(() => false)
   if (!readmeExists) {
-    await fs.writeFile(readmePath, await buildProjectReadme(name, remote))
+    await fs.writeFile(readmePath, buildProjectReadme(name, remote))
   }
 
   await withDubiousOwnershipRecovery(async () => {

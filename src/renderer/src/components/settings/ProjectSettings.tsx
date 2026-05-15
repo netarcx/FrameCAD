@@ -105,7 +105,7 @@ export default function ProjectSettings() {
         <input
           value={config.defaultPartPrefix ?? ''}
           onChange={e => set('defaultPartPrefix', e.target.value)}
-          placeholder="e.g. 26-9999 (year + team number)"
+          placeholder="e.g. 26-2129"
         />
         <p className="admin-hint">
           Stays with this project. Used by the auto-numbering when creating

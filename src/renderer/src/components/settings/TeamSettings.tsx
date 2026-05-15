@@ -71,7 +71,7 @@ export default function TeamSettings() {
         <input
           value={form.teamName ?? ''}
           onChange={e => set('teamName', e.target.value)}
-          placeholder={globalState.defaults.teamName || 'e.g. FRC Team 9999'}
+          placeholder={globalState.defaults.teamName || 'FRC Team 2129'}
         />
         <label>Welcome message</label>
         <textarea

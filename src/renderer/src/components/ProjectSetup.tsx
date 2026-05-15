@@ -520,16 +520,22 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
       el.style.setProperty('--slam-bounce', `${-rand(10, 22).toFixed(1)}px`)
     }
 
-    el.classList.add(cls)
-
     // Slam starts the logo at translateY(-130vh), which expands the
     // scroll container's overflow upward and pops a scrollbar for the
-    // duration of the fall. Add a class to the closest .setup-screen
-    // ancestor that hides overflow; cleared on animationend below.
-    // Using JS + a static class (rather than :has()) for cross-version
-    // reliability — :has() didn't take effect for some users.
-    const setupScreen = cls === 'slam' ? el.closest('.setup-screen') : null
-    setupScreen?.classList.add('slam-active')
+    // duration of the fall. Hide overflow on the closest .setup-screen
+    // BEFORE adding the .slam class so the next paint already has
+    // overflow hidden — no chance of a one-frame scrollbar flash. Set
+    // both a class (for the !important CSS) and an inline style; the
+    // inline style wins over any cascade-ordering edge case.
+    const setupScreen = cls === 'slam'
+      ? (el.closest('.setup-screen') as HTMLElement | null)
+      : null
+    if (setupScreen) {
+      setupScreen.classList.add('slam-active')
+      setupScreen.style.overflow = 'hidden'
+    }
+
+    el.classList.add(cls)
 
     // Fire the water-ripple right at the moment the logo hits the
     // ground (60% of the 1500ms keyframe = 900ms). Snapshot is
@@ -553,7 +559,10 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
         el.style.removeProperty('--slam-squash-y')
         el.style.removeProperty('--slam-squash-down')
         el.style.removeProperty('--slam-bounce')
-        setupScreen?.classList.remove('slam-active')
+        if (setupScreen) {
+          setupScreen.classList.remove('slam-active')
+          setupScreen.style.overflow = ''
+        }
       }
       if (slamCleanup !== null) {
         window.clearTimeout(slamCleanup)
@@ -699,14 +708,13 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             ))}
           </div>
         </div>
-        <h1>FrameCAD FRC</h1>
-        <p className="subtitle">File / Revision / Asset Management Engine</p>
-        {globalAdmin?.teamName && (
-          <p className="subtitle subtitle-team">for {globalAdmin.teamName}</p>
-        )}
-        {globalAdmin?.welcomeMessage && (
-          <p className="welcome-message">{globalAdmin.welcomeMessage}</p>
-        )}
+        <div className="setup-header">
+          <h1>FrameCAD FRC</h1>
+          <p className="subtitle">File / Revision / Asset Management Engine</p>
+          {globalAdmin?.teamName && (
+            <p className="subtitle subtitle-team">for {globalAdmin.teamName}</p>
+          )}
+        </div>
         {pinnedProjects.length > 0 && (
           <div className="pinned-projects">
             {pinnedProjects.map(p => (
@@ -792,6 +800,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             onClose={() => setShowBrowse(false)}
           />
         )}
+        <div className="setup-footer">
         <div className="setup-toolbar">
           <div className="setup-auth">
             {authStatus?.loggedIn ? (
@@ -869,6 +878,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             </div>
           </div>
         )}
+        </div>
       </div>
     )
   }
@@ -890,7 +900,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
           <div className="form-group">
             <label>Location</label>
             <div className="path-input">
-              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\YourTeam\Documents" />
+              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\team2129\Documents" />
               <button className="browse-btn" onClick={handleBrowse}>Browse</button>
             </div>
           </div>
@@ -899,7 +909,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <input
               value={remote}
               onChange={e => setRemote(e.target.value)}
-              placeholder="https://github.com/your-team-org/2026-robot.git"
+              placeholder="https://github.com/frc2129/2026-robot.git"
             />
             {orgConfigured && projectPrefix && name && authStatus?.loggedIn && (
               <p className="admin-hint">
@@ -975,14 +985,14 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <input
               value={url}
               onChange={e => setUrl(e.target.value)}
-              placeholder="https://github.com/your-team-org/2026-robot.git"
+              placeholder="https://github.com/frc2129/2026-robot.git"
               autoFocus
             />
           </div>
           <div className="form-group">
             <label>Save To</label>
             <div className="path-input">
-              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\YourTeam\Documents" />
+              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\team2129\Documents" />
               <button className="browse-btn" onClick={handleBrowse}>Browse</button>
             </div>
           </div>

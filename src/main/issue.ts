@@ -3,25 +3,15 @@ import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
 import { app } from 'electron'
-import { getEffectiveGlobalAdmin } from './global-admin'
+import { getBuildDefaultIssueRepo } from './branding'
 
 /**
- * Resolve the auto-bug-report destination repo (`owner/name`). Priority:
- *   1. Runtime override from the admin panel (per-machine userData)
- *   2. Build-time FRAMECAD_DEFAULT_ISSUE_REPO env (set by forks at build)
- *   3. Upstream `netarcx/FrameCAD` tracker
- * Resolved per-call so admin-panel changes take effect immediately.
+ * Where bug reports go. FrameCAD's own repo, not the user's project repo —
+ * project bugs and FrameCAD bugs are different things. Forks override
+ * the default via the FRAMECAD_DEFAULT_ISSUE_REPO env var at build time
+ * so their auto-reports land in their own tracker instead of upstream.
  */
-async function resolveIssueRepo(): Promise<string> {
-  try {
-    const effective = await getEffectiveGlobalAdmin()
-    if (effective.issueRepo && /^[\w.-]+\/[\w.-]+$/.test(effective.issueRepo)) {
-      return effective.issueRepo
-    }
-  } catch { /* fall through to upstream default */ }
-  return 'netarcx/FrameCAD'
-}
-
+const ISSUE_REPO = getBuildDefaultIssueRepo() || 'netarcx/FrameCAD'
 const ISSUE_LABEL = 'auto-report'
 
 export interface ReportIssueResult {
@@ -111,7 +101,6 @@ export async function reportIssue(errorMessage: string): Promise<ReportIssueResu
   const gh = await locateGh()
   if (!gh) return { success: false, error: 'GitHub CLI not found' }
   const ghq = quoteForCmd(gh)
-  const issueRepo = await resolveIssueRepo()
 
   // Resolve current user so the issue body can credit them; non-fatal
   let ghUser: string | undefined
@@ -136,7 +125,7 @@ export async function reportIssue(errorMessage: string): Promise<ReportIssueResu
     // exact same code is correct on both. We control the title format
     // so stripping these characters never loses meaningful content.
     const safeTitle = title.replace(/["`$\\]/g, '').slice(0, 200)
-    const cmd = `${ghq} issue create --repo ${issueRepo} --title "${safeTitle}" --body-file ${quoteForCmd(bodyPath)} --label ${ISSUE_LABEL}`
+    const cmd = `${ghq} issue create --repo ${ISSUE_REPO} --title "${safeTitle}" --body-file ${quoteForCmd(bodyPath)} --label ${ISSUE_LABEL}`
     const result = await run(cmd, { timeout: 30000 })
 
     if (result.code !== 0) {
@@ -145,7 +134,7 @@ export async function reportIssue(errorMessage: string): Promise<ReportIssueResu
       // retry once without the label so first-use doesn't need a label set up.
       if (/label.+not found|could not add label/i.test(result.stderr + result.stdout)) {
         const fallback = await run(
-          `${ghq} issue create --repo ${issueRepo} --title "${safeTitle}" --body-file ${quoteForCmd(bodyPath)}`,
+          `${ghq} issue create --repo ${ISSUE_REPO} --title "${safeTitle}" --body-file ${quoteForCmd(bodyPath)}`,
           { timeout: 30000 }
         )
         if (fallback.code === 0) return parseIssueUrl(fallback.stdout)

@@ -2639,104 +2639,6 @@ body.slam-shake {
   margin-top: 16px;
 }
 
-/* ─── First-run setup wizard ─── */
-.first-run-overlay { z-index: 2200; }
-.first-run-modal {
-  width: 560px;
-  max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  padding: 28px 32px;
-  position: relative;
-}
-.first-run-modal .modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-}
-.first-run-modal .modal-close:hover { background: rgba(127, 127, 127, 0.12); color: var(--text); }
-.first-run-modal h2 { margin: 0 0 4px; }
-.first-run-intro {
-  color: var(--text-muted);
-  font-size: 13px;
-  margin: 0 0 18px;
-  line-height: 1.5;
-}
-.first-run-grid {
-  display: grid;
-  gap: 14px;
-}
-.first-run-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-}
-.first-run-grid label > span { font-weight: 600; }
-.first-run-grid label .req { color: var(--danger, #d04444); font-style: normal; margin-left: 2px; }
-.first-run-grid input {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 13px;
-}
-.first-run-grid input:focus { outline: none; border-color: var(--accent); }
-.first-run-grid small {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-.first-run-grid small code {
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(127, 127, 127, 0.15);
-  font-size: 10px;
-}
-.first-run-error {
-  margin-top: 12px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: rgba(208, 68, 68, 0.12);
-  color: var(--danger, #d04444);
-  font-size: 12px;
-}
-.first-run-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 22px;
-}
-.first-run-actions .btn-ghost {
-  padding: 8px 14px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-}
-.first-run-actions .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
-.first-run-actions .btn-primary {
-  padding: 8px 16px;
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 13px;
-}
-.first-run-actions .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
 /* ─── Setup Screen ─── */
 
 .setup-screen {
@@ -2756,7 +2658,9 @@ body.slam-shake {
   padding: 32px 16px;
   box-sizing: border-box;
   overflow-y: auto;
-  gap: 32px;
+  /* Reduced from 32px now that .setup-header and .setup-footer own
+     their internal spacing — fewer loose siblings, tighter layout. */
+  gap: 24px;
 }
 
 .setup-screen h1 {
@@ -2777,27 +2681,40 @@ body.slam-shake {
   letter-spacing: 0.3px;
 }
 
-.setup-screen .welcome-message {
-  max-width: 640px;
-  margin: 14px auto 0;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: var(--surface-subtle, rgba(127, 127, 127, 0.08));
-  color: var(--text-secondary, var(--text-muted));
-  font-size: 13px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
-
 .setup-screen .team-label {
   color: var(--text-muted);
   font-size: 12px;
   margin-top: -28px;
 }
 
+/* Welcome-mode header block: title + subtitle + (team name) grouped
+   into one flex column so spacing inside the title cluster is tight
+   (6px) regardless of the parent .setup-screen gap. Overrides the
+   loose-children rules above (which exist for Create/Join/Open modes
+   that don't use .setup-header) so the -24px margin hack doesn't
+   apply inside the header. */
+.setup-screen .setup-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 640px;
+}
+
+.setup-screen .setup-header h1,
+.setup-screen .setup-header .subtitle,
+.setup-screen .setup-header .subtitle.subtitle-team {
+  margin: 0;
+}
+
 .setup-cards {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 16px;
+  width: 100%;
+  max-width: 920px;
 }
 
 .setup-card {
@@ -2811,7 +2728,11 @@ body.slam-shake {
   border-radius: var(--radius);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
-  min-width: 200px;
+  /* Four cards across when the row fits (920 / 4 ≈ 220 each minus
+     16-px gaps). At narrower widths the cards wrap 2-up because 200
+     is the flex basis. */
+  flex: 1 1 200px;
+  max-width: 240px;
 }
 
 .setup-card:hover {
@@ -2835,9 +2756,25 @@ body.slam-shake {
   text-align: center;
 }
 
+/* Welcome-mode footer: groups the auth toolbar + recent projects so
+   they read as one visually-coherent block under the cards. Width
+   here owns; child .setup-toolbar / .recent-projects stretch to fill. */
+.setup-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+  max-width: 540px;
+}
+
 .setup-toolbar {
-  width: 500px;
-  max-width: 90vw;
+  width: 100%;
+}
+
+.setup-footer .recent-projects {
+  width: 100%;
+  max-width: none;
 }
 
 .setup-auth {
@@ -3346,19 +3283,6 @@ body.slam-shake {
 
 .update-banner button:hover {
   background: var(--accent-hover);
-}
-
-.update-banner-error {
-  background: rgba(208, 68, 68, 0.12);
-  border-bottom-color: var(--danger, #d04444);
-  color: var(--danger, #d04444);
-}
-.update-banner-error button {
-  background: var(--danger, #d04444);
-  color: white;
-}
-.update-banner-error button:hover {
-  background: #b53737;
 }
 
 .update-progress {

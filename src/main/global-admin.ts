@@ -6,24 +6,12 @@ declare const __FRAMECAD_DEFAULT_GITHUB_ORG__: string
 declare const __FRAMECAD_DEFAULT_PROJECT_PREFIX__: string
 declare const __FRAMECAD_DEFAULT_TEAM_NAME__: string
 declare const __FRAMECAD_DEFAULT_WELCOME_MESSAGE__: string
-declare const __FRAMECAD_DEFAULT_ISSUE_REPO__: string
 
 export interface GlobalAdminConfig {
   teamName?: string
-  /** FRC team number (e.g. "2129"). Drives the default part-number prefix
-   *  for new projects: `${YY}-${teamNumber}`. */
-  teamNumber?: string
   welcomeMessage?: string
   gitHubOrg?: string
   projectPrefix?: string
-  /** Auto-bug-report destination repo (`owner/name`). Runtime override;
-   *  build-time default is FRAMECAD_DEFAULT_ISSUE_REPO. Falls back to
-   *  upstream `netarcx/FrameCAD` if neither is set. */
-  issueRepo?: string
-  /** Mentor-set admin PIN hash (lowercase 64-char SHA-256 hex), or empty.
-   *  When set, takes priority over the build-time FRAMECAD_ADMIN_PIN_HASH
-   *  default. Not synced with the team — stored in per-machine userData. */
-  adminPinHash?: string
 }
 
 export interface GlobalAdminState {
@@ -64,11 +52,6 @@ function buildDefaults(): GlobalAdminConfig {
       typeof __FRAMECAD_DEFAULT_TEAM_NAME__ !== 'undefined' ? __FRAMECAD_DEFAULT_TEAM_NAME__ : undefined),
     welcomeMessage: readDefine('WELCOME',
       typeof __FRAMECAD_DEFAULT_WELCOME_MESSAGE__ !== 'undefined' ? __FRAMECAD_DEFAULT_WELCOME_MESSAGE__ : undefined),
-    issueRepo: readDefine('ISSUE_REPO',
-      typeof __FRAMECAD_DEFAULT_ISSUE_REPO__ !== 'undefined' ? __FRAMECAD_DEFAULT_ISSUE_REPO__ : undefined),
-    // teamNumber and adminPinHash have no build-time default in upstream;
-    // forks that want a baked default can extend this list and declare
-    // matching __FRAMECAD_DEFAULT_*__ vite defines.
   }
 }
 
@@ -80,14 +63,12 @@ async function readLocal(): Promise<GlobalAdminConfig | null> {
   try {
     const raw = await fs.readFile(localPath(), 'utf-8')
     const parsed = JSON.parse(raw) as Record<string, unknown>
+    // Coerce only the four known fields — ignore anything else
     return {
       teamName: typeof parsed.teamName === 'string' ? parsed.teamName : undefined,
-      teamNumber: typeof parsed.teamNumber === 'string' ? parsed.teamNumber : undefined,
       welcomeMessage: typeof parsed.welcomeMessage === 'string' ? parsed.welcomeMessage : undefined,
       gitHubOrg: typeof parsed.gitHubOrg === 'string' ? parsed.gitHubOrg : undefined,
       projectPrefix: typeof parsed.projectPrefix === 'string' ? parsed.projectPrefix : undefined,
-      issueRepo: typeof parsed.issueRepo === 'string' ? parsed.issueRepo : undefined,
-      adminPinHash: typeof parsed.adminPinHash === 'string' ? parsed.adminPinHash : undefined,
     }
   } catch {
     return null
@@ -97,14 +78,12 @@ async function readLocal(): Promise<GlobalAdminConfig | null> {
 async function writeLocal(config: GlobalAdminConfig): Promise<void> {
   const dir = path.dirname(localPath())
   await fs.mkdir(dir, { recursive: true })
+  // Keep only string-valued, non-empty fields so the file stays minimal
   const cleaned: GlobalAdminConfig = {}
   if (pick(config.teamName)) cleaned.teamName = config.teamName!.trim()
-  if (pick(config.teamNumber)) cleaned.teamNumber = config.teamNumber!.trim()
   if (pick(config.welcomeMessage)) cleaned.welcomeMessage = config.welcomeMessage!.trim()
   if (pick(config.gitHubOrg)) cleaned.gitHubOrg = config.gitHubOrg!.trim()
   if (pick(config.projectPrefix)) cleaned.projectPrefix = config.projectPrefix!.trim()
-  if (pick(config.issueRepo)) cleaned.issueRepo = config.issueRepo!.trim()
-  if (pick(config.adminPinHash)) cleaned.adminPinHash = config.adminPinHash!.trim().toLowerCase()
   await fs.writeFile(localPath(), JSON.stringify(cleaned, null, 2) + '\n', 'utf-8')
 }
 
@@ -124,12 +103,9 @@ function merge(defaults: GlobalAdminConfig, local: GlobalAdminConfig | null): Gl
   if (!local) return { ...defaults }
   return {
     teamName: pick(local.teamName) ?? defaults.teamName,
-    teamNumber: pick(local.teamNumber) ?? defaults.teamNumber,
     welcomeMessage: pick(local.welcomeMessage) ?? defaults.welcomeMessage,
     gitHubOrg: pick(local.gitHubOrg) ?? defaults.gitHubOrg,
     projectPrefix: pick(local.projectPrefix) ?? defaults.projectPrefix,
-    issueRepo: pick(local.issueRepo) ?? defaults.issueRepo,
-    adminPinHash: pick(local.adminPinHash) ?? defaults.adminPinHash,
   }
 }
 

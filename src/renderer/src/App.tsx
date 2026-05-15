@@ -14,7 +14,6 @@ import AdminPinPrompt from './components/AdminPinPrompt'
 import ManufacturingQueue from './components/ManufacturingQueue'
 import ManufacturingModeShell from './components/ManufacturingModeShell'
 import OnboardingTour from './components/OnboardingTour'
-import FirstRunWizard from './components/FirstRunWizard'
 import Sidebar, { type SidebarSection } from './components/Sidebar'
 import ActivityView from './components/ActivityView'
 import PartsManager from './components/PartsManager'
@@ -85,26 +84,13 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
   const [updateReady, setUpdateReady] = useState(false)
-  const [updateError, setUpdateError] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [adminConfig, setAdminConfig] = useState<AdminConfig>({})
   const [globalAdmin, setGlobalAdmin] = useState<GlobalAdminConfig>({})
-  const [globalAdminDefaults, setGlobalAdminDefaults] = useState<GlobalAdminConfig>({})
-  // First-run wizard: shows on a fresh install when the user has no
-  // local override AND the build didn't bake one in (the public binary
-  // case). Skipped once dismissed by writing a minimal override file so
-  // hasLocalOverride flips to true.
-  const [showFirstRun, setShowFirstRun] = useState(false)
 
   const refreshGlobalAdmin = useCallback(() => {
     window.api.getGlobalAdmin()
-      .then(state => {
-        setGlobalAdmin(state.effective)
-        setGlobalAdminDefaults(state.defaults)
-        if (!state.hasLocalOverride && !state.effective.teamName) {
-          setShowFirstRun(true)
-        }
-      })
+      .then(state => setGlobalAdmin(state.effective))
       .catch(() => {})
   }, [])
 
@@ -442,8 +428,7 @@ export default function App() {
       window.api.onUpdateDownloaded(() => {
         setUpdateProgress(null)
         setUpdateReady(true)
-      }),
-      window.api.onUpdateError(({ message }) => setUpdateError(message))
+      })
     ]
     return () => cleanups.forEach(fn => fn())
   }, [])
@@ -549,27 +534,22 @@ export default function App() {
     </div>
   )
 
-  const updateBanner = (updateInfo || updateError) && (
-    <div className={`update-banner${updateError ? ' update-banner-error' : ''}`}>
-      {updateError ? (
+  const updateBanner = updateInfo && (
+    <div className="update-banner">
+      {updateReady ? (
         <>
-          <span>Auto-update check failed: {updateError}</span>
-          <button onClick={() => setUpdateError(null)}>Dismiss</button>
-        </>
-      ) : updateReady ? (
-        <>
-          <span>Update v{updateInfo!.version} ready to install</span>
+          <span>Update v{updateInfo.version} ready to install</span>
           <button onClick={() => window.api.restartToUpdate()}>Restart Now</button>
         </>
       ) : updateProgress != null ? (
         <>
-          <span>Downloading v{updateInfo!.version}... {updateProgress}%</span>
+          <span>Downloading v{updateInfo.version}... {updateProgress}%</span>
           <div className="update-progress">
             <div className="update-progress-bar" style={{ width: `${updateProgress}%` }} />
           </div>
         </>
       ) : (
-        <span>Update v{updateInfo!.version} available — downloading...</span>
+        <span>Update v{updateInfo.version} available — downloading...</span>
       )}
     </div>
   )
@@ -586,28 +566,6 @@ export default function App() {
 
   const onboardingModal = showOnboarding && (
     <OnboardingTour onClose={dismissOnboarding} />
-  )
-
-  const firstRunModal = showFirstRun && (
-    <FirstRunWizard
-      defaults={globalAdminDefaults}
-      onSubmit={async (config, adminPin) => {
-        await window.api.saveGlobalAdmin(config)
-        if (adminPin) {
-          try { await window.api.adminPinSet(adminPin) } catch { /* non-fatal */ }
-        }
-        refreshGlobalAdmin()
-        setShowFirstRun(false)
-      }}
-      onSkip={async () => {
-        // Persist an empty override so hasLocalOverride flips true and
-        // the wizard doesn't reappear on next launch. User can fill in
-        // the details later from Admin.
-        try { await window.api.saveGlobalAdmin({}) } catch { /* ignore */ }
-        refreshGlobalAdmin()
-        setShowFirstRun(false)
-      }}
-    />
   )
 
   const depsModal = missingDeps && (
@@ -786,7 +744,6 @@ export default function App() {
         {depsModal}
         {offlineBanner}
         {onboardingModal}
-        {firstRunModal}
         {progressModal}
         {versionCorner}
       </div>

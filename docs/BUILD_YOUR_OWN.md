@@ -1,19 +1,8 @@
 # Build your own FrameCAD
 
-> **Most teams should not need this guide.** The upstream binary at
-> [netarcx/FrameCAD](https://github.com/netarcx/FrameCAD/releases) runs a
-> one-time setup wizard on first launch that captures your team number,
-> GitHub org, repo prefix, and admin PIN — all the team-specific bits
-> are configurable from inside the app, no rebuild required.
->
-> Fork this project only if you want one of: a custom name + brand on
-> the installer, a code-signing cert applied at build, auto-bug-reports
-> sent to your own GitHub tracker, defaults baked in so every laptop
-> arrives pre-configured (skipping the first-run wizard for your team).
-
-FrameCAD was originally written for FRC Team 2129, but the team-specific
-bits live in a handful of build-time environment variables. Forking and
-shipping your own team's distribution takes maybe an hour.
+FrameCAD was written for FRC Team 2129, but the team-specific bits live
+in a handful of build-time environment variables. Forking and shipping
+your own team's distribution takes maybe an hour.
 
 This doc covers what you'll need to change. The result is an installer
 that auto-fills your team's defaults on every machine it lands on, plus

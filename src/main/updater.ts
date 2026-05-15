@@ -35,12 +35,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
   })
 
   autoUpdater.on('error', (err) => {
-    const message = err?.message || String(err)
-    console.error('Auto-update error:', message)
-    const win = getMainWindow()
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('update-error', { message })
-    }
+    console.error('Auto-update error:', err?.message || err)
   })
 
   ipcMain.handle('restart-to-update', () => {
