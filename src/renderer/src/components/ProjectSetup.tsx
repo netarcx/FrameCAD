@@ -239,6 +239,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   // the inner click-animations (slam, flip, etc.) can still apply their
   // own transforms on top.
   const logoBounceRef = useRef<HTMLDivElement | null>(null)
+  const logoSpacerRef = useRef<HTMLDivElement | null>(null)
   const screensaverActiveRef = useRef(false)
   const bounceStateRef = useRef({
     x: 0, y: 0, vx: 0, vy: 0, naturalX: 0, naturalY: 0
@@ -291,6 +292,12 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
       w.style.top = ''
       w.style.width = ''
       w.style.height = ''
+      const spacer = logoSpacerRef.current
+      if (spacer) {
+        spacer.style.display = ''
+        spacer.style.width = ''
+        spacer.style.height = ''
+      }
       document.body.classList.remove('logo-screensaver-active')
     }, 550)
   }, [])
@@ -323,6 +330,17 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     wrap.style.top = `${rect.top}px`
     wrap.style.width = `${rect.width}px`
     wrap.style.height = `${rect.height}px`
+    // Size the spacer to the wrap's exact rect rather than relying on
+    // the CSS rule's hardcoded 192x192 — devicePixelRatio, font scaling
+    // and parent transforms can all shift the actual rendered size,
+    // which would otherwise leave the following elements (title, cards)
+    // shifted up by the difference.
+    const spacer = logoSpacerRef.current
+    if (spacer) {
+      spacer.style.display = 'block'
+      spacer.style.width = `${rect.width}px`
+      spacer.style.height = `${rect.height}px`
+    }
     document.body.classList.add('logo-screensaver-active')
     let last = performance.now()
     const tick = (now: number): void => {
@@ -504,6 +522,15 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
 
     el.classList.add(cls)
 
+    // Slam starts the logo at translateY(-130vh), which expands the
+    // scroll container's overflow upward and pops a scrollbar for the
+    // duration of the fall. Add a class to the closest .setup-screen
+    // ancestor that hides overflow; cleared on animationend below.
+    // Using JS + a static class (rather than :has()) for cross-version
+    // reliability — :has() didn't take effect for some users.
+    const setupScreen = cls === 'slam' ? el.closest('.setup-screen') : null
+    setupScreen?.classList.add('slam-active')
+
     // Fire the water-ripple right at the moment the logo hits the
     // ground (60% of the 1500ms keyframe = 900ms). Snapshot is
     // pre-captured on welcome-screen mount so there's no capture
@@ -526,6 +553,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
         el.style.removeProperty('--slam-squash-y')
         el.style.removeProperty('--slam-squash-down')
         el.style.removeProperty('--slam-bounce')
+        setupScreen?.classList.remove('slam-active')
       }
       if (slamCleanup !== null) {
         window.clearTimeout(slamCleanup)
@@ -649,7 +677,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <span>Admin Panel</span>
           </button>
         )}
-        <div className="setup-logo-spacer" aria-hidden="true" />
+        <div ref={logoSpacerRef} className="setup-logo-spacer" aria-hidden="true" />
         <div ref={logoBounceRef} className="setup-logo-bounce-wrap">
           <div
             ref={logoRef}

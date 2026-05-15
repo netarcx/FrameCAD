@@ -281,12 +281,13 @@ body.logo-screensaver-active .setup-logo-bounce-wrap { z-index: 2; }
 
 /* The slam keyframe starts at translateY(-130vh), which expands the
    scrollable area upward and pops a vertical scrollbar on the welcome
-   screen while the logo falls. Hide overflow on the scroll container
-   for the duration of the slam — `:has()` matches only while the
-   class is present, so the scrollbar comes back automatically when
-   the animation ends. */
-.setup-screen:has(.setup-logo.slam) {
-  overflow: hidden;
+   screen while the logo falls. JS adds .slam-active to .setup-screen
+   for the duration of the slam (set + cleared around the .setup-logo
+   class toggle in ProjectSetup.tsx). !important needed because the
+   original .setup-screen { overflow-y: auto } longhand can win over
+   the shorthand in some style-resolution orders. */
+.setup-screen.slam-active {
+  overflow: hidden !important;
 }
 
 /* @property registration so the radial-gradient stop position is an
