@@ -279,6 +279,16 @@ body.logo-screensaver-active .setup-logo-bounce-wrap { z-index: 2; }
   will-change: transform;
 }
 
+/* The slam keyframe starts at translateY(-130vh), which expands the
+   scrollable area upward and pops a vertical scrollbar on the welcome
+   screen while the logo falls. Hide overflow on the scroll container
+   for the duration of the slam — `:has()` matches only while the
+   class is present, so the scrollbar comes back automatically when
+   the animation ends. */
+.setup-screen:has(.setup-logo.slam) {
+  overflow: hidden;
+}
+
 /* @property registration so the radial-gradient stop position is an
    animatable typed value. Without this, browsers treat the custom
    property as an unparsed string and snap between keyframes instead
