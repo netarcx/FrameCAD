@@ -714,7 +714,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
               <input
                 value={globalForm.teamName ?? ''}
                 onChange={e => setGlobal('teamName', e.target.value)}
-                placeholder={globalState?.defaults.teamName || 'FRC Team 2129'}
+                placeholder={globalState?.defaults.teamName || 'e.g. FRC Team 9999'}
               />
               <label>Welcome message</label>
               <textarea
@@ -777,7 +777,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
                   <input
                     value={config.defaultPartPrefix ?? ''}
                     onChange={e => set('defaultPartPrefix', e.target.value)}
-                    placeholder="e.g. 26-2129"
+                    placeholder="e.g. 26-9999 (year + team number)"
                   />
                   <p className="admin-hint">
                     Stays with this project. Used by the auto-numbering when creating
@@ -819,7 +819,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
                     FrameCAD's numbering scheme. New files keep their
                     original filename (e.g. <code>Frame.sldprt</code>) as
                     the displayed part number instead of getting a
-                    generated <code>26-2129-001</code>. <strong>Toggling
+                    generated <code>26-NNNN-001</code>. <strong>Toggling
                     doesn't rewrite existing part numbers</strong> — SolidWorks
                     assembly references would break if it did, so once a
                     file has a number it keeps that number for life. Only

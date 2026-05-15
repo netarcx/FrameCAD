@@ -206,9 +206,18 @@ export interface AdminConfig {
  */
 export interface GlobalAdminConfig {
   teamName?: string
+  /** FRC team number, e.g. "2129". Drives the default part-number prefix
+   *  (`${YY}-${teamNumber}`) suggested when creating a new project. */
+  teamNumber?: string
   welcomeMessage?: string
   gitHubOrg?: string
   projectPrefix?: string
+  /** Auto-bug-report destination repo (`owner/name`). Runtime override
+   *  for forks that don't want reports flowing upstream. */
+  issueRepo?: string
+  /** Mentor-set admin PIN hash (SHA-256 hex). When set, takes priority
+   *  over the build-time embedded PIN. Per-machine, not synced. */
+  adminPinHash?: string
 }
 
 export interface GlobalAdminState {
@@ -300,6 +309,7 @@ export interface IpcApi {
   getAdminConfig(): Promise<AdminConfig>
   adminPinRequired(): Promise<boolean>
   adminPinVerify(pin: string): Promise<boolean>
+  adminPinSet(pin: string): Promise<void>
   getGlobalAdmin(): Promise<GlobalAdminState>
   saveGlobalAdmin(config: GlobalAdminConfig): Promise<void>
   resetGlobalAdmin(): Promise<void>
@@ -345,6 +355,7 @@ export interface IpcApi {
   onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void
   onUpdateDownloadProgress(callback: (progress: { percent: number }) => void): () => void
   onUpdateDownloaded(callback: () => void): () => void
+  onUpdateError(callback: (info: { message: string }) => void): () => void
   onPublishProgress(callback: (progress: PublishProgress) => void): () => void
   onJoinProgress(callback: (progress: PublishProgress) => void): () => void
 }

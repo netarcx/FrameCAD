@@ -6,7 +6,7 @@
 
 **Git-based CAD collaboration that hides Git behind a button.**
 
-Built for FRC Team 2129 (Ultraviolet). SolidWorks-friendly. No CLI required.
+Built by FRC Team 2129 (Ultraviolet), free for any FRC team to use. SolidWorks-friendly. No CLI required.
 
 [![Latest release](https://img.shields.io/github/v/release/netarcx/FrameCAD?style=flat-square)](https://github.com/netarcx/FrameCAD/releases/latest)
 [![Build](https://img.shields.io/github/actions/workflow/status/netarcx/FrameCAD/build-installer.yml?branch=main&style=flat-square)](https://github.com/netarcx/FrameCAD/actions/workflows/build-installer.yml)
@@ -24,7 +24,7 @@ Built for FRC Team 2129 (Ultraviolet). SolidWorks-friendly. No CLI required.
 FrameCAD is a desktop app that lets a robotics team collaborate on SolidWorks assemblies the same way developers collaborate on code — except your students never see a Git command. Under the hood it's Git + Git LFS + GitHub; on the surface it's **Download**, **Upload**, **Check Out**, and **Check In**.
 
 - 🔒 **Check-out / check-in locks** on every CAD file so two students can't accidentally edit the same part at the same time. Backed by `git lfs lock`.
-- 📁 **Auto part numbering** in your team's format (`YY-2129-XX-YYY`). New parts and assemblies are created pre-named — SolidWorks references never break from renames.
+- 📁 **Auto part numbering** in your team's format (`YY-NNNN-XX-YYY` where `NNNN` is your FRC team number). New parts and assemblies are created pre-named — SolidWorks references never break from renames.
 - 🔧 **SolidWorks task pane add-in** with the same buttons (Check Out / Check In / Sync / Publish) inside SolidWorks itself.
 - 📊 **Build-season documents** generated from your CAD: Bill of Materials (CSV + PDF), Manufacturing Queue cut list (CSV + PDF), Project Summary with FRC 125 lb weight headroom (Markdown + PDF).
 - 🛒 **Manufacturing queue** that groups released parts by method (3D Print / CNC / Manual / Other) and material — shop floor walks the queue in one direction.
@@ -56,9 +56,16 @@ Latest installers are auto-built from `main`:
 ## Quick start
 
 1. **Download and install** FrameCAD for your platform.
-2. **Sign in to GitHub** from the welcome screen (the installer already put `gh` CLI on your machine if winget was available).
-3. Click **Create Project** to start a new robot, **Browse Projects** to list existing team repos, or **Join Project** to clone one by URL.
-4. Open a CAD file in SolidWorks. **Check Out** before you edit it. **Check In** when you're done. **Upload** to push your changes for the rest of the team to see.
+2. **Tell it about your team.** First launch opens a one-time setup wizard asking for your team name, FRC team number, and GitHub org. Everything's editable later from the Admin panel (`Ctrl+Shift+A`).
+3. **Sign in to GitHub** from the welcome screen (the installer already put `gh` CLI on your machine if winget was available).
+4. Click **Create Project** to start a new robot, **Browse Projects** to list existing team repos, or **Join Project** to clone one by URL.
+5. Open a CAD file in SolidWorks. **Check Out** before you edit it. **Check In** when you're done. **Upload** to push your changes for the rest of the team to see.
+
+## For other FRC teams
+
+You can use the upstream `netarcx/FrameCAD` build as-is — the first-run wizard customises everything that's team-specific (team number, GitHub org, repo prefix, optional admin PIN). Nothing needs to be rebuilt from source.
+
+If you want your own brand (custom name, signed installer, your team's tracker for auto-bug-reports, baked-in defaults so every laptop on your team starts pre-configured), see [docs/BUILD_YOUR_OWN.md](docs/BUILD_YOUR_OWN.md) for the fork-and-build path.
 
 For a student-friendly walkthrough, see [docs/STUDENT_SETUP.md](docs/STUDENT_SETUP.md).
 
@@ -89,4 +96,4 @@ This is a small project built for one FRC team, but PRs and issues are welcome �
 
 ## License
 
-Source-available for FRC team use. No license file is currently included — if you're a mentor on another team interested in using FrameCAD, open an issue and we'll talk.
+[MIT](LICENSE). Free to use, fork, modify, and ship for any team or project.

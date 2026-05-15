@@ -1,6 +1,6 @@
 # FrameCAD — Student Setup Guide
 
-Welcome to FRC Team 2129's CAD workflow. FrameCAD is the desktop app the team uses to share SolidWorks files. You won't need to know Git, but you'll need to install three small tools once, then everything is one-click after that.
+Welcome to your team's CAD workflow. FrameCAD is the desktop app your team uses to share SolidWorks files. You won't need to know Git, but you'll need to install three small tools once, then everything is one-click after that.
 
 Total setup time: about 10 minutes.
 
@@ -129,7 +129,7 @@ While a file is checked out by you, the file shows a blue dot. Nobody else on th
 2. Optionally type a description.
 3. Click **Create Part**.
 
-FrameCAD reserves a unique part number like `26-2129-001`, then the SolidWorks add-in automatically creates a new part document with that filename. You'll see the new part open in SolidWorks ready to design.
+FrameCAD reserves a unique part number like `26-NNNN-001` (where `NNNN` is your team number), then the SolidWorks add-in automatically creates a new part document with that filename. You'll see the new part open in SolidWorks ready to design.
 
 ### To upload your work
 
@@ -171,7 +171,7 @@ The progress modal will show you what's happening. Most likely:
 - Your network is slow — give it time
 - Your GitHub login expired — click **Sign in with GitHub** again from the welcome screen
 
-### "The file 26-2129-001.sldprt is corrupt"
+### "The file 26-NNNN-001.sldprt is corrupt"
 
 This used to happen on older FrameCAD versions (pre-0.4.7). If you see it on a file you created recently, delete the file from File Explorer, then create a new part with the same number from the add-in's **+ Part** button — that uses SolidWorks's own template instead of an empty file.
 

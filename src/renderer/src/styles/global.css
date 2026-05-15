@@ -2628,6 +2628,104 @@ body.slam-shake {
   margin-top: 16px;
 }
 
+/* ─── First-run setup wizard ─── */
+.first-run-overlay { z-index: 2200; }
+.first-run-modal {
+  width: 560px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 28px 32px;
+  position: relative;
+}
+.first-run-modal .modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+}
+.first-run-modal .modal-close:hover { background: rgba(127, 127, 127, 0.12); color: var(--text); }
+.first-run-modal h2 { margin: 0 0 4px; }
+.first-run-intro {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 18px;
+  line-height: 1.5;
+}
+.first-run-grid {
+  display: grid;
+  gap: 14px;
+}
+.first-run-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.first-run-grid label > span { font-weight: 600; }
+.first-run-grid label .req { color: var(--danger, #d04444); font-style: normal; margin-left: 2px; }
+.first-run-grid input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+.first-run-grid input:focus { outline: none; border-color: var(--accent); }
+.first-run-grid small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.first-run-grid small code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.15);
+  font-size: 10px;
+}
+.first-run-error {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(208, 68, 68, 0.12);
+  color: var(--danger, #d04444);
+  font-size: 12px;
+}
+.first-run-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+.first-run-actions .btn-ghost {
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.first-run-actions .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+.first-run-actions .btn-primary {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+.first-run-actions .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ─── Setup Screen ─── */
 
 .setup-screen {
@@ -2664,6 +2762,18 @@ body.slam-shake {
   color: var(--text-muted);
   margin-top: 2px;
   letter-spacing: 0.3px;
+}
+
+.setup-screen .welcome-message {
+  max-width: 640px;
+  margin: 14px auto 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--surface-subtle, rgba(127, 127, 127, 0.08));
+  color: var(--text-secondary, var(--text-muted));
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .setup-screen .team-label {
@@ -3223,6 +3333,19 @@ body.slam-shake {
 
 .update-banner button:hover {
   background: var(--accent-hover);
+}
+
+.update-banner-error {
+  background: rgba(208, 68, 68, 0.12);
+  border-bottom-color: var(--danger, #d04444);
+  color: var(--danger, #d04444);
+}
+.update-banner-error button {
+  background: var(--danger, #d04444);
+  color: white;
+}
+.update-banner-error button:hover {
+  background: #b53737;
 }
 
 .update-progress {

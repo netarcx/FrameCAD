@@ -676,6 +676,9 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
         {globalAdmin?.teamName && (
           <p className="subtitle subtitle-team">for {globalAdmin.teamName}</p>
         )}
+        {globalAdmin?.welcomeMessage && (
+          <p className="welcome-message">{globalAdmin.welcomeMessage}</p>
+        )}
         {pinnedProjects.length > 0 && (
           <div className="pinned-projects">
             {pinnedProjects.map(p => (
@@ -859,7 +862,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
           <div className="form-group">
             <label>Location</label>
             <div className="path-input">
-              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\team2129\Documents" />
+              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\YourTeam\Documents" />
               <button className="browse-btn" onClick={handleBrowse}>Browse</button>
             </div>
           </div>
@@ -868,7 +871,7 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <input
               value={remote}
               onChange={e => setRemote(e.target.value)}
-              placeholder="https://github.com/frc2129/2026-robot.git"
+              placeholder="https://github.com/your-team-org/2026-robot.git"
             />
             {orgConfigured && projectPrefix && name && authStatus?.loggedIn && (
               <p className="admin-hint">
@@ -944,14 +947,14 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
             <input
               value={url}
               onChange={e => setUrl(e.target.value)}
-              placeholder="https://github.com/frc2129/2026-robot.git"
+              placeholder="https://github.com/your-team-org/2026-robot.git"
               autoFocus
             />
           </div>
           <div className="form-group">
             <label>Save To</label>
             <div className="path-input">
-              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\team2129\Documents" />
+              <input value={path} onChange={e => setPath(e.target.value)} placeholder="C:\Users\YourTeam\Documents" />
               <button className="browse-btn" onClick={handleBrowse}>Browse</button>
             </div>
           </div>

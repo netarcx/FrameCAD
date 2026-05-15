@@ -137,6 +137,9 @@ const api: IpcApi = {
   adminPinVerify: (pin) =>
     ipcRenderer.invoke('admin-pin-verify', pin),
 
+  adminPinSet: (pin) =>
+    ipcRenderer.invoke('admin-pin-set', pin),
+
   getGlobalAdmin: () =>
     ipcRenderer.invoke('get-global-admin'),
 
@@ -257,6 +260,13 @@ const api: IpcApi = {
     const handler = () => callback()
     ipcRenderer.on('update-downloaded', handler)
     return () => ipcRenderer.removeListener('update-downloaded', handler)
+  },
+
+  onUpdateError: (callback) => {
+    const handler = (_event: Electron.IpcRendererEvent, info: unknown) =>
+      callback(info as Parameters<typeof callback>[0])
+    ipcRenderer.on('update-error', handler)
+    return () => ipcRenderer.removeListener('update-error', handler)
   },
 
   onPublishProgress: (callback) => {

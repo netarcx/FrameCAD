@@ -20,7 +20,7 @@ For end-user docs see the [README](../README.md). For student onboarding see [ST
 
 ### Part numbering system
 
-Hierarchical part numbers in the format `YY-2129-XX-YYY` (year-team-subsystem-part). `parts.json` is committed to Git so the whole team shares a single source of truth.
+Hierarchical part numbers in the format `YY-NNNN-XX-YYY` (year-team-subsystem-part), where `NNNN` is your FRC team number, set in the admin panel. `parts.json` is committed to Git so the whole team shares a single source of truth.
 
 - Auto-assigns numbers to SolidWorks files (`.sldprt`, `.sldasm`, `.slddrw`)
 - **Top-level folder = subsystem**. Sub-folders inherit the parent subsystem's number (no extra dash-segment per nested folder)
@@ -29,14 +29,14 @@ Hierarchical part numbers in the format `YY-2129-XX-YYY` (year-team-subsystem-pa
 - Deleted file entries remain as tombstones so part numbers are never reused
 
 ```
-YY-2129-XX-YYY
+YY-NNNN-XX-YYY
  │   │    │   └── Part number (3 digits, per-subsystem counter)
  │   │    └────── Subsystem number (2 digits, per top-level folder)
- │   └─────────── Team number
+ │   └─────────── Team number (your FRC team #, set in admin panel)
  └─────────────── Year (last 2 digits, set at project creation)
 ```
 
-Examples (for a project created in 2026):
+Examples (for a project created in 2026 by FRC team 2129):
 - `26-2129-001` — a part in the project root (no subsystem)
 - `26-2129-01` — the first subsystem (top-level folder)
 - `26-2129-01-001` — the first part inside that subsystem (regardless of how deeply nested)
