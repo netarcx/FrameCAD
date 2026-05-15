@@ -2733,12 +2733,14 @@ body.slam-shake {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  /* min-height + padding + box-sizing so the screen centers content
-     vertically when there's room AND grows to scroll when there's not.
-     Fixed `height: 100vh` with `justify-content: center` was clipping
-     the logo off the top whenever the welcome content (logo + 3 cards
-     + recent projects + auth row) was taller than the window. */
+  /* `safe center` keeps the content vertically centered when there's
+     room, AND falls back to top-aligned (flex-start) when the content
+     exceeds the viewport — instead of centering it and clipping the
+     top (which used to swallow the logo). Required for the welcome
+     screen to stay readable down to minHeight 680 once you have
+     pinned projects + welcome message + recent projects + auth row
+     all stacked. */
+  justify-content: safe center;
   min-height: 100vh;
   padding: 32px 16px;
   box-sizing: border-box;
