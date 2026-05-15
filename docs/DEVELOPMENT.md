@@ -82,7 +82,7 @@ Per-project field in admin settings. When set, FrameCAD writes a `.lfsconfig` at
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 18 or later
+- [Node.js](https://nodejs.org/) 24 (matches `.nvmrc` and CI). 22 also works; 20 is past EOL.
 - [Git](https://git-scm.com/) with [Git LFS](https://git-lfs.com/) installed
 - A GitHub account and repository for team collaboration
 

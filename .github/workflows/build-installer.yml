@@ -6,6 +6,14 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  # Opt every JS-based action (checkout, setup-node, setup-dotnet,
+  # upload-artifact) into Node.js 24 instead of the runner's default
+  # Node 20. Node 20 hits end-of-life on the runner Sept 2026; this
+  # flag becomes the default June 2026. Setting it now silences the
+  # deprecation warnings and exercises the future runtime today.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # Compute which platforms to build for this run. Windows on every
   # push; mac/linux only when the workflow is manually dispatched.
@@ -71,7 +79,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       # SolidWorks add-in only builds on Windows (the SW interop assemblies
       # are Windows-specific and the add-in only loads inside SolidWorks).
