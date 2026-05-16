@@ -1,6 +1,20 @@
 !include "LogicLib.nsh"
 
+; Override electron-builder's built-in "app is running" check — we handle
+; it ourselves in customInit by force-killing the lingering process.
+!macro customCheckAppRunning
+!macroend
+
 !macro customInit
+  ; Kill any lingering FrameCAD process (Electron can take a few seconds
+  ; to fully exit after the window closes, which makes NSIS think the app
+  ; is still running and abort with "cannot close FrameCAD").
+  nsExec::ExecToStack 'cmd /c taskkill /IM "FrameCAD.exe" /F 2>nul'
+  Pop $0
+  Pop $1
+  ; Brief pause so the OS releases file handles
+  Sleep 1000
+
   ; Block install if SolidWorks is running so we can replace the locked add-in DLLs
   framecad_sw_check:
   nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq SLDWORKS.exe" /NH 2>nul | find /I "SLDWORKS.exe"'
