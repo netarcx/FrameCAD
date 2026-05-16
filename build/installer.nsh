@@ -27,6 +27,26 @@
 !macroend
 
 !macro customInstall
+  ; Wipe stale Electron files from the previous version so they don't
+  ; accumulate across upgrades and eat SSD space. We only delete the
+  ; directories that electron-builder owns — the uninstaller, solidworks-
+  ; addin folder, and user data are left alone.
+  RMDir /r "$INSTDIR\resources"
+  RMDir /r "$INSTDIR\locales"
+  RMDir /r "$INSTDIR\swiftshader"
+  Delete "$INSTDIR\*.dll"
+  Delete "$INSTDIR\*.pak"
+  Delete "$INSTDIR\*.bin"
+  Delete "$INSTDIR\*.dat"
+  Delete "$INSTDIR\*.json"
+  Delete "$INSTDIR\snapshot_blob.bin"
+  Delete "$INSTDIR\v8_context_snapshot.bin"
+  Delete "$INSTDIR\LICENSE*"
+  Delete "$INSTDIR\LICENSES*"
+  Delete "$INSTDIR\chrome_*.pak"
+  Delete "$INSTDIR\FrameCAD.exe"
+  Delete "$INSTDIR\TrentCAD.exe"
+
   ; Unregister any existing add-in for a clean upgrade. Handle BOTH the
   ; new FrameCAD.SolidWorksAddin.dll filename AND the pre-1.1.0
   ; TrentCAD.SolidWorksAddin.dll so an upgrade from v1.0.x doesn't
