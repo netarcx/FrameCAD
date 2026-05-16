@@ -4,6 +4,7 @@ import { is } from '@electron-toolkit/utils'
 import { setupIpc, stopWatching, stopRestServer, isPublishing } from './ipc'
 import { startRestServer } from './rest'
 import { initAutoUpdater } from './updater'
+import { cleanupAskpass } from './auth'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -174,4 +175,12 @@ app.on('window-all-closed', () => {
   stopWatching()
   stopRestServer()
   if (process.platform !== 'darwin') app.quit()
+})
+
+// Best-effort cleanup of the GIT_ASKPASS temp script written under
+// /tmp by auth.ts. Removes the token-bearing file so it doesn't
+// survive a graceful exit. `before-quit` fires regardless of platform
+// and before windows are destroyed.
+app.on('before-quit', () => {
+  cleanupAskpass().catch(() => { /* best-effort */ })
 })

@@ -106,6 +106,22 @@ namespace FrameCAD.SolidWorksAddin
             return JsonConvert.DeserializeObject<ApiResult>(json);
         }
 
+        /// <summary>
+        /// Tell FrameCAD to `git add` a newly-created file so it's tracked
+        /// before the user's first publish. Best-effort — caller swallows
+        /// errors because the file will still surface as "untracked" in
+        /// the next status refresh. Uses the shared static HttpClient
+        /// (reuses sockets) instead of constructing a per-call client.
+        /// </summary>
+        public async Task<ApiResult> StageAsync(string relativePath)
+        {
+            var body = JsonConvert.SerializeObject(new { path = relativePath });
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var response = await Client.PostAsync($"{_baseUrl}/api/stage", content);
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<ApiResult>(json);
+        }
+
         public async Task<SyncResult> SyncAsync()
         {
             var response = await Client.PostAsync($"{_baseUrl}/api/sync", new StringContent("{}", Encoding.UTF8, "application/json"));

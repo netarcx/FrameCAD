@@ -2,6 +2,7 @@ import { exec, spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
+import { randomBytes } from 'crypto'
 
 export interface GitHubAuthStatus {
   ghCliAvailable: boolean
@@ -93,13 +94,43 @@ async function ensureGhCredentialHelper(gh: string): Promise<void> {
 }
 
 /**
+ * Per-session askpass script path. Randomised so two FrameCAD instances
+ * on the same machine don't clobber each other, and so the file name
+ * isn't a fixed target an outside process could overwrite between
+ * write and `git`'s read. Tracked module-level so we can delete on
+ * app quit and so repeated installAskpass calls reuse the same file.
+ */
+let askpassScriptPath: string | null = null
+
+/**
+ * Best-effort cleanup of the askpass script written by installAskpass.
+ * Called by index.ts on app `before-quit` so the token-bearing file
+ * doesn't survive a normal exit. Returns silently if no script was
+ * written or the unlink fails (file already gone, etc.).
+ */
+export async function cleanupAskpass(): Promise<void> {
+  if (!askpassScriptPath) return
+  const p = askpassScriptPath
+  askpassScriptPath = null
+  try { await fs.unlink(p) } catch { /* best-effort */ }
+}
+
+/**
  * Write a GIT_ASKPASS script for `token` so git calls it instead of
  * prompting on /dev/tty (which doesn't exist for packaged Linux builds
  * launched from a .desktop file). The script handles both Username and
- * Password prompts that git sends during HTTPS auth.
+ * Password prompts that git sends during HTTPS auth. The token lives
+ * inside the script body (not on the command line), so it doesn't
+ * appear in `ps aux` output — but the file persists on disk with mode
+ * 0700, so cleanupAskpass() should be called on app quit to remove it.
  */
 async function installAskpass(token: string): Promise<void> {
-  const scriptPath = path.join(os.tmpdir(), 'framecad-git-askpass.sh')
+  // Random suffix prevents two FrameCAD instances from sharing one
+  // askpass script (with potentially different tokens) and frustrates
+  // any attempt by another process to swap the file out between our
+  // write and git's read.
+  const suffix = randomBytes(8).toString('hex')
+  const scriptPath = path.join(os.tmpdir(), `framecad-git-askpass-${suffix}.sh`)
   const script =
     '#!/bin/sh\n' +
     'case "$1" in\n' +
@@ -107,6 +138,12 @@ async function installAskpass(token: string): Promise<void> {
     `  Password*) echo "${token}" ;;\n` +
     'esac\n'
   await fs.writeFile(scriptPath, script, { mode: 0o700 })
+  // If a previous askpass was installed in this session, remove it now
+  // so we don't leak files across multiple credential refreshes.
+  if (askpassScriptPath && askpassScriptPath !== scriptPath) {
+    fs.unlink(askpassScriptPath).catch(() => { /* best-effort */ })
+  }
+  askpassScriptPath = scriptPath
   process.env.GIT_ASKPASS = scriptPath
   process.env.GIT_TERMINAL_PROMPT = '0'
 }

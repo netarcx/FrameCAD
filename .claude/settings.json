@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Bash(cp*)",
+      "Bash(curl*)",
+      "Bash(grep*)",
+      "Bash(ls*)",
+      "Bash(python*)",
+      "Bash(python3*)",
+      "Bash(sed*)",
+      "Bash(npx tsc --noEmit *)",
+      "Bash(gh search *)",
+      "Bash(tasklist.exe*)"
+    ]
+  }
+}

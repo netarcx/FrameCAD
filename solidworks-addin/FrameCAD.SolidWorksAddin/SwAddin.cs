@@ -500,17 +500,14 @@ namespace FrameCAD.SolidWorksAddin
 
         private async System.Threading.Tasks.Task StageFileViaApi(string relativePath)
         {
-            // Tell FrameCAD to git-add the new file so it's actively tracked
+            // Tell FrameCAD to git-add the new file so it's actively
+            // tracked. Routes through FrameCadApiClient.StageAsync which
+            // reuses the shared static HttpClient — avoids the
+            // per-call HttpClient + socket-pool exhaustion anti-pattern.
             try
             {
-                using (var client = new System.Net.Http.HttpClient(
-                    new System.Net.Http.HttpClientHandler { UseProxy = false, Proxy = null }))
-                {
-                    client.Timeout = TimeSpan.FromSeconds(5);
-                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { path = relativePath });
-                    var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                    await client.PostAsync("http://127.0.0.1:42129/api/stage", content);
-                }
+                var client = new FrameCadApiClient();
+                await client.StageAsync(relativePath);
             }
             catch
             {

@@ -529,9 +529,26 @@ async function migrateLegacyMetaDir(dirPath: string): Promise<void> {
   } catch {
     return
   }
+  // Try fs.rename first — atomic on the same filesystem, no data
+  // duplication. If that fails (e.g. cross-volume EXDEV, or partial
+  // rename on a permissions error), fall back to copy + delete so a
+  // broken intermediate state can self-heal on next open.
   try {
     await fs.rename(oldDir, newDir)
-  } catch { /* best-effort; permissions or in-use file shouldn't block project open */ }
+    return
+  } catch (renameErr) {
+    console.warn(`[migrateLegacyMetaDir] fs.rename ${oldDir} → ${newDir} failed: ${(renameErr as Error).message}. Falling back to cp+rm.`)
+  }
+  try {
+    await fs.cp(oldDir, newDir, { recursive: true, errorOnExist: false, force: true })
+    await fs.rm(oldDir, { recursive: true, force: true })
+  } catch (fallbackErr) {
+    // Both rename and cp+rm failed. Leave both directories in place
+    // so the user can manually resolve; meta.ts will read from
+    // .framecad (now empty) and the project will operate without
+    // historical metadata until someone fixes permissions.
+    console.error(`[migrateLegacyMetaDir] cp+rm fallback also failed: ${(fallbackErr as Error).message}. Project will open without legacy metadata.`)
+  }
 }
 
 export async function openProject(dirPath: string): Promise<void> {
@@ -1046,9 +1063,27 @@ export async function publish(
       ? `Uploading small files (1 of 2, ${phase1Files.length} files)`
       : 'Uploading to GitHub')
 
-    const phase2Hash = await runPhase(phase2Files, phase2Msg, willSplit
-      ? `Uploading large files (2 of 2, ${phase2Files.length} files)`
-      : 'Uploading to GitHub')
+    let phase2Hash: string | null = null
+    try {
+      phase2Hash = await runPhase(phase2Files, phase2Msg, willSplit
+        ? `Uploading large files (2 of 2, ${phase2Files.length} files)`
+        : 'Uploading to GitHub')
+    } catch (phase2Err) {
+      // Phase 1 already pushed to origin, phase 2 failed mid-publish.
+      // Decorate the error so the UI tells the user they're in a
+      // partial-upload state instead of just showing a generic failure:
+      // some files made it to GitHub, others didn't, and re-publishing
+      // will only retry the failed ones.
+      if (willSplit && phase1Hash) {
+        const msg = (phase2Err as Error).message || String(phase2Err)
+        throw new Error(
+          `Publish partially completed: small files uploaded as ${phase1Hash.slice(0, 7)}, ` +
+          `but large-file phase failed. Re-publish to retry the remaining files.\n\n` +
+          `Underlying error: ${msg}`
+        )
+      }
+      throw phase2Err
+    }
 
     onProgress?.({ phase: 'done', files, percent: 100, detail: 'Upload complete' })
     return { success: true, hash: phase2Hash ?? phase1Hash ?? undefined }

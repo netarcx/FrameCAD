@@ -430,7 +430,9 @@ export default function App() {
         setUpdateReady(true)
       })
     ]
-    return () => cleanups.forEach(fn => fn())
+    // Guard against a preload that ever returns undefined for one of
+    // these subscriptions (contract violation but cheap to defend).
+    return () => cleanups.forEach(fn => { if (typeof fn === 'function') fn() })
   }, [])
 
   const handleProfileComplete = useCallback(() => {

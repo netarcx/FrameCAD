@@ -246,6 +246,11 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
   })
   const rafIdRef = useRef<number | null>(null)
   const idleTimerRef = useRef<number | null>(null)
+  // Tracks the 550 ms setTimeout that drops the bounce wrap out of
+  // position:fixed at the end of stopScreensaver's glide-back. Held in
+  // a ref so the unmount cleanup (and any subsequent stopScreensaver
+  // call) can cancel it instead of letting it fire on a detached DOM.
+  const stopScreensaverTimerRef = useRef<number | null>(null)
   const SCREENSAVER_IDLE_MS = 45_000
   const SCREENSAVER_SPEED = 130 // px/s — DVD-ish, slow enough to read
   // Bounds for +/- speed adjustments while screensaver is active.
@@ -271,6 +276,14 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     screensaverActiveRef.current = false
     if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
     rafIdRef.current = null
+    // Cancel any in-flight glide-back timer from a previous stop call
+    // before scheduling a new one — otherwise a stop-restart-stop
+    // sequence could double-fire the cleanup and clobber the
+    // in-progress screensaver's inline styles.
+    if (stopScreensaverTimerRef.current !== null) {
+      clearTimeout(stopScreensaverTimerRef.current)
+      stopScreensaverTimerRef.current = null
+    }
     const wrap = logoBounceRef.current
     if (!wrap) return
     // Smooth glide back to the natural layout position. The wrapper
@@ -279,7 +292,8 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
     // to where the in-flow version would sit.
     wrap.style.transition = 'transform 500ms cubic-bezier(0.22, 1, 0.36, 1)'
     wrap.style.transform = 'translate(0, 0)'
-    window.setTimeout(() => {
+    stopScreensaverTimerRef.current = window.setTimeout(() => {
+      stopScreensaverTimerRef.current = null
       const w = logoBounceRef.current
       if (!w) return
       // Drop out of fixed positioning and clear the spacer; wrapper
@@ -397,8 +411,18 @@ export default function ProjectSetup({ onCreateProject, onJoinProject, onOpenPro
       document.removeEventListener('mousemove', onActivity)
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('focus', onFocus)
-      if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current)
+      if (idleTimerRef.current !== null) {
+        window.clearTimeout(idleTimerRef.current)
+        idleTimerRef.current = null
+      }
       stopScreensaver()
+      // stopScreensaver schedules a 550ms glide-back timer that mutates
+      // DOM at the end. On unmount the DOM is going away — cancel the
+      // timer so the callback doesn't fire on a detached tree.
+      if (stopScreensaverTimerRef.current !== null) {
+        window.clearTimeout(stopScreensaverTimerRef.current)
+        stopScreensaverTimerRef.current = null
+      }
     }
   }, [mode, startScreensaver, stopScreensaver])
 

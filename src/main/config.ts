@@ -7,21 +7,27 @@ const CONFIG_FILE = 'framecad-app.json'
 const LEGACY_CONFIG_FILE = 'trentcad-app.json'
 
 // One-shot rename of the userData app-config file from the legacy
-// trentcad-app.json to framecad-app.json. Runs lazily on first read so
-// users on the new client keep their recent-projects list.
-let legacyConfigMigrationDone = false
-async function migrateLegacyConfigFile(): Promise<void> {
-  if (legacyConfigMigrationDone) return
-  legacyConfigMigrationDone = true
-  const newPath = path.join(app.getPath('userData'), CONFIG_FILE)
-  const oldPath = path.join(app.getPath('userData'), LEGACY_CONFIG_FILE)
-  try {
-    await fs.access(newPath)
-    return
-  } catch { /* new file absent */ }
-  try {
-    await fs.rename(oldPath, newPath)
-  } catch { /* old file absent or rename failed; harmless */ }
+// trentcad-app.json to framecad-app.json. Runs lazily on first read.
+// Stored as a Promise (not a boolean flag) so concurrent readConfig
+// calls await the SAME migration attempt instead of racing into two
+// fs.rename() calls — the second of which would error because the
+// first already moved the file. Once the promise settles, the cached
+// result lets every subsequent reader return immediately.
+let legacyConfigMigration: Promise<void> | null = null
+function migrateLegacyConfigFile(): Promise<void> {
+  if (legacyConfigMigration) return legacyConfigMigration
+  legacyConfigMigration = (async () => {
+    const newPath = path.join(app.getPath('userData'), CONFIG_FILE)
+    const oldPath = path.join(app.getPath('userData'), LEGACY_CONFIG_FILE)
+    try {
+      await fs.access(newPath)
+      return
+    } catch { /* new file absent — try the rename */ }
+    try {
+      await fs.rename(oldPath, newPath)
+    } catch { /* old file absent or rename failed; harmless */ }
+  })()
+  return legacyConfigMigration
 }
 
 /**

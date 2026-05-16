@@ -113,6 +113,36 @@ function parseJson(raw: string): unknown {
   }
 }
 
+/**
+ * Sanitize a `?path=…` query param so callers can't break out of the
+ * project directory via `..` segments, absolute paths, or back-slash
+ * mixed traversal. The REST API binds to 127.0.0.1 and is only
+ * "reached" by the SolidWorks add-in, but the input is still
+ * untrusted (anything running on the user's machine could hit it —
+ * a CAD macro, another local tool, etc.), so paths are treated like
+ * any other untrusted input.
+ *
+ * Returns the canonicalised, project-relative POSIX-style path, or
+ * null if the path is missing/invalid/escapes the project root.
+ */
+function sanitizeProjectRelPath(input: string | null): string | null {
+  if (!input) return null
+  // Reject paths that include any absolute-path marker or NUL byte.
+  // Normalize and re-check after — path.normalize collapses `.` and
+  // `..` but doesn't refuse them.
+  if (input.includes('\0')) return null
+  if (path.isAbsolute(input)) return null
+  // path.normalize uses the OS separator; convert to POSIX style so
+  // comparisons and downstream consumers (parts.json keys are stored
+  // with forward slashes) work consistently.
+  const normalized = path.normalize(input).split(path.sep).join('/')
+  // After normalize, a `..` segment that escapes the root remains a
+  // leading `..` (e.g. `../etc/passwd` normalizes to `../etc/passwd`).
+  if (normalized.startsWith('..') || normalized.includes('/../') || normalized === '..') return null
+  // Strip any leading `./` for consistency with manifest keys.
+  return normalized.replace(/^\.\//, '')
+}
+
 function findEntry(entries: FileEntry[], targetPath: string): FileEntry | null {
   for (const entry of entries) {
     if (entry.path === targetPath) return entry
@@ -156,9 +186,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
       case 'GET /api/file': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
-        const filePath = url.searchParams.get('path')
+        const filePath = sanitizeProjectRelPath(url.searchParams.get('path'))
         if (!filePath) {
-          json(res, 400, { error: 'Missing path parameter' })
+          json(res, 400, { error: 'Missing or invalid path parameter' })
           return
         }
         const files = await gitOps.getStatus()
@@ -183,12 +213,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
       case 'POST /api/checkout': {
         const body = parseJson(await readBody(req)) as { path?: string } | null
-        if (!body?.path) {
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath) {
           json(res, 400, { error: 'Missing or invalid path in request body' })
           return
         }
         try {
-          await serialWrite(() => lockOps.checkOut(body.path!))
+          await serialWrite(() => lockOps.checkOut(safePath))
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })
@@ -198,12 +229,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
       case 'POST /api/checkin': {
         const body = parseJson(await readBody(req)) as { path?: string } | null
-        if (!body?.path) {
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath) {
           json(res, 400, { error: 'Missing or invalid path in request body' })
           return
         }
         try {
-          await serialWrite(() => lockOps.checkIn(body.path!))
+          await serialWrite(() => lockOps.checkIn(safePath))
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })
@@ -236,7 +268,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
       case 'POST /api/parts/new-part': {
         const body = parseJson(await readBody(req)) as { folder?: string; description?: string } | null
-        const folder = body?.folder ?? ''
+        // Empty folder = project root. Otherwise sanitize: reject
+        // absolute paths and any traversal that would escape the
+        // project root.
+        const rawFolder = body?.folder ?? ''
+        const folder = rawFolder === '' ? '' : sanitizeProjectRelPath(rawFolder)
+        if (folder === null) {
+          json(res, 400, { error: 'Invalid folder path' })
+          return
+        }
         const result = await serialWrite(() => partsOps.createNewPart(folder, body?.description))
         json(res, 200, { success: true, ...result })
         return
@@ -245,14 +285,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       case 'POST /api/part-mass-auto': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string; mass?: number } | null
-        if (!body?.path || typeof body.mass !== 'number') {
-          json(res, 400, { error: 'Missing path or mass' })
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath || typeof body?.mass !== 'number') {
+          json(res, 400, { error: 'Missing or invalid path, or non-numeric mass' })
           return
         }
         try {
           // Lazy import so rest.ts doesn't pull in meta on load
           const meta = await import('./meta')
-          await serialWrite(() => meta.setPartMass(body.path!, body.mass!))
+          await serialWrite(() => meta.setPartMass(safePath, body.mass!))
           broadcastStatus()
           json(res, 200, { success: true })
         } catch (err) {
@@ -280,8 +321,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       case 'GET /api/meta': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const url = new URL(req.url || '', 'http://localhost')
-        const filePath = url.searchParams.get('path')
-        if (!filePath) { json(res, 400, { error: 'Missing path query param' }); return }
+        const filePath = sanitizeProjectRelPath(url.searchParams.get('path'))
+        if (!filePath) { json(res, 400, { error: 'Missing or invalid path query param' }); return }
         try {
           const meta = await import('./meta')
           const result = await meta.getPartMeta(filePath)
@@ -295,8 +336,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       case 'POST /api/release-state': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string; state?: string; note?: string } | null
-        if (!body?.path || !body?.state) {
-          json(res, 400, { error: 'Missing path or state' })
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath || !body?.state) {
+          json(res, 400, { error: 'Missing or invalid path, or missing state' })
           return
         }
         const validStates = ['draft', 'in-review', 'released', 'manufactured']
@@ -307,7 +349,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         try {
           const meta = await import('./meta')
           await serialWrite(() => meta.setReleaseState(
-            body.path!,
+            safePath,
             body.state as 'draft' | 'in-review' | 'released' | 'manufactured',
             body.note
           ))
@@ -321,8 +363,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
       case 'GET /api/title-block-data': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
-        const filePath = url.searchParams.get('path')
-        if (!filePath) { json(res, 400, { error: 'Missing path' }); return }
+        const filePath = sanitizeProjectRelPath(url.searchParams.get('path'))
+        if (!filePath) { json(res, 400, { error: 'Missing or invalid path' }); return }
         try {
           const parts = await import('./parts')
           const manifest = await parts.loadManifest()
@@ -357,13 +399,14 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       case 'POST /api/material': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string; material?: string } | null
-        if (!body?.path || typeof body.material !== 'string') {
-          json(res, 400, { error: 'Missing path or material' })
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath || typeof body?.material !== 'string') {
+          json(res, 400, { error: 'Missing or invalid path, or material' })
           return
         }
         try {
           const meta = await import('./meta')
-          await serialWrite(() => meta.setManufacturingMaterial(body.path!, body.material!))
+          await serialWrite(() => meta.setManufacturingMaterial(safePath, body.material!))
           broadcastStatus()
           json(res, 200, { success: true })
         } catch (err) {
@@ -378,17 +421,18 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         // part show up on the shop-floor queue.
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string; method?: string | null } | null
-        if (!body?.path) { json(res, 400, { error: 'Missing path' }); return }
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath) { json(res, 400, { error: 'Missing or invalid path' }); return }
         const validMethods = ['print', 'cnc', 'manual', 'other']
-        const method = body.method === null || body.method === '' ? null : body.method
-        if (method !== null && !validMethods.includes(method)) {
+        const method = body?.method === null || body?.method === '' ? null : body?.method
+        if (method !== null && method !== undefined && !validMethods.includes(method)) {
           json(res, 400, { error: `Invalid method. Expected one of: ${validMethods.join(', ')}, or null to clear` })
           return
         }
         try {
           const meta = await import('./meta')
           await serialWrite(() => meta.setManufacturingMethod(
-            body.path!,
+            safePath,
             method as 'print' | 'cnc' | 'manual' | 'other' | null
           ))
           broadcastStatus()
@@ -402,13 +446,14 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       case 'POST /api/comments': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string; text?: string } | null
-        if (!body?.path || !body?.text || !body.text.trim()) {
-          json(res, 400, { error: 'Missing path or text' })
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath || !body?.text || !body.text.trim()) {
+          json(res, 400, { error: 'Missing or invalid path, or empty text' })
           return
         }
         try {
           const meta = await import('./meta')
-          await serialWrite(() => meta.addComment(body.path!, body.text!.trim()))
+          await serialWrite(() => meta.addComment(safePath, body.text!.trim()))
           broadcastStatus()
           json(res, 200, { success: true })
         } catch (err) {
@@ -420,9 +465,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       case 'POST /api/stage': {
         if (!currentProject) { json(res, 503, { error: 'No project open' }); return }
         const body = parseJson(await readBody(req)) as { path?: string } | null
-        if (!body?.path) { json(res, 400, { error: 'Missing path' }); return }
+        const safePath = sanitizeProjectRelPath(body?.path ?? null)
+        if (!safePath) { json(res, 400, { error: 'Missing or invalid path' }); return }
         try {
-          await serialWrite(() => gitOps.getGit().raw(['add', '--', body.path!]))
+          await serialWrite(() => gitOps.getGit().raw(['add', '--', safePath]))
           json(res, 200, { success: true })
         } catch (err) {
           json(res, 500, { success: false, error: (err as Error).message })

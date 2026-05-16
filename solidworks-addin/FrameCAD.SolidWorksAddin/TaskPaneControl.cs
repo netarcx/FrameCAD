@@ -1030,6 +1030,7 @@ namespace FrameCAD.SolidWorksAddin
             if (meta.Comments != null && meta.Comments.Count > 0)
             {
                 var ordered = meta.Comments
+                    .Where(c => c != null)
                     .OrderByDescending(c => c.At ?? "")
                     .Take(8);
                 foreach (var c in ordered)
@@ -1474,31 +1475,48 @@ namespace FrameCAD.SolidWorksAddin
 
         private void DoOpenApp()
         {
-            // If FrameCAD is already running, just bring its window to the foreground
-            var existing = System.Diagnostics.Process.GetProcessesByName("FrameCAD");
+            // Prevent spam-clicks from fork-bombing multiple FrameCAD
+            // processes while the first launch is still in flight.
+            // Disable the button + set the busy flag; reset both in
+            // finally so a thrown exception doesn't leave the button
+            // stuck disabled.
+            if (_busy) return;
+            _busy = true;
+            _btnOpenApp.Enabled = false;
             try
             {
-                foreach (var proc in existing)
+                // If FrameCAD is already running, just bring its window
+                // to the foreground.
+                var existing = System.Diagnostics.Process.GetProcessesByName("FrameCAD");
+                try
                 {
-                    var hwnd = proc.MainWindowHandle;
-                    if (hwnd != IntPtr.Zero)
+                    foreach (var proc in existing)
                     {
-                        if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
-                        SetForegroundWindow(hwnd);
-                        return;
+                        var hwnd = proc.MainWindowHandle;
+                        if (hwnd != IntPtr.Zero)
+                        {
+                            if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+                            SetForegroundWindow(hwnd);
+                            return;
+                        }
                     }
                 }
+                finally
+                {
+                    foreach (var proc in existing) proc.Dispose();
+                }
+
+                string target = LocateFrameCADExe();
+                if (target != null)
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = target, UseShellExecute = true });
+                else
+                    ShowMessage("FrameCAD not found — please reinstall or open it manually first.", true);
             }
             finally
             {
-                foreach (var proc in existing) proc.Dispose();
+                _busy = false;
+                _btnOpenApp.Enabled = true;
             }
-
-            string target = LocateFrameCADExe();
-            if (target != null)
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = target, UseShellExecute = true });
-            else
-                ShowMessage("FrameCAD not found — please reinstall or open it manually first.", true);
         }
 
         /// <summary>
@@ -1571,6 +1589,9 @@ namespace FrameCAD.SolidWorksAddin
                     foreach (var dir in System.IO.Directory.GetDirectories(root))
                     {
                         var name = System.IO.Path.GetFileName(dir);
+                        // Path.GetFileName can return null on degenerate inputs;
+                        // skip those rather than NRE'ing on .IndexOf.
+                        if (string.IsNullOrEmpty(name)) continue;
                         if (name.IndexOf("framecad", StringComparison.OrdinalIgnoreCase) < 0 &&
                             name.IndexOf("trentcad", StringComparison.OrdinalIgnoreCase) < 0) continue;
                         foreach (var exeName in new[] { "FrameCAD.exe", "TrentCAD.exe" })
