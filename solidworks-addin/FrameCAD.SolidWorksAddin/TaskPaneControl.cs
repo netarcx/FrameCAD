@@ -1494,27 +1494,115 @@ namespace FrameCAD.SolidWorksAddin
                 foreach (var proc in existing) proc.Dispose();
             }
 
-            // Look in every plausible install location. Fresh FrameCAD
-            // installs land under "FrameCAD"; v1.0.x TrentCAD installs
-            // that were upgraded in place keep their old folder names
-            // until the user does a clean re-install.
-            var localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            var candidates = new[] {
-                System.IO.Path.Combine(localData, "Programs", "framecad", "FrameCAD.exe"),
-                System.IO.Path.Combine(localData, "Programs", "FrameCAD", "FrameCAD.exe"),
-                System.IO.Path.Combine(localData, "Programs", "trentcad", "FrameCAD.exe"),
-                System.IO.Path.Combine(localData, "Programs", "trentcad", "TrentCAD.exe"),
-                System.IO.Path.Combine(progFiles, "FrameCAD", "FrameCAD.exe"),
-                System.IO.Path.Combine(progFiles, "TrentCAD", "TrentCAD.exe")
-            };
-            string target = null;
-            foreach (var c in candidates) { if (System.IO.File.Exists(c)) { target = c; break; } }
-
+            string target = LocateFrameCADExe();
             if (target != null)
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = target, UseShellExecute = true });
             else
-                ShowMessage("FrameCAD not found", true);
+                ShowMessage("FrameCAD not found — please reinstall or open it manually first.", true);
+        }
+
+        /// <summary>
+        /// Find the installed FrameCAD.exe across every layout we've seen:
+        /// 1. Windows uninstall registry (NSIS writes InstallLocation here on install — most
+        ///    reliable, works for custom install dirs the user picked at install time).
+        /// 2. Hard-coded fallback paths for the default per-machine and per-user installs.
+        /// 3. Directory walk of Program Files / LocalAppData\Programs looking for any
+        ///    "framecad"-named subfolder (case-insensitive) containing FrameCAD.exe.
+        /// Returns null if nothing matches.
+        /// </summary>
+        private static string LocateFrameCADExe()
+        {
+            // ── 1. Registry ──────────────────────────────────────────────
+            // electron-builder NSIS writes the uninstall entry under the
+            // appId (com.trentcad.app, kept for v1.0.x → v1.1.x update
+            // chain). Per-machine installs land in HKLM; per-user in HKCU.
+            // On 64-bit Windows the 64-bit NSIS template writes to the
+            // native key, but check WOW6432Node too for older 32-bit builds.
+            string[] registryRoots = new[] {
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\com.trentcad.app",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\com.trentcad.app",
+            };
+            foreach (var subPath in registryRoots)
+            {
+                foreach (var root in new[] { Microsoft.Win32.Registry.LocalMachine, Microsoft.Win32.Registry.CurrentUser })
+                {
+                    string fromRegistry = TryRegistryInstallLocation(root, subPath);
+                    if (fromRegistry != null) return fromRegistry;
+                }
+            }
+
+            // ── 2. Hard-coded fallback paths ─────────────────────────────
+            // Order matters: check fresh installs first, then legacy
+            // TrentCAD layouts that v1.0.x users may have upgraded in place.
+            var localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var progFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            var candidates = new[] {
+                System.IO.Path.Combine(localData, "Programs", "framecad", "FrameCAD.exe"),
+                System.IO.Path.Combine(localData, "Programs", "FrameCAD", "FrameCAD.exe"),
+                System.IO.Path.Combine(progFiles, "FrameCAD", "FrameCAD.exe"),
+                System.IO.Path.Combine(progFilesX86, "FrameCAD", "FrameCAD.exe"),
+                System.IO.Path.Combine(localData, "Programs", "trentcad", "FrameCAD.exe"),
+                System.IO.Path.Combine(localData, "Programs", "trentcad", "TrentCAD.exe"),
+                System.IO.Path.Combine(progFiles, "TrentCAD", "TrentCAD.exe"),
+                System.IO.Path.Combine(progFilesX86, "TrentCAD", "TrentCAD.exe"),
+            };
+            foreach (var c in candidates)
+            {
+                if (System.IO.File.Exists(c)) return c;
+            }
+
+            // ── 3. Directory walk ────────────────────────────────────────
+            // Final fallback: scan one level deep under each Programs root
+            // for any folder whose name contains "framecad" (case-insensitive)
+            // and pick the first FrameCAD.exe / TrentCAD.exe inside. Catches
+            // version-suffixed dirs, capitalisation oddities, and users who
+            // installed to a custom-named subdirectory.
+            var roots = new[] {
+                System.IO.Path.Combine(localData, "Programs"),
+                progFiles,
+                progFilesX86,
+            };
+            foreach (var root in roots)
+            {
+                if (string.IsNullOrEmpty(root) || !System.IO.Directory.Exists(root)) continue;
+                try
+                {
+                    foreach (var dir in System.IO.Directory.GetDirectories(root))
+                    {
+                        var name = System.IO.Path.GetFileName(dir);
+                        if (name.IndexOf("framecad", StringComparison.OrdinalIgnoreCase) < 0 &&
+                            name.IndexOf("trentcad", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        foreach (var exeName in new[] { "FrameCAD.exe", "TrentCAD.exe" })
+                        {
+                            var exe = System.IO.Path.Combine(dir, exeName);
+                            if (System.IO.File.Exists(exe)) return exe;
+                        }
+                    }
+                }
+                catch { /* permission denied on a Programs subdir — skip */ }
+            }
+
+            return null;
+        }
+
+        private static string TryRegistryInstallLocation(Microsoft.Win32.RegistryKey root, string subKeyPath)
+        {
+            try
+            {
+                using (var key = root.OpenSubKey(subKeyPath))
+                {
+                    if (key == null) return null;
+                    var location = key.GetValue("InstallLocation") as string;
+                    if (string.IsNullOrEmpty(location)) return null;
+                    var exe = System.IO.Path.Combine(location, "FrameCAD.exe");
+                    if (System.IO.File.Exists(exe)) return exe;
+                    var legacyExe = System.IO.Path.Combine(location, "TrentCAD.exe");
+                    if (System.IO.File.Exists(legacyExe)) return legacyExe;
+                    return null;
+                }
+            }
+            catch { return null; }
         }
 
         [DllImport("user32.dll")]
