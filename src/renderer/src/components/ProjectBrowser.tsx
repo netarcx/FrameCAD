@@ -630,6 +630,14 @@ export default function ProjectBrowser({ files, selectedFile, onSelect, onCheckO
       {contextMenu && (
         <div
           className="context-menu"
+          ref={(el) => {
+            if (!el) return
+            const rect = el.getBoundingClientRect()
+            const clampedX = Math.min(contextMenu.x, window.innerWidth - rect.width - 4)
+            const clampedY = Math.min(contextMenu.y, window.innerHeight - rect.height - 4)
+            if (parseFloat(el.style.left) !== clampedX) el.style.left = `${clampedX}px`
+            if (parseFloat(el.style.top) !== clampedY) el.style.top = `${clampedY}px`
+          }}
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <button

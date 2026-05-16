@@ -880,7 +880,7 @@ export default function App() {
                   className={`parts-tab${parts.stateFilter === 'in-review' ? ' active' : ''}`}
                   onClick={() => parts.setStateFilter('in-review')}
                 >
-                  Needs Review {parts.inReviewCount > 0 && <span className="parts-tab-badge">{parts.inReviewCount}</span>}
+                  Needs Review {parts.inReviewParts.length > 0 && <span className="parts-tab-badge">{parts.inReviewParts.length}</span>}
                 </button>
               </div>
               <div className="parts-panel">

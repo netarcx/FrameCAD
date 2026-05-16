@@ -22,6 +22,8 @@ namespace FrameCAD.SolidWorksAddin
 
         public NewPartDialog()
         {
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96F, 96F);
             Text = "Create New";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterScreen;
@@ -31,39 +33,51 @@ namespace FrameCAD.SolidWorksAddin
             ForeColor = Color.FromArgb(220, 223, 230);
             Font = new Font("Segoe UI", 9.75f);
 
+            var radioFlow = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.LeftToRight,
+                AutoSize = true,
+                WrapContents = false,
+                Location = new Point(20, 16),
+                BackColor = Color.Transparent,
+                Padding = Padding.Empty,
+                Margin = Padding.Empty
+            };
+
             _rbPart = new RadioButton
             {
                 Text = "Part",
                 Checked = true,
-                Location = new Point(20, 20),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(220, 223, 230),
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(0, 0, 16, 0)
             };
             _rbPart.CheckedChanged += (s, e) => LayoutFields();
-            Controls.Add(_rbPart);
+            radioFlow.Controls.Add(_rbPart);
 
             _rbAssembly = new RadioButton
             {
                 Text = "Assembly",
-                Location = new Point(100, 20),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(220, 223, 230),
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(0, 0, 16, 0)
             };
             _rbAssembly.CheckedChanged += (s, e) => LayoutFields();
-            Controls.Add(_rbAssembly);
+            radioFlow.Controls.Add(_rbAssembly);
 
             _rbFolder = new RadioButton
             {
                 Text = "Folder",
-                Location = new Point(200, 20),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(220, 223, 230),
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(0, 0, 0, 0)
             };
             _rbFolder.CheckedChanged += (s, e) => LayoutFields();
-            Controls.Add(_rbFolder);
+            radioFlow.Controls.Add(_rbFolder);
+            Controls.Add(radioFlow);
 
             _lblName = new Label
             {
@@ -142,7 +156,7 @@ namespace FrameCAD.SolidWorksAddin
             var showDesc = !_rbFolder.Checked;
             _lblName.Visible = showName;
             _txtName.Visible = showName;
-            _lblName.Text = "Folder name";
+            _lblName.Text = _rbFolder.Checked ? "Folder name" : "Assembly name";
 
             var y = 52;
             if (showName)

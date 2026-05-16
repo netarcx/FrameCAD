@@ -17,6 +17,10 @@
   --red-tint: rgba(251, 113, 133, 0.15);
   --blue: #60a5fa;
   --border: #353535;
+  --bg-input: #2a2a2a;
+  --shadow-menu: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --backdrop-dim: rgba(0, 0, 0, 0.18);
+  --on-yellow: #1d1d1d;
   --radius: 6px;
 }
 
@@ -38,6 +42,10 @@
   --red-tint: rgba(220, 38, 38, 0.1);
   --blue: #2563eb;
   --border: #d4d4d4;
+  --bg-input: #ffffff;
+  --shadow-menu: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --backdrop-dim: rgba(0, 0, 0, 0.3);
+  --on-yellow: #422006;
   --radius: 6px;
 }
 
@@ -194,10 +202,10 @@ body.logo-screensaver-active .setup-logo-bounce-wrap { z-index: 2; }
 .setup-logo.spinning-flipping .setup-logo-face,
 .setup-logo.chaos .setup-logo-face {
   filter:
-    drop-shadow(1px 0 0 #000)
-    drop-shadow(-1px 0 0 #000)
-    drop-shadow(0 1px 0 #000)
-    drop-shadow(0 -1px 0 #000);
+    drop-shadow(1px 0 0 rgba(0, 0, 0, 0.5))
+    drop-shadow(-1px 0 0 rgba(0, 0, 0, 0.5))
+    drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5))
+    drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.5));
 }
 
 @keyframes setup-logo-spin {
@@ -433,7 +441,7 @@ body.slam-shake {
   font-weight: 600;
   color: var(--text-muted);
   letter-spacing: 0.3px;
-  margin-left: -6px;
+  margin-left: -4px;
   margin-top: 2px;
 }
 
@@ -1704,7 +1712,7 @@ body.slam-shake {
 .details-overlay-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--backdrop-dim);
   z-index: 49;
   animation: details-backdrop-fade-in 180ms ease-out;
 }
@@ -1919,8 +1927,8 @@ body.slam-shake {
 }
 
 .release-badge.release-draft { color: var(--text-muted); }
-.release-badge.release-in-review { color: var(--yellow); background: rgba(252, 211, 77, 0.15); }
-.release-badge.release-released { color: var(--green); background: rgba(134, 239, 172, 0.15); }
+.release-badge.release-in-review { color: var(--yellow); background: color-mix(in srgb, var(--yellow) 15%, transparent); }
+.release-badge.release-released { color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
 .release-badge.release-manufactured { color: var(--accent); background: var(--accent-tint); }
 
 .release-meta {
@@ -2242,7 +2250,7 @@ body.slam-shake {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   background: var(--yellow);
-  color: #fff;
+  color: var(--on-yellow);
   border-radius: 10px;
   vertical-align: middle;
 }
@@ -2258,7 +2266,7 @@ body.slam-shake {
   font-size: 10px;
   font-weight: 700;
   background: var(--yellow);
-  color: #fff;
+  color: var(--on-yellow);
   border-radius: 8px;
 }
 
@@ -2304,8 +2312,8 @@ body.slam-shake {
 }
 
 .export-queue-sw-state.alive .export-queue-dot {
-  background: #22c55e;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 30%, transparent);
+  background: var(--green);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 30%, transparent);
 }
 
 .export-queue-pending {
@@ -2529,7 +2537,7 @@ body.slam-shake {
   border-radius: var(--radius);
   padding: 4px 0;
   min-width: 180px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-menu);
   z-index: 1000;
 }
 
@@ -2671,7 +2679,7 @@ body.slam-shake {
 .setup-screen .subtitle {
   color: var(--text-secondary);
   font-size: 14px;
-  margin-top: -24px;
+  margin-top: -20px;
 }
 
 .setup-screen .subtitle.subtitle-team {
@@ -2684,7 +2692,7 @@ body.slam-shake {
 .setup-screen .team-label {
   color: var(--text-muted);
   font-size: 12px;
-  margin-top: -28px;
+  margin-top: -24px;
 }
 
 /* Welcome-mode header block: title + subtitle + (team name) grouped
@@ -2754,6 +2762,12 @@ body.slam-shake {
   font-size: 12px;
   color: var(--text-secondary);
   text-align: center;
+}
+
+.setup-card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Welcome-mode footer: groups the auth toolbar + recent projects so
@@ -3326,7 +3340,7 @@ body.slam-shake {
 
 .publish-mini-bar {
   position: fixed;
-  bottom: 0;
+  bottom: 24px;
   left: 0;
   right: 0;
   z-index: 1900;
@@ -3440,6 +3454,20 @@ body.slam-shake {
   font-size: 13px;
 }
 
+.project-name-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.project-name-btn:hover {
+  background: var(--bg-hover);
+}
+
 .mfg-mode-project {
   position: relative;
   display: flex;
@@ -3519,7 +3547,7 @@ body.slam-shake {
   position: fixed;
   inset: 0;
   background: var(--bg-primary);
-  z-index: 2000;
+  z-index: 1950;
   display: flex;
   flex-direction: column;
   color: var(--text-primary);
@@ -3854,7 +3882,7 @@ body.slam-shake {
 .parts-bulk-bar select,
 .parts-bulk-bar input[type="text"] {
   padding: 4px 8px;
-  background: var(--bg-input);
+  background: var(--bg-input, var(--bg-surface));
   color: var(--text-primary);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -4027,10 +4055,8 @@ body.slam-shake {
 .admin-pin-modal { width: 360px; }
 
 /* PIN gate must sit above every other surface (modal-overlay = 2000,
-   admin-fullscreen = 2000, depsModal = 2000, onboarding = 2000). At the
-   same z-index whatever is rendered last in DOM wins — when any of those
-   are mounted alongside the PIN prompt, they steal clicks. Pinning the
-   PIN overlay to 2100 keeps the input clickable regardless of order. */
+   admin-fullscreen = 1950, depsModal = 2000, onboarding = 2000).
+   Pinning the PIN overlay to 2100 keeps the input clickable. */
 .admin-pin-overlay { z-index: 2100; }
 .admin-pin-modal input { pointer-events: auto; }
 

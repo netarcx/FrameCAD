@@ -10,7 +10,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   static getDerivedStateFromError(error: Error) { return { error } }
   componentDidCatch(error: Error) { console.error('React crash:', error) }
   render() {
-    if (this.state.error) return <pre style={{ padding: 20, color: 'red' }}>{this.state.error.message + '\n' + this.state.error.stack}</pre>
+    if (this.state.error) return <pre style={{ padding: 20, color: '#fb7185', background: '#1d1d1d', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', height: '100vh' }}>{this.state.error.message + '\n' + this.state.error.stack}</pre>
     return this.props.children
   }
 }

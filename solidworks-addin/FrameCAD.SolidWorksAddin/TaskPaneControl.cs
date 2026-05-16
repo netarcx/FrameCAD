@@ -12,6 +12,7 @@ namespace FrameCAD.SolidWorksAddin
     {
         private readonly FrameCadApiClient _api = new FrameCadApiClient();
         private Timer _healthTimer;
+        private Timer _messageClearTimer;
         private string _currentFilePath;
         private bool _busy;
         private bool _disposed;
@@ -116,6 +117,8 @@ namespace FrameCAD.SolidWorksAddin
 
         public TaskPaneControl()
         {
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96F, 96F);
             SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
             BackColor = CBase;
             AutoScroll = true;
@@ -125,10 +128,10 @@ namespace FrameCAD.SolidWorksAddin
 
         private void BuildUI()
         {
+            SuspendLayout();
             // --- Header ---
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
 
-            // Logo loaded from disk (copied alongside the DLL by the csproj)
             try
             {
                 var dllDir = System.IO.Path.GetDirectoryName(
@@ -136,9 +139,13 @@ namespace FrameCAD.SolidWorksAddin
                 var logoPath = System.IO.Path.Combine(dllDir ?? "", "logo.png");
                 if (System.IO.File.Exists(logoPath))
                 {
+                    var ms = new System.IO.MemoryStream();
+                    using (var fs = System.IO.File.OpenRead(logoPath))
+                        fs.CopyTo(ms);
+                    ms.Position = 0;
                     _logo = new PictureBox
                     {
-                        Image = Image.FromFile(logoPath),
+                        Image = Image.FromStream(ms),
                         SizeMode = PictureBoxSizeMode.Zoom,
                         Size = new Size(LogoSize, LogoSize),
                         Location = new Point(Pad, 8),
@@ -182,7 +189,7 @@ namespace FrameCAD.SolidWorksAddin
             Controls.Add(_pnlConnection);
 
             // --- File info card ---
-            _pnlFileCard = new Panel
+            _pnlFileCard = new BufferedPanel
             {
                 BackColor = CSurface0,
                 Visible = false
@@ -196,6 +203,8 @@ namespace FrameCAD.SolidWorksAddin
             _lblStatus = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI", 8.25f), CSubtext);
             _lblLockedBy = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI", 8.25f), CSubtext);
             _lblRenameWarning = MakeLabel(_pnlFileCard, ref cardY, new Font("Segoe UI Semibold", 8.25f), CYellow);
+            _lblRenameWarning.AutoEllipsis = false;
+            _lblRenameWarning.Height = 32;
             _lblRenameWarning.Visible = false;
             Controls.Add(_pnlFileCard);
 
@@ -241,19 +250,21 @@ namespace FrameCAD.SolidWorksAddin
                 ForeColor = CSubtext,
                 Font = new Font("Segoe UI", 8f),
                 AutoSize = false,
-                Size = new Size(200, 32)
+                AutoEllipsis = true,
+                Size = new Size(200, 48)
             };
             Controls.Add(_lblMessage);
 
             BuildMetaPanel();
 
             SetButtonStates(false, false);
+            ResumeLayout(true);
             LayoutAll();
         }
 
         private void BuildMetaPanel()
         {
-            _pnlMeta = new Panel { BackColor = CSurface0, Visible = false };
+            _pnlMeta = new BufferedPanel { BackColor = CSurface0, Visible = false };
 
             var y = 10;
 
@@ -277,8 +288,10 @@ namespace FrameCAD.SolidWorksAddin
                 ForeColor = CText,
                 Font = new Font("Segoe UI", 9.5f),
                 Location = new Point(10, y),
-                Size = new Size(180, 24)
+                Size = new Size(180, 24),
+                DrawMode = DrawMode.OwnerDrawFixed
             };
+            _cmbReleaseState.DrawItem += ComboDrawItem;
             _cmbReleaseState.Items.AddRange(new object[] { "draft", "in-review", "released", "manufactured" });
             _cmbReleaseState.SelectedIndexChanged += async (s, e) =>
             {
@@ -352,8 +365,10 @@ namespace FrameCAD.SolidWorksAddin
                 ForeColor = CText,
                 Font = new Font("Segoe UI", 9.5f),
                 Location = new Point(10, y),
-                Size = new Size(180, 24)
+                Size = new Size(180, 24),
+                DrawMode = DrawMode.OwnerDrawFixed
             };
+            _cmbMfgMethod.DrawItem += ComboDrawItem;
             // "(not set)" sentinel maps to a null write so the user can
             // clear the field from the add-in too.
             _cmbMfgMethod.Items.AddRange(new object[] { "(not set)", "print", "cnc", "manual", "other" });
@@ -392,7 +407,7 @@ namespace FrameCAD.SolidWorksAddin
 
             _txtComment = new TextBox
             {
-                BackColor = CSurface1,
+                BackColor = Color.FromArgb(60, 65, 77),
                 ForeColor = CText,
                 Font = new Font("Segoe UI", 9f),
                 BorderStyle = BorderStyle.FixedSingle,
@@ -422,20 +437,20 @@ namespace FrameCAD.SolidWorksAddin
 
             // "Newer version available" banner — separate panel so it can
             // appear without the meta panel (or vice versa)
-            _pnlNewerVersion = new Panel
+            _pnlNewerVersion = new BufferedPanel
             {
                 BackColor = CYellow,
                 Visible = false,
-                Height = 56
+                Height = 62
             };
             _lblNewerVersion = new Label
             {
                 Text = "A teammate uploaded a newer version of this file",
                 ForeColor = CMantle,
                 Font = new Font("Segoe UI Semibold", 9f),
-                Location = new Point(10, 8),
+                Location = new Point(10, 6),
                 AutoSize = false,
-                Size = new Size(180, 24)
+                Size = new Size(180, 32)
             };
             _pnlNewerVersion.Controls.Add(_lblNewerVersion);
             _btnDownloadNewer = new Button
@@ -445,7 +460,7 @@ namespace FrameCAD.SolidWorksAddin
                 BackColor = CMantle,
                 ForeColor = CYellow,
                 Font = new Font("Segoe UI Semibold", 9f),
-                Location = new Point(10, 30),
+                Location = new Point(10, 36),
                 Size = new Size(110, 22),
                 Cursor = Cursors.Hand,
                 FlatAppearance = { BorderSize = 0 }
@@ -459,6 +474,12 @@ namespace FrameCAD.SolidWorksAddin
         {
             var w = ClientSize.Width - Pad * 2;
             if (w < 40) return;
+            SuspendLayout();
+            _pnlFileCard?.SuspendLayout();
+            _pnlMeta?.SuspendLayout();
+            _pnlNewerVersion?.SuspendLayout();
+            try
+            {
 
             // Header (logo + title) — reposition every layout pass so a
             // resized pane keeps things aligned
@@ -551,6 +572,14 @@ namespace FrameCAD.SolidWorksAddin
 
             _lblMessage.Location = new Point(Pad, y);
             _lblMessage.Width = w;
+            }
+            finally
+            {
+                _pnlNewerVersion?.ResumeLayout(true);
+                _pnlMeta?.ResumeLayout(true);
+                _pnlFileCard?.ResumeLayout(true);
+                ResumeLayout(true);
+            }
         }
 
         private void PlaceButton(Button btn, ref int y, int w)
@@ -576,6 +605,17 @@ namespace FrameCAD.SolidWorksAddin
             parent.Controls.Add(lbl);
             y += rowH + 4;
             return lbl;
+        }
+
+        private void ComboDrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0) return;
+            var combo = (ComboBox)sender;
+            var bg = (e.State & DrawItemState.Selected) != 0 ? CSurface0 : CSurface1;
+            using (var bgBrush = new SolidBrush(bg))
+                e.Graphics.FillRectangle(bgBrush, e.Bounds);
+            using (var textBrush = new SolidBrush(CText))
+                e.Graphics.DrawString(combo.Items[e.Index].ToString(), e.Font, textBrush, e.Bounds);
         }
 
         private Button MakeButton(string text)
@@ -649,6 +689,8 @@ namespace FrameCAD.SolidWorksAddin
                 _disposed = true;
                 _healthTimer?.Stop();
                 _healthTimer?.Dispose();
+                _messageClearTimer?.Stop();
+                _messageClearTimer?.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -858,16 +900,16 @@ namespace FrameCAD.SolidWorksAddin
         {
             _currentFilePath = absolutePath;
 
-            // Toggle drawing-only buttons immediately so the user doesn't see
-            // them flash on for non-drawings before the API call returns
             var isDrawing = !string.IsNullOrEmpty(absolutePath) &&
                 absolutePath.EndsWith(".slddrw", StringComparison.OrdinalIgnoreCase);
             SafeInvoke(() => {
                 if (_btnFillTitleBlock != null)
-                {
                     _btnFillTitleBlock.Visible = isDrawing;
-                    LayoutAll();
-                }
+                var fname = string.IsNullOrEmpty(absolutePath)
+                    ? "" : System.IO.Path.GetFileName(absolutePath);
+                ShowFileCard(fname, "", "", "Loading…", CSubtext, "");
+                SetButtonStates(false, false);
+                LayoutAll();
             });
 
             try
@@ -1024,8 +1066,7 @@ namespace FrameCAD.SolidWorksAddin
                 _suppressMethodChange = false;
             }
 
-            // Render comments newest-first, cap at 8 entries to keep the
-            // pane compact. Each line shows "<author>: <truncated text>".
+            _lstComments.BeginUpdate();
             _lstComments.Items.Clear();
             if (meta.Comments != null && meta.Comments.Count > 0)
             {
@@ -1045,6 +1086,7 @@ namespace FrameCAD.SolidWorksAddin
             {
                 _lstComments.Items.Add("(no comments yet)");
             }
+            _lstComments.EndUpdate();
 
             _pnlMeta.Visible = true;
             LayoutAll();
@@ -1235,6 +1277,15 @@ namespace FrameCAD.SolidWorksAddin
         {
             _lblMessage.Text = text;
             _lblMessage.ForeColor = isError ? CRed : CGreen;
+            _messageClearTimer?.Stop();
+            _messageClearTimer?.Dispose();
+            _messageClearTimer = new Timer { Interval = 8000 };
+            _messageClearTimer.Tick += (s, e) =>
+            {
+                _messageClearTimer.Stop();
+                if (!_disposed && IsHandleCreated) _lblMessage.Text = "";
+            };
+            _messageClearTimer.Start();
         }
 
         private System.Collections.Generic.List<string> AssemblyTargets()
@@ -1268,6 +1319,7 @@ namespace FrameCAD.SolidWorksAddin
             if (string.IsNullOrEmpty(_currentFilePath) || _busy) return;
             _busy = true;
             SetButtonStates(false, false);
+            ShowMessage("Checking out…");
             try
             {
                 var targets = AssemblyTargets();
@@ -1307,6 +1359,7 @@ namespace FrameCAD.SolidWorksAddin
             if (string.IsNullOrEmpty(_currentFilePath) || _busy) return;
             _busy = true;
             SetButtonStates(false, false);
+            ShowMessage("Checking in…");
             try
             {
                 var targets = AssemblyTargets();
@@ -1346,6 +1399,7 @@ namespace FrameCAD.SolidWorksAddin
             if (_busy) return;
             _busy = true;
             SetButtonStates(false, false);
+            ShowMessage("Downloading…");
             try
             {
                 var result = await _api.SyncAsync();
@@ -1372,6 +1426,7 @@ namespace FrameCAD.SolidWorksAddin
 
                 _busy = true;
                 SetButtonStates(false, false);
+                ShowMessage("Uploading…");
                 try
                 {
                     var result = await _api.PublishAsync(message);
@@ -1469,7 +1524,7 @@ namespace FrameCAD.SolidWorksAddin
                     }
                 }
                 catch (Exception ex) { SafeInvoke(() => ShowMessage(ex.Message, true)); }
-                finally { _busy = false; }
+                finally { _busy = false; ApplyButtonStates(); }
             }
         }
 
@@ -1636,6 +1691,14 @@ namespace FrameCAD.SolidWorksAddin
         private static extern bool IsIconic(IntPtr hWnd);
 
         private const int SW_RESTORE = 9;
+    }
+
+    internal class BufferedPanel : Panel
+    {
+        public BufferedPanel()
+        {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+        }
     }
 
     internal class StatusDot : Control

@@ -11,6 +11,8 @@ namespace FrameCAD.SolidWorksAddin
 
         public PublishMessageDialog()
         {
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96F, 96F);
             Text = "Upload Changes";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterScreen;
