@@ -24,29 +24,28 @@
     MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "SolidWorks is currently running. The FrameCAD add-in cannot be updated while SolidWorks is open.$\n$\nClose SolidWorks and click Retry, or Cancel to abort." /SD IDCANCEL IDRETRY framecad_sw_check
     Abort "Installation aborted - close SolidWorks first."
   ${EndIf}
+
+  ; Wipe stale Electron files from the PREVIOUS version before the new
+  ; files are extracted. This must happen in customInit (pre-extract), not
+  ; customInstall (post-extract), otherwise we'd delete the freshly
+  ; installed files. Only touches directories/patterns that Electron owns.
+  ${If} ${FileExists} "$INSTDIR\FrameCAD.exe"
+    RMDir /r "$INSTDIR\resources"
+    RMDir /r "$INSTDIR\locales"
+    RMDir /r "$INSTDIR\swiftshader"
+    Delete "$INSTDIR\*.dll"
+    Delete "$INSTDIR\*.pak"
+    Delete "$INSTDIR\*.bin"
+    Delete "$INSTDIR\*.dat"
+    Delete "$INSTDIR\*.json"
+    Delete "$INSTDIR\LICENSE*"
+    Delete "$INSTDIR\LICENSES*"
+    Delete "$INSTDIR\FrameCAD.exe"
+    Delete "$INSTDIR\TrentCAD.exe"
+  ${EndIf}
 !macroend
 
 !macro customInstall
-  ; Wipe stale Electron files from the previous version so they don't
-  ; accumulate across upgrades and eat SSD space. We only delete the
-  ; directories that electron-builder owns — the uninstaller, solidworks-
-  ; addin folder, and user data are left alone.
-  RMDir /r "$INSTDIR\resources"
-  RMDir /r "$INSTDIR\locales"
-  RMDir /r "$INSTDIR\swiftshader"
-  Delete "$INSTDIR\*.dll"
-  Delete "$INSTDIR\*.pak"
-  Delete "$INSTDIR\*.bin"
-  Delete "$INSTDIR\*.dat"
-  Delete "$INSTDIR\*.json"
-  Delete "$INSTDIR\snapshot_blob.bin"
-  Delete "$INSTDIR\v8_context_snapshot.bin"
-  Delete "$INSTDIR\LICENSE*"
-  Delete "$INSTDIR\LICENSES*"
-  Delete "$INSTDIR\chrome_*.pak"
-  Delete "$INSTDIR\FrameCAD.exe"
-  Delete "$INSTDIR\TrentCAD.exe"
-
   ; Unregister any existing add-in for a clean upgrade. Handle BOTH the
   ; new FrameCAD.SolidWorksAddin.dll filename AND the pre-1.1.0
   ; TrentCAD.SolidWorksAddin.dll so an upgrade from v1.0.x doesn't
