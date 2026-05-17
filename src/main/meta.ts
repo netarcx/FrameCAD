@@ -23,7 +23,42 @@ export async function loadAllMeta(): Promise<PartsMetaFile> {
     const raw = await fs.readFile(metaAbsPath(), 'utf-8')
     return JSON.parse(raw)
   } catch {
+    // File might contain git conflict markers — try to salvage by
+    // stripping markers and merging both sides of the conflict.
+    try {
+      const raw = await fs.readFile(metaAbsPath(), 'utf-8')
+      if (raw.includes('<<<<<<<') && raw.includes('>>>>>>>')) {
+        const merged = mergeConflictedJson(raw)
+        if (merged) {
+          await saveAllMeta(merged)
+          return merged
+        }
+      }
+    } catch { /* give up */ }
     return {}
+  }
+}
+
+function mergeConflictedJson(raw: string): PartsMetaFile | null {
+  // Extract both sides of the conflict and merge them (theirs as base,
+  // ours on top so local edits win for any overlapping keys).
+  try {
+    const oursChunks: string[] = []
+    const theirsChunks: string[] = []
+    let section: 'none' | 'ours' | 'theirs' = 'none'
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('<<<<<<<')) { section = 'ours'; continue }
+      if (line.startsWith('=======')) { section = 'theirs'; continue }
+      if (line.startsWith('>>>>>>>')) { section = 'none'; continue }
+      if (section === 'ours') oursChunks.push(line)
+      else if (section === 'theirs') theirsChunks.push(line)
+      else { oursChunks.push(line); theirsChunks.push(line) }
+    }
+    const ours: PartsMetaFile = JSON.parse(oursChunks.join('\n') || '{}')
+    const theirs: PartsMetaFile = JSON.parse(theirsChunks.join('\n') || '{}')
+    return { ...theirs, ...ours }
+  } catch {
+    return null
   }
 }
 

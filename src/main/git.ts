@@ -1192,6 +1192,17 @@ export async function pullRemoteFile(relPath: string): Promise<void> {
 export async function commitAndPushFile(relPath: string, message: string): Promise<void> {
   const g = getGit()
   const remotes = await g.getRemotes(false)
+
+  // If any files are stuck in unmerged state from a prior failed sync,
+  // resolve them before committing. For our target file, the caller
+  // already wrote the correct content; for others, accept their current
+  // working-tree version so the commit can proceed.
+  const preStatus = await g.status()
+  const unmerged = preStatus.conflicted
+  if (unmerged.length > 0) {
+    await g.raw(['add', ...unmerged])
+  }
+
   await g.raw(['add', relPath])
   const status = await g.status()
   if (!status.files.some(f => f.path === relPath)) return
