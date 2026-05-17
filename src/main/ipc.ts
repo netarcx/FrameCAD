@@ -166,6 +166,7 @@ export function setupIpc(getMainWindow: () => BrowserWindow | null): void {
     const win = getMainWindow()
     publishingNow = true
     try {
+      await metaOps.flushMetaCommit()
       const result = await gitOps.publish(message, (progress) => {
         if (win && !win.isDestroyed()) win.webContents.send('publish-progress', progress)
       })

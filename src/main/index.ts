@@ -5,6 +5,7 @@ import { setupIpc, stopWatching, stopRestServer, isPublishing } from './ipc'
 import { startRestServer } from './rest'
 import { initAutoUpdater } from './updater'
 import { cleanupAskpass } from './auth'
+import { flushMetaCommit } from './meta'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -182,5 +183,6 @@ app.on('window-all-closed', () => {
 // survive a graceful exit. `before-quit` fires regardless of platform
 // and before windows are destroyed.
 app.on('before-quit', () => {
+  flushMetaCommit().catch(() => { /* best-effort */ })
   cleanupAskpass().catch(() => { /* best-effort */ })
 })

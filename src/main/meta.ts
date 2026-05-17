@@ -8,6 +8,38 @@ import { isSwAlive, queuePendingExport } from './export-queue'
 const META_DIR = '.framecad'
 const META_FILE = 'parts-meta.json'
 
+// --- Debounced meta commit/push ---
+// Saves are written to disk immediately so the UI stays responsive, but
+// the git commit+push is deferred by 60 seconds. Each new meta write
+// resets the timer so rapid edits collapse into a single commit.
+const META_COMMIT_DELAY = 60_000
+let metaCommitTimer: ReturnType<typeof setTimeout> | null = null
+let pendingCommitMessages: string[] = []
+
+function scheduleMetaCommit(message: string): void {
+  pendingCommitMessages.push(message)
+  if (metaCommitTimer) clearTimeout(metaCommitTimer)
+  metaCommitTimer = setTimeout(flushMetaCommit, META_COMMIT_DELAY)
+}
+
+async function flushMetaCommit(): Promise<void> {
+  metaCommitTimer = null
+  const messages = pendingCommitMessages.splice(0)
+  if (messages.length === 0) return
+  const combined = messages.length === 1
+    ? messages[0]
+    : `[meta] ${messages.length} changes\n\n${messages.map(m => `- ${m}`).join('\n')}`
+  try {
+    await commitAndPushFile(metaRelPath(), combined)
+  } catch (err) {
+    // Log but don't crash — the local file is already saved. Next
+    // mutation or manual publish will pick it up.
+    console.error('[meta] deferred commit/push failed:', (err as Error).message)
+  }
+}
+
+export { flushMetaCommit }
+
 interface PartsMetaFile { [relPath: string]: PartMeta }
 
 function metaAbsPath(): string {
@@ -137,11 +169,7 @@ async function modifyAndSync(
   mutator(entry)
   all[filePath] = entry
   await saveAllMeta(all)
-  // commitAndPushFile throws on push failure (after rolling back the git
-  // commit + stage). We let the throw propagate so the UI can show the
-  // error; the local parts-meta.json keeps the mutation so the user's
-  // edit isn't lost on a retry.
-  await commitAndPushFile(metaRelPath(), commitMessage)
+  scheduleMetaCommit(commitMessage)
 }
 
 /**
@@ -213,7 +241,7 @@ export async function setReleaseState(
   const msg = cascadeCount > 0
     ? `[release] ${baseName} → ${state} (+ ${cascadeCount} cascaded)`
     : `[release] ${baseName} → ${state}`
-  await commitAndPushFile(metaRelPath(), msg)
+  scheduleMetaCommit(msg)
 
   // After a CAM-track part lands in "released", try to get an export
   // paired with it. If SolidWorks is open and listening we kick off an
@@ -398,7 +426,7 @@ export async function bulkUpdateMeta(updates: Record<string, BulkMetaPatch>): Pr
   if (fieldCounts.notes) labelParts.push(`notes×${fieldCounts.notes}`)
   if (cascadeCount > 0) labelParts.push(`+${cascadeCount} cascaded`)
   const msg = `[bulk-meta] ${touched} part${touched === 1 ? '' : 's'}: ${labelParts.join(', ')}`
-  await commitAndPushFile(metaRelPath(), msg)
+  scheduleMetaCommit(msg)
   return touched
 }
 
