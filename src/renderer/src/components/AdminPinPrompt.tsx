@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import ErrorMsg from './ErrorMsg'
 
 interface AdminPinPromptProps {
   onSuccess: () => void
@@ -62,7 +63,7 @@ export default function AdminPinPrompt({ onSuccess, onClose }: AdminPinPromptPro
             placeholder="PIN"
             disabled={verifying}
           />
-          {error && <div className="admin-pin-error">{error}</div>}
+          {error && <ErrorMsg text={error} className="admin-pin-error" />}
           <div className="modal-actions">
             <button type="button" onClick={onClose} disabled={verifying}>Cancel</button>
             <button type="submit" className="primary" disabled={verifying || !pin}>

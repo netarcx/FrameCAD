@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, Sun, Moon, X } from 'lucide-react'
+import ErrorMsg from './components/ErrorMsg'
 import { useGit } from './hooks/useGit'
 import useLayoutTier from './hooks/useLayoutTier'
 import { DEFAULT_MATERIALS, DEFAULT_MATERIALS_DATALIST_ID } from './constants'
@@ -641,7 +642,7 @@ export default function App() {
           </div>
         )}
         {publishProgress.phase === 'error' && (
-          <div className="admin-error">{publishProgress.error || 'Unknown error'}</div>
+          <ErrorMsg text={publishProgress.error || 'Unknown error'} />
         )}
         <div className="actions">
           {publishProgress.phase === 'error' || publishProgress.phase === 'done' ? (
@@ -868,7 +869,7 @@ export default function App() {
 
           {activeSection === 'parts' && (
             <div className="parts-content">
-              {parts.error && <div className="admin-error" style={{ margin: '8px 16px' }}>{parts.error}</div>}
+              {parts.error && <ErrorMsg text={parts.error} style={{ margin: '8px 16px' }} />}
               <div className="parts-content-tabs">
                 <button
                   className={`parts-tab${parts.stateFilter !== 'in-review' ? ' active' : ''}`}

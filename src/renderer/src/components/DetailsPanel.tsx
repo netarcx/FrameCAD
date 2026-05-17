@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { X } from 'lucide-react'
 import type { BulkMetaPatch, FileEntry, FileState, ManufacturingMethod, PartMeta, ReleaseState } from '@shared/types'
 import FileThumbnail from './FileThumbnail'
+import ErrorMsg from './ErrorMsg'
 
 interface Props {
   file: FileEntry | null
@@ -457,7 +458,7 @@ export default function DetailsPanel({ file, onCheckOut, onCheckIn, onClose, onN
         </>
       )}
 
-      {error && <div className="details-error">{error}</div>}
+      {error && <ErrorMsg text={error} className="details-error" />}
 
       {!file.isDirectory && (
         <div className="details-actions">

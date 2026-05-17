@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ErrorMsg from './ErrorMsg'
 
 export default function DocumentsPanel() {
   const [generating, setGenerating] = useState<null | 'bom' | 'manufacturing' | 'summary' | 'bom-by-subsystem'>(null)
@@ -99,7 +100,7 @@ export default function DocumentsPanel() {
           )
         })}
       </div>
-      {error && <div className="admin-error">{error}</div>}
+      {error && <ErrorMsg text={error} />}
       {status && <div className="admin-status">{status}</div>}
     </div>
   )

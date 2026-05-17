@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { GlobalAdminConfig, GlobalAdminState } from '@shared/types'
+import ErrorMsg from '../ErrorMsg'
 
 export default function TeamSettings() {
   const [globalState, setGlobalState] = useState<GlobalAdminState | null>(null)
@@ -119,7 +120,7 @@ export default function TeamSettings() {
         </button>
       </div>
 
-      {error && <div className="admin-error">{error}</div>}
+      {error && <ErrorMsg text={error} />}
       {status && <div className="admin-status">{status}</div>}
     </>
   )

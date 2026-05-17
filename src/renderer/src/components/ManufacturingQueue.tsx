@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { ManufacturingMethod, ManufacturingQueueItem } from '@shared/types'
+import ErrorMsg from './ErrorMsg'
 
 interface Props {
   onClose: () => void
@@ -166,7 +167,7 @@ export default function ManufacturingQueue({ onClose, embedded = false }: Props)
           </div>
         )}
 
-        {error && <div className="admin-error">{error}</div>}
+        {error && <ErrorMsg text={error} />}
 
         <div className="actions">
           <button className="toolbar-btn" onClick={refresh}>Refresh</button>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { AdminConfig } from '@shared/types'
+import ErrorMsg from '../ErrorMsg'
 
 export default function ProjectSettings() {
   const [config, setConfig] = useState<AdminConfig>({})
@@ -211,7 +212,7 @@ export default function ProjectSettings() {
         </button>
       </div>
 
-      {error && <div className="admin-error">{error}</div>}
+      {error && <ErrorMsg text={error} />}
       {status && <div className="admin-status">{status}</div>}
     </>
   )

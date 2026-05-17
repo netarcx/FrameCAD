@@ -3,6 +3,7 @@ import type {
   AdminConfig, BulkMetaPatch, GlobalAdminConfig, GlobalAdminState, LockInfo,
   ManufacturingQueueItem, PartsManifest, PartMeta, ReleaseState, ManufacturingMethod
 } from '@shared/types'
+import ErrorMsg from './ErrorMsg'
 import ProfileSetup from './ProfileSetup'
 import PartsManager from './PartsManager'
 import ApprovalsPanel from './ApprovalsPanel'
@@ -1124,7 +1125,7 @@ export default function AdminPage({ hasProject, onClose, appVersion, gitName, gi
           </div>
         )}
 
-        {error && <div className="admin-error">{error}</div>}
+        {error && <ErrorMsg text={error} />}
         {status && <div className="admin-status">{status}</div>}
 
         </div>
@@ -1370,7 +1371,7 @@ function ExportQueueTab() {
         </div>
       </div>
 
-      {error && <div className="admin-error">{error}</div>}
+      {error && <ErrorMsg text={error} />}
       {status && <div className="admin-status">{status}</div>}
 
       {loading && items.length === 0 && <div className="mfg-queue-empty">Loading…</div>}

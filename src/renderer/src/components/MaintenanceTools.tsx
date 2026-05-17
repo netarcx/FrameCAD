@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ErrorMsg from './ErrorMsg'
 
 export default function MaintenanceTools() {
   const [integrity, setIntegrity] = useState<null | {
@@ -138,7 +139,7 @@ export default function MaintenanceTools() {
         </div>
       </div>
 
-      {error && <div className="admin-error">{error}</div>}
+      {error && <ErrorMsg text={error} />}
       {status && <div className="admin-status">{status}</div>}
     </>
   )

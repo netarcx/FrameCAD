@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { GitHubRepoSummary } from '@shared/types'
+import ErrorMsg from './ErrorMsg'
 
 interface Props {
   org: string
@@ -72,7 +73,7 @@ export default function BrowseProjects({ org, prefix, onPick, onClose }: Props) 
         />
 
         {loading && <div className="browse-empty">Loading projects from GitHub...</div>}
-        {error && <div className="admin-error">{error}</div>}
+        {error && <ErrorMsg text={error} />}
         {!loading && !error && visible.length === 0 && (
           <div className="browse-empty">
             {repos.length === 0

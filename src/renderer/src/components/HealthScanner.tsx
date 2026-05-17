@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ErrorMsg from './ErrorMsg'
 
 function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
@@ -85,7 +86,7 @@ export default function HealthScanner() {
           ))}
         </div>
       )}
-      {error && <div className="admin-error">{error}</div>}
+      {error && <ErrorMsg text={error} />}
     </div>
   )
 }
