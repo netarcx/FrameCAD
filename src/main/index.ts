@@ -93,6 +93,9 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 680,
     title: 'FrameCAD',
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, 'icon.png')
+      : path.join(__dirname, '../../build/icons/256x256.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
